@@ -1,0 +1,6 @@
+[[tool.mypy.overrides]]
+module = ["networkx.*"]
+ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["tensorflow.*"]
+ignore_missing_imports = true

@@ -1,10 +1,12 @@
 import setuptools
 
-with open("README.md", "r", encoding='utf-8') as readme_file:
+with open("README.md", "r", encoding="utf-8") as readme_file:
     long_description = readme_file.read()
 
-with open('requirements.txt', 'r', encoding='utf-8') as req_file:
-    requirements = [r.strip() for r in req_file.readlines()]
+with open("requirements.txt", "r", encoding="utf-8") as req_file:
+    # Temporarily remove requirements for faster development iteration on Kaggle.
+    # Kaggle has torch, but for some reason if it's here, it spends a lot of time installing it.
+    requirements = [] #[r.strip() for r in req_file.readlines()]
 
 setuptools.setup(
     name="cayleypy",
@@ -16,6 +18,10 @@ setuptools.setup(
     license="MIT",
     url="https://github.com/iKolt/cayleypy",
     packages=setuptools.find_packages(),
-    python_requires='>=3.10',
+    include_package_data=True,
+    package_data={
+        "cayleypy": ["data/*.csv"],
+    },
+    python_requires=">=3.10",
     install_requires=requirements,
 )
