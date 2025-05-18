@@ -19,6 +19,11 @@ This what we plan to support:
 * Library of datasets with solutions to some problems (e.g. growth functions like
   [here](https://www.kaggle.com/code/fedimser/bfs-for-binary-string-permutations)).
 
+## Usage
+
+See this demo [Kaggle notebook](https://www.kaggle.com/code/fedimser/cayleypy-demo) for examples
+on how this library can be used.
+
 ## Development
 
 To start development, run:
