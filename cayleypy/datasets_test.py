@@ -17,7 +17,7 @@ def test_lrx_cayley_growth():
     for key, layer_sizes in load_dataset("lrx_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(CayleyGraph(prepare_graph("lrx", n=n)[0]), layer_sizes)
+        _verify_layers_fast(CayleyGraph(prepare_graph("lrx", n=n).generators), layer_sizes)
 
 
 # TopSpin Cayley graphs contain all permutations for even n>=6, and half of all permutations for odd n>=7.
@@ -28,7 +28,7 @@ def test_top_spin_cayley_growth():
             assert sum(layer_sizes) == math.factorial(n)
         if n % 2 == 1 and n >= 7:
             assert sum(layer_sizes) == math.factorial(n) // 2
-        _verify_layers_fast(CayleyGraph(prepare_graph("top_spin", n=n)[0]), layer_sizes)
+        _verify_layers_fast(CayleyGraph(prepare_graph("top_spin", n=n).generators), layer_sizes)
 
 
 # Number of elements in coset graph for LRX and binary strings is binomial coefficient.
@@ -37,7 +37,7 @@ def test_lrx_coset_growth():
         n = len(initial_state)
         k = initial_state.count('1')
         assert sum(layer_sizes) == math.comb(n, k)
-        _verify_layers_fast(CayleyGraph(prepare_graph("lrx", n=n)[0], dest=initial_state), layer_sizes)
+        _verify_layers_fast(CayleyGraph(prepare_graph("lrx", n=n).generators, dest=initial_state), layer_sizes)
 
 
 # Number of elements in coset graph for TopSpin and binary strings is binomial coefficient, for n>=6.
@@ -47,4 +47,4 @@ def test_top_spin_coset_growth():
         k = initial_state.count('1')
         if n >= 6:
             assert sum(layer_sizes) == math.comb(n, k)
-        _verify_layers_fast(CayleyGraph(prepare_graph("top_spin", n=n)[0], dest=initial_state), layer_sizes)
+        _verify_layers_fast(CayleyGraph(prepare_graph("top_spin", n=n).generators, dest=initial_state), layer_sizes)

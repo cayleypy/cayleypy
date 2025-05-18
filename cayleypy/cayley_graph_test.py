@@ -20,7 +20,7 @@ def test_generators_format():
 
 
 def test_destination_format():
-    generators = prepare_graph("lrx", n=10)[0]
+    generators = prepare_graph("lrx", n=10).generators
     dest_list = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1]
     graph1 = CayleyGraph(generators, dest="0123012301")
     graph2 = CayleyGraph(generators, dest=dest_list)
@@ -41,7 +41,7 @@ def test_bfs_growth_swap():
 
 
 def test_bfs_lrx_coset_5():
-    graph = CayleyGraph(prepare_graph("lrx", n=5)[0], dest="01210")
+    graph = CayleyGraph(prepare_graph("lrx", n=5).generators, dest="01210")
     ans = graph.bfs()
     assert ans.bfs_completed
     assert ans.diameter() == 6
@@ -53,7 +53,7 @@ def test_bfs_lrx_coset_5():
 
 
 def test_bfs_lrx_coset_10():
-    graph = CayleyGraph(prepare_graph("lrx", n=10)[0], dest="0110110110")
+    graph = CayleyGraph(prepare_graph("lrx", n=10).generators, dest="0110110110")
     ans = graph.bfs()
     assert ans.diameter() == 17
     assert ans.layer_sizes == [1, 3, 4, 6, 11, 16, 19, 23, 31, 29, 20, 14, 10, 10, 6, 3, 3, 1]
@@ -65,21 +65,21 @@ def test_bfs_lrx_coset_10():
 
 
 def test_bfs_max_radius():
-    graph = CayleyGraph(prepare_graph("lrx", n=10)[0], dest="0110110110")
+    graph = CayleyGraph(prepare_graph("lrx", n=10).generators, dest="0110110110")
     ans = graph.bfs(max_diameter=5)
     assert not ans.bfs_completed
     assert ans.layer_sizes == [1, 3, 4, 6, 11, 16]
 
 
 def test_bfs_max_layer_size_to_explore():
-    graph = CayleyGraph(prepare_graph("lrx", n=10)[0], dest="0110110110")
+    graph = CayleyGraph(prepare_graph("lrx", n=10).generators, dest="0110110110")
     ans = graph.bfs(max_layer_size_to_explore=10)
     assert not ans.bfs_completed
     assert ans.layer_sizes == [1, 3, 4, 6, 11]
 
 
 def test_bfs_max_layer_size_to_store():
-    graph = CayleyGraph(prepare_graph("lrx", n=10)[0], dest="0110110110")
+    graph = CayleyGraph(prepare_graph("lrx", n=10).generators, dest="0110110110")
     ans = graph.bfs(max_layer_size_to_store=10)
     assert ans.bfs_completed
     assert ans.diameter() == 17
@@ -87,14 +87,14 @@ def test_bfs_max_layer_size_to_store():
 
 
 def test_bfs_start_state():
-    graph = CayleyGraph(prepare_graph("lrx", n=5)[0])
+    graph = prepare_graph("lrx", n=5)
     ans = graph.bfs(start_states=[0, 1, 2, 1, 0])
     assert ans.bfs_completed
     assert ans.layer_sizes == [1, 3, 5, 8, 7, 5, 1]
 
 
 def test_bfs_multiple_start_states():
-    graph = CayleyGraph(prepare_graph("lrx", n=5)[0])
+    graph = prepare_graph("lrx", n=5)
     ans = graph.bfs(start_states=[[0, 1, 2, 1, 0], [1, 0, 2, 0, 1], [0, 1, 1, 2, 0]])
     assert ans.bfs_completed
     assert ans.layer_sizes == [3, 9, 11, 6, 1]
@@ -104,26 +104,24 @@ def test_bfs_multiple_start_states():
 def test_bfs_lrx_n40_layers5(bit_encoding_width):
     # We need 6*40=240 bits for encoding, so each states is encoded by four int64's.
     n = 40
-    generators, dest = prepare_graph("lrx", n=n)
-    graph = CayleyGraph(generators, dest=dest, bit_encoding_width=bit_encoding_width)
+    graph = prepare_graph("lrx", n=n)
+    graph = CayleyGraph(graph.generators, dest=graph.destination_state, bit_encoding_width=bit_encoding_width)
     assert graph.bfs(max_diameter=5).layer_sizes == [1, 3, 6, 12, 24, 48]
 
 
 def test_bfs_last_layer_lrx_n8():
-    generators, dest = prepare_graph("lrx", n=8)
-    graph = CayleyGraph(generators, dest=dest)
+    graph = prepare_graph("lrx", n=8)
     assert graph.bfs().last_layer() == ["10765432"]
 
 
 def test_bfs_last_layer_lrx_coset_n8():
-    generators, _ = prepare_graph("lrx", n=8)
-    graph = CayleyGraph(generators, dest="01230123")
+    graph = CayleyGraph(prepare_graph("lrx", n=8).generators, dest="01230123")
     assert set(graph.bfs().last_layer()) == {"11003322", "22110033", "33221100", "00332211"}
 
 
 @pytest.mark.parametrize("bit_encoding_width", [None, 3, 10, 'auto'])
 def test_bfs_bit_encoding(bit_encoding_width):
-    generators, _ = prepare_graph("lrx", n=8)
+    generators = prepare_graph("lrx", n=8).generators
     result = CayleyGraph(generators, bit_encoding_width=bit_encoding_width).bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
@@ -131,20 +129,20 @@ def test_bfs_bit_encoding(bit_encoding_width):
 @pytest.mark.parametrize("bit_encoding_width", [None, 'auto'])
 @pytest.mark.parametrize("batch_size", [100, 1000, 10 ** 9])
 def test_bfs_batching(bit_encoding_width, batch_size: int):
-    generators, _ = prepare_graph("lrx", n=8)
+    generators = prepare_graph("lrx", n=8).generators
     result = CayleyGraph(generators, bit_encoding_width=bit_encoding_width, batch_size=batch_size).bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
 @pytest.mark.parametrize("hash_chunk_size", [100, 1000, 10 ** 9])
 def test_bfs_hash_chunking(hash_chunk_size: int):
-    generators, _ = prepare_graph("lrx", n=8)
+    generators = prepare_graph("lrx", n=8).generators
     result = CayleyGraph(generators, hash_chunk_size=hash_chunk_size).bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
 def test_free_memory():
-    generators, _ = prepare_graph("lrx", n=8)
+    generators = prepare_graph("lrx", n=8).generators
     result = CayleyGraph(generators, memory_limit_gb=0.0001).bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
@@ -174,13 +172,13 @@ def test_edges_list_n2():
 
 
 def test_edges_list_n3():
-    graph = CayleyGraph(prepare_graph("lrx", n=3)[0], dest="001")
+    graph = CayleyGraph(prepare_graph("lrx", n=3).generators, dest="001")
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
     assert result.named_undirected_edges() == {('001', '001'), ('001', '010'), ('001', '100'), ('010', '100')}
 
 
 def test_edges_list_n4():
-    graph = CayleyGraph(prepare_graph("top_spin", n=4)[0], dest="0011")
+    graph = CayleyGraph(prepare_graph("top_spin", n=4).generators, dest="0011")
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
     assert result.named_undirected_edges() == {
         ('0011', '0110'), ('0011', '1001'), ('0011', '1100'), ('0110', '0110'), ('0110', '1100'), ('1001', '1001'),
@@ -195,14 +193,14 @@ def test_generators_not_inverse_closed():
 
 
 def test_bfs_numpy():
-    graph = CayleyGraph(prepare_graph("lrx", n=7)[0])
+    graph = prepare_graph("lrx", n=7)
     assert graph.bfs_numpy() == load_dataset("lrx_cayley_growth")["7"]
 
-    graph = CayleyGraph(prepare_graph("top_spin", n=7)[0])
+    graph = prepare_graph("top_spin", n=7)
     assert graph.bfs_numpy() == load_dataset("top_spin_cayley_growth")["7"]
 
     dest = "000000000111111111"
-    graph = CayleyGraph(prepare_graph("top_spin", n=18)[0], dest=dest)
+    graph = CayleyGraph(prepare_graph("top_spin", n=18).generators, dest=dest)
     assert graph.bfs_numpy() == load_dataset("top_spin_coset_growth")[dest]
 
 
@@ -210,7 +208,7 @@ def test_bfs_numpy():
 def test_lrx_cayley_growth():
     expected = load_dataset("lrx_cayley_growth")
     for n in range(3, 10):
-        generators, _ = prepare_graph("lrx", n=int(n))
+        generators = prepare_graph("lrx", n=int(n)).generators
         graph = CayleyGraph(generators)
         result = graph.bfs()
         assert result.layer_sizes == expected[str(n)]
@@ -219,7 +217,7 @@ def test_lrx_cayley_growth():
 def test_top_spin_cayley_growth():
     expected = load_dataset("top_spin_cayley_growth")
     for n in range(4, 10):
-        generators, _ = prepare_graph("top_spin", n=int(n))
+        generators = prepare_graph("top_spin", n=int(n)).generators
         graph = CayleyGraph(generators)
         result = graph.bfs()
         assert result.layer_sizes == expected[str(n)]
@@ -230,7 +228,7 @@ def test_lrx_coset_growth():
     for initial_state in expected.keys():
         if len(initial_state) > 15:
             continue
-        generators, _ = prepare_graph("lrx", n=len(initial_state))
+        generators = prepare_graph("lrx", n=len(initial_state)).generators
         graph = CayleyGraph(generators, dest=initial_state)
         result = graph.bfs()
         assert result.layer_sizes == expected[initial_state]
@@ -241,7 +239,7 @@ def test_top_spin_coset_growth():
     for initial_state in expected.keys():
         if len(initial_state) > 15:
             continue
-        generators, _ = prepare_graph("top_spin", n=len(initial_state))
+        generators = prepare_graph("top_spin", n=len(initial_state)).generators
         graph = CayleyGraph(generators, dest=initial_state)
         result = graph.bfs()
         assert result.layer_sizes == expected[initial_state]
@@ -250,8 +248,7 @@ def test_top_spin_coset_growth():
 # To skip slower tests ike this, do `FAST=1 pytest`
 @pytest.mark.skipif(FAST_RUN, reason="slow test")
 def test_cube222_qtm():
-    generators, dest = prepare_graph("cube_2/2/2_6gensQTM")
-    graph = CayleyGraph(generators, dest=dest)
+    graph = prepare_graph("cube_2/2/2_6gensQTM")
     result = graph.bfs()
     assert result.num_vertices == 3674160
     assert result.diameter() == 14
@@ -261,12 +258,23 @@ def test_cube222_qtm():
 
 @pytest.mark.skipif(FAST_RUN, reason="slow test")
 def test_cube222_htm():
-    generators, dest = prepare_graph("cube_2/2/2_9gensHTM")
-    graph = CayleyGraph(generators, dest=dest)
+    graph = prepare_graph("cube_2/2/2_9gensHTM")
     result = graph.bfs()
     assert result.num_vertices == 3674160
     assert result.diameter() == 11
     assert result.layer_sizes == [1, 9, 54, 321, 1847, 9992, 50136, 227536, 870072, 1887748, 623800, 2644]
+
+
+def test_cube333_qtm():
+    graph = prepare_graph("cube_3/3/3_12gensQTM")
+    result = graph.bfs(max_diameter=5)
+    assert result.layer_sizes == [1, 12, 114, 1068, 10011, 93840]
+
+
+def test_cube333_htm():
+    graph = prepare_graph("cube_3/3/3_18gensHTM")
+    result = graph.bfs(max_diameter=4)
+    assert result.layer_sizes == [1, 18, 243, 3240, 43239]
 
 
 # Below is the benchmark code. To tun: `BENCHMARK=1 pytest . -k benchmark`

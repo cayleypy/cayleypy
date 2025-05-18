@@ -1,5 +1,5 @@
 """Library of pre-defined graphs."""
-
+from cayleypy import CayleyGraph
 from cayleypy.permutation_utils import compose_permutations
 
 CUBE222_ALLOWED_MOVES = {
@@ -11,8 +11,35 @@ CUBE222_ALLOWED_MOVES = {
     '-d0': [0, 1, 2, 3, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13, 18, 19, 16, 17, 6, 7, 21, 23, 20, 22]
 }
 
+CUBE333_ALLOWED_MOVES = {
+    'U': [6, 3, 0, 7, 4, 1, 8, 5, 2, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 47, 21, 22, 50, 24, 25, 53, 27, 28, 38,
+          30, 31, 41, 33, 34, 44, 36, 37, 20, 39, 40, 23, 42, 43, 26, 45, 46, 29, 48, 49, 32, 51, 52, 35],
+    'D': [0, 1, 2, 3, 4, 5, 6, 7, 8, 15, 12, 9, 16, 13, 10, 17, 14, 11, 36, 19, 20, 39, 22, 23, 42, 25, 26, 45, 28, 29,
+          48, 31, 32, 51, 34, 35, 27, 37, 38, 30, 40, 41, 33, 43, 44, 18, 46, 47, 21, 49, 50, 24, 52, 53],
+    'L': [44, 43, 42, 3, 4, 5, 6, 7, 8, 45, 46, 47, 12, 13, 14, 15, 16, 17, 24, 21, 18, 25, 22, 19, 26, 23, 20, 27, 28,
+          29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 11, 10, 9, 0, 1, 2, 48, 49, 50, 51, 52, 53],
+    'R': [0, 1, 2, 3, 4, 5, 51, 52, 53, 9, 10, 11, 12, 13, 14, 38, 37, 36, 18, 19, 20, 21, 22, 23, 24, 25, 26, 33, 30,
+          27, 34, 31, 28, 35, 32, 29, 8, 7, 6, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 15, 16, 17],
+    'B': [0, 1, 35, 3, 4, 34, 6, 7, 33, 20, 10, 11, 19, 13, 14, 18, 16, 17, 2, 5, 8, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+          30, 31, 32, 9, 12, 15, 42, 39, 36, 43, 40, 37, 44, 41, 38, 45, 46, 47, 48, 49, 50, 51, 52, 53],
+    'F': [24, 1, 2, 25, 4, 5, 26, 7, 8, 9, 10, 27, 12, 13, 28, 15, 16, 29, 18, 19, 20, 21, 22, 23, 17, 14, 11, 6, 3, 0,
+          30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 51, 48, 45, 52, 49, 46, 53, 50, 47],
+    "U'": [2, 5, 8, 1, 4, 7, 0, 3, 6, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 38, 21, 22, 41, 24, 25, 44, 27, 28, 47,
+           30, 31, 50, 33, 34, 53, 36, 37, 29, 39, 40, 32, 42, 43, 35, 45, 46, 20, 48, 49, 23, 51, 52, 26],
+    "D'": [0, 1, 2, 3, 4, 5, 6, 7, 8, 11, 14, 17, 10, 13, 16, 9, 12, 15, 45, 19, 20, 48, 22, 23, 51, 25, 26, 36, 28, 29,
+           39, 31, 32, 42, 34, 35, 18, 37, 38, 21, 40, 41, 24, 43, 44, 27, 46, 47, 30, 49, 50, 33, 52, 53],
+    "L'": [45, 46, 47, 3, 4, 5, 6, 7, 8, 44, 43, 42, 12, 13, 14, 15, 16, 17, 20, 23, 26, 19, 22, 25, 18, 21, 24, 27, 28,
+           29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 2, 1, 0, 9, 10, 11, 48, 49, 50, 51, 52, 53],
+    "R'": [0, 1, 2, 3, 4, 5, 38, 37, 36, 9, 10, 11, 12, 13, 14, 51, 52, 53, 18, 19, 20, 21, 22, 23, 24, 25, 26, 29, 32,
+           35, 28, 31, 34, 27, 30, 33, 17, 16, 15, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 6, 7, 8],
+    "B'": [0, 1, 18, 3, 4, 19, 6, 7, 20, 33, 10, 11, 34, 13, 14, 35, 16, 17, 15, 12, 9, 21, 22, 23, 24, 25, 26, 27, 28,
+           29, 30, 31, 32, 8, 5, 2, 38, 41, 44, 37, 40, 43, 36, 39, 42, 45, 46, 47, 48, 49, 50, 51, 52, 53],
+    "F'": [29, 1, 2, 28, 4, 5, 27, 7, 8, 9, 10, 26, 12, 13, 25, 15, 16, 24, 18, 19, 20, 21, 22, 23, 0, 3, 6, 11, 14, 17,
+           30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 47, 50, 53, 46, 49, 52, 45, 48, 51],
+}
 
-def prepare_graph(name, n=0) -> tuple[list[list[int]], list[int]]:
+
+def prepare_graph(name, n=0) -> CayleyGraph:
     """Returns pre-defined Cayley or Schreier coset graph (defined by generators and destination state).
 
     Supported graphs:
@@ -21,6 +48,8 @@ def prepare_graph(name, n=0) -> tuple[list[list[int]], list[int]]:
       * "cube_2/2/2_6gensQTM" - Schreier coset graph for 2x2x2 Rubik's cube with fixed back left upper corner and only
           quarter-turns allowed. There are 6 generators (front, right, down face - clockwise and counterclockwise).
       * "cube_2/2/2_9gensHTM" - same as above, but using half turn metrics (i.e. it has 9 generators).
+      * "cube_3/3/3_12gensQTM" - Schreier coset graph for 3x3x3 Rubik's cube with fixed central pieces and only
+          quarter-turns allowed. There are 12 generators (clockwise and counterclockwise for reach face).
 
     :param name: name of pre-defined graph.
     :param n: parameter (if applicable).
@@ -29,19 +58,28 @@ def prepare_graph(name, n=0) -> tuple[list[list[int]], list[int]]:
     if name == "lrx":
         assert n >= 3
         generators = [list(range(1, n)) + [0], [n - 1] + list(range(0, n - 1)), [1, 0] + list(range(2, n))]
-        return generators, list(range(n))
+        return CayleyGraph(generators, dest=list(range(n)))
     elif name == "top_spin":
         assert n >= 4
         generators = [list(range(1, n)) + [0], [n - 1] + list(range(0, n - 1)), [3, 2, 1, 0] + list(range(4, n))]
-        return generators, list(range(n))
+        return CayleyGraph(generators, dest=list(range(n)))
     elif name == "cube_2/2/2_6gensQTM":
         initial_state = [color for color in range(6) for _ in range(4)]
-        return list(CUBE222_ALLOWED_MOVES.values()), initial_state
+        return CayleyGraph(list(CUBE222_ALLOWED_MOVES.values()), dest=initial_state)
     elif name == "cube_2/2/2_9gensHTM":
         generators = list(CUBE222_ALLOWED_MOVES.values())
         for move_id in ['f0', 'r1', 'd0']:
             generators.append(compose_permutations(CUBE222_ALLOWED_MOVES[move_id], CUBE222_ALLOWED_MOVES[move_id]))
         initial_state = [color for color in range(6) for _ in range(4)]
-        return list(generators), initial_state
+        return CayleyGraph(generators, dest=initial_state)
+    elif name == "cube_3/3/3_12gensQTM":
+        initial_state = [color for color in range(6) for _ in range(9)]
+        return CayleyGraph(list(CUBE333_ALLOWED_MOVES.values()), dest=initial_state)
+    elif name == "cube_3/3/3_18gensHTM":
+        generators = list(CUBE333_ALLOWED_MOVES.values())
+        for move_id in ['U', 'D', 'L', 'R', 'B', 'F']:
+            generators.append(compose_permutations(CUBE333_ALLOWED_MOVES[move_id], CUBE333_ALLOWED_MOVES[move_id]))
+        initial_state = [color for color in range(6) for _ in range(9)]
+        return CayleyGraph(generators, dest=initial_state)
     else:
         raise ValueError(f"Unknown generator set: {name}")
