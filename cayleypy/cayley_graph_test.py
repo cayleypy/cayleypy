@@ -1,3 +1,4 @@
+import math
 import os
 
 import numpy as np
@@ -276,14 +277,20 @@ def test_cube333_htm():
     result = graph.bfs(max_diameter=4)
     assert result.layer_sizes == [1, 18, 243, 3240, 43239]
 
+
+def test_all_transpositions():
+    graph = prepare_graph("all_transpositions", n=10)
+    result = graph.bfs()
+    assert result.layer_sizes == [1, 45, 870, 9450, 63273, 269325, 723680, 1172700, 1026576, 362880]
+    assert result.num_vertices == math.factorial(10)
+
+
 def test_generator_names():
-    graph = CayleyGraph([[1,2,3,0], [0,2,1,3]])
+    graph = CayleyGraph([[1, 2, 3, 0], [0, 2, 1, 3]])
     assert graph.generator_names == ["1,2,3,0", "0,2,1,3"]
 
     graph = prepare_graph("lrx", n=4)
     assert graph.generator_names == ["L", "R", "X"]
-
-
 
 
 # Below is the benchmark code. To tun: `BENCHMARK=1 pytest . -k benchmark`
