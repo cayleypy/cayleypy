@@ -72,8 +72,8 @@ class BfsResult:
         vn = self.vertex_names
         return {tuple(sorted([vn[i1], vn[i2]])) for i1, i2 in self.edges_list}  # type: ignore
 
-    def incidence_matrix(self) -> np.ndarray:
-        """Return incidence matrix as a dense NumPy array."""
+    def adjacency_matrix(self) -> np.ndarray:
+        """Return adjacency matrix as a dense NumPy array."""
         ans = np.zeros((self.num_vertices, self.num_vertices), dtype=np.int8)
         for i1, i2 in self.edges_list:
             ans[i1, i2] = 1
