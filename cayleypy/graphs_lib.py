@@ -1,6 +1,6 @@
 """Library of pre-defined graphs."""
 from cayleypy import CayleyGraph
-from cayleypy.permutation_utils import compose_permutations
+from cayleypy.permutation_utils import compose_permutations, apply_permutation
 
 CUBE222_ALLOWED_MOVES = {
     'f0': [0, 1, 19, 17, 6, 4, 7, 5, 2, 9, 3, 11, 12, 13, 14, 15, 16, 20, 18, 21, 10, 8, 22, 23],
@@ -59,28 +59,37 @@ def prepare_graph(name, n=0) -> CayleyGraph:
     if name == "lrx":
         assert n >= 3
         generators = [list(range(1, n)) + [0], [n - 1] + list(range(0, n - 1)), [1, 0] + list(range(2, n))]
-        return CayleyGraph(generators, dest=list(range(n)))
+        generator_names = ["L", "R", "X"]
+        return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
     elif name == "top_spin":
         assert n >= 4
         generators = [list(range(1, n)) + [0], [n - 1] + list(range(0, n - 1)), [3, 2, 1, 0] + list(range(4, n))]
         return CayleyGraph(generators, dest=list(range(n)))
     elif name == "cube_2/2/2_6gensQTM":
+        generator_names = list(CUBE222_ALLOWED_MOVES.keys())
+        generators = [CUBE222_ALLOWED_MOVES[k] for k in generator_names]
         initial_state = [color for color in range(6) for _ in range(4)]
-        return CayleyGraph(list(CUBE222_ALLOWED_MOVES.values()), dest=initial_state)
+        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "cube_2/2/2_9gensHTM":
-        generators = list(CUBE222_ALLOWED_MOVES.values())
+        generator_names = list(CUBE222_ALLOWED_MOVES.keys())
+        generators = [CUBE222_ALLOWED_MOVES[k] for k in generator_names]
         for move_id in ['f0', 'r1', 'd0']:
             generators.append(compose_permutations(CUBE222_ALLOWED_MOVES[move_id], CUBE222_ALLOWED_MOVES[move_id]))
+            generator_names.append(move_id + "^2")
         initial_state = [color for color in range(6) for _ in range(4)]
-        return CayleyGraph(generators, dest=initial_state)
+        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "cube_3/3/3_12gensQTM":
+        generator_names = list(CUBE333_ALLOWED_MOVES.keys())
+        generators = [CUBE333_ALLOWED_MOVES[k] for k in generator_names]
         initial_state = [color for color in range(6) for _ in range(9)]
-        return CayleyGraph(list(CUBE333_ALLOWED_MOVES.values()), dest=initial_state)
+        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "cube_3/3/3_18gensHTM":
-        generators = list(CUBE333_ALLOWED_MOVES.values())
+        generator_names = list(CUBE333_ALLOWED_MOVES.keys())
+        generators = [CUBE333_ALLOWED_MOVES[k] for k in generator_names]
         for move_id in ['U', 'D', 'L', 'R', 'B', 'F']:
             generators.append(compose_permutations(CUBE333_ALLOWED_MOVES[move_id], CUBE333_ALLOWED_MOVES[move_id]))
+            generator_names.append(move_id + "^2")
         initial_state = [color for color in range(6) for _ in range(9)]
-        return CayleyGraph(generators, dest=initial_state)
+        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     else:
         raise ValueError(f"Unknown generator set: {name}")

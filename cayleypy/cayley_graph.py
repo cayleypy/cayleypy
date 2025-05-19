@@ -35,6 +35,7 @@ class CayleyGraph:
             self,
             generators: list[list[int]] | torch.Tensor | np.ndarray,
             *,
+            generator_names: list[str] | None = None,
             dest: list[int] | torch.Tensor | np.ndarray | str | None = None,
             device: str = "auto",
             random_seed: Optional[int] = None,
@@ -46,6 +47,7 @@ class CayleyGraph:
         """Initializes CayleyGraph.
 
         :param generators: List of generating permutations of size n.
+        :param generators: Names of the generators (optional).
         :param dest: List of n numbers between 0 and n-1, the destination state.
                  If None, defaults to the identity permutation of size n.
         :param device: one of ['auto','cpu','cuda'] - PyTorch device to store all tensors.
@@ -115,6 +117,12 @@ class CayleyGraph:
             encoded_state_size = self.string_encoder.encoded_length
 
         self.hasher = StateHasher(encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
+
+        # Prepare generator names.
+        if generator_names is not None:
+            self.generator_names = generator_names
+        else:
+            self.generator_names = [",".join(str(int(i)) for i in g) for g in self.generators]
 
     def get_unique_states(self,
                           states: torch.Tensor,
