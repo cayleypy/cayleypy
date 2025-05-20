@@ -1,9 +1,15 @@
+import typing
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
 
 import numpy as np
 import torch
+
+from cayleypy.permutation_utils import apply_permutation
+
+if typing.TYPE_CHECKING:
+    from cayleypy import CayleyGraph
 
 
 @dataclass(frozen=True)
@@ -24,6 +30,9 @@ class BfsResult:
     # List of edges (if requested).
     # Tensor of shape (num_edges, 2) where vertices are represented by their hashes.
     edges_list_hashes: Optional[torch.Tensor]
+
+    # Reference to CayleyGraph on which BFS was run. Needed if we want to restore edge names.
+    graph: Optional["CayleyGraph"]
 
     def diameter(self):
         """Maximal distance from any start vertex to any other vertex."""
@@ -89,7 +98,21 @@ class BfsResult:
             ans += self.get_layer(layer_id)
         return ans
 
-    def to_networkx_graph(self, directed=False):
+    @cached_property
+    def all_states(self) -> torch.Tensor:
+        """Explicit states, ordered by index."""
+        return torch.vstack([self.layers[i] for i in range(len(self.layer_sizes))])
+
+    def get_edge_name(self, i1: int, i2: int) -> str:
+        """Returns name for generator used to go from vertex i1 to vertex i2."""
+        state_before = list(map(int, self.all_states[i1]))
+        state_after = list(map(int, self.all_states[i2]))
+        for i in range(self.graph.n_generators):
+            if apply_permutation(self.graph.generators[i], state_before) == state_after:
+                return self.graph.generator_names[i]
+        assert False, "Edge not found."
+
+    def to_networkx_graph(self, directed=False, with_labels=True):
         """Returns explicit graph as networkx.Graph or networkx.DiGraph."""
         import networkx  # So we don't need to depend on this library in requirements.
         vertex_names = self.vertex_names
@@ -97,5 +120,6 @@ class BfsResult:
         for name in vertex_names:
             ans.add_node(name)
         for i1, i2 in self.edges_list:
-            ans.add_edge(vertex_names[i1], vertex_names[i2])
+            label = self.get_edge_name(i1, i2) if with_labels else None
+            ans.add_edge(vertex_names[i1], vertex_names[i2], label=label)
         return ans

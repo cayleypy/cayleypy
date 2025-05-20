@@ -291,7 +291,8 @@ class CayleyGraph:
             layers=layers,
             bfs_completed=full_graph_explored,
             vertices_hashes=vertices_hashes,
-            edges_list_hashes=edges_list_hashes)
+            edges_list_hashes=edges_list_hashes,
+            graph=self)
 
     @functools.cache
     def to_networkx_graph(self):

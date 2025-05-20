@@ -56,6 +56,8 @@ def test_full_reversals_cayley_growth():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
         _verify_layers_fast(CayleyGraph(prepare_graph("full_reversals", n=n).generators), layer_sizes)
+        assert len(layer_sizes) == n  # Graph diameter is n-1.
+        assert layer_sizes[-1] == math.factorial(n - 1)  # Size of last layer is (n-1)!.
 
 
 # Number of elements in coset graph for LRX and binary strings is binomial coefficient.
