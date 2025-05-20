@@ -66,6 +66,14 @@ def _compute_top_spin_cayley_growth(n: str) -> list[int]:
     return prepare_graph("lrx", n=int(n)).bfs().layer_sizes
 
 
+def _compute_all_transpositions_cayley_growth(n: str) -> list[int]:
+    return prepare_graph("all_transpositions", n=int(n)).bfs().layer_sizes
+
+
+def _compute_pancake_cayley_growth(n: str) -> list[int]:
+    return prepare_graph("pancake", n=int(n)).bfs().layer_sizes
+
+
 def generate_datasets():
     """Generates datasets for small n, keeping existing values."""
     keys = []
@@ -76,7 +84,11 @@ def generate_datasets():
     keys = [key for key in keys if len(key) >= 4]
     _update_dataset("top_spin_coset_growth", keys, _compute_top_spin_coset_growth)
 
-    keys = [str(n) for n in range(2, 12)]
+    keys = [str(n) for n in range(3, 12)]
     _update_dataset("lrx_cayley_growth", keys, _compute_lrx_cayley_growth)
     keys = [str(n) for n in range(4, 12)]
     _update_dataset("top_spin_cayley_growth", keys, _compute_top_spin_cayley_growth)
+    keys = [str(n) for n in range(2, 11)]
+    _update_dataset("all_transpositions_cayley_growth", keys, _compute_all_transpositions_cayley_growth)
+    keys = [str(n) for n in range(2, 12)]
+    _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
