@@ -32,7 +32,7 @@ class BfsResult:
     edges_list_hashes: Optional[torch.Tensor]
 
     # Reference to CayleyGraph on which BFS was run. Needed if we want to restore edge names.
-    graph: Optional["CayleyGraph"]
+    graph: "CayleyGraph"
 
     def diameter(self):
         """Maximal distance from any start vertex to any other vertex."""
