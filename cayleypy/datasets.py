@@ -74,6 +74,10 @@ def _compute_pancake_cayley_growth(n: str) -> list[int]:
     return prepare_graph("pancake", n=int(n)).bfs().layer_sizes
 
 
+def _compute_full_reversals_cayley_growth(n: str) -> list[int]:
+    return prepare_graph("full_reversals", n=int(n)).bfs().layer_sizes
+
+
 def generate_datasets():
     """Generates datasets for small n, keeping existing values."""
     keys = []
@@ -90,5 +94,5 @@ def generate_datasets():
     _update_dataset("top_spin_cayley_growth", keys, _compute_top_spin_cayley_growth)
     keys = [str(n) for n in range(2, 11)]
     _update_dataset("all_transpositions_cayley_growth", keys, _compute_all_transpositions_cayley_growth)
-    keys = [str(n) for n in range(2, 12)]
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
+    _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)

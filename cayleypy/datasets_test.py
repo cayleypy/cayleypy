@@ -51,6 +51,13 @@ def test_pancake_cayley_growth():
         _verify_layers_fast(CayleyGraph(prepare_graph("pancake", n=n).generators), layer_sizes)
 
 
+def test_full_reversals_cayley_growth():
+    for key, layer_sizes in load_dataset("full_reversals_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        _verify_layers_fast(CayleyGraph(prepare_graph("full_reversals", n=n).generators), layer_sizes)
+
+
 # Number of elements in coset graph for LRX and binary strings is binomial coefficient.
 def test_lrx_coset_growth():
     for initial_state, layer_sizes in load_dataset("lrx_coset_growth").items():
