@@ -101,10 +101,12 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
     assert is_permutation(graph.destination_state), "This version of BFS works only for permutations."
     perms = graph.generators
     enc = graph.string_encoder
+    assert enc is not None
     perm_funcs = [enc.implement_permutation_1d(p) for p in perms]
     perm_funcs = [numba.jit("i8[:](i8[:])")(f) for f in perm_funcs]
-    encode_perm = lambda p: sum(p[i] << (4 * i) for i in range(N))
-    decode_perm = lambda p: [(int(p >> (4 * i)) & 15) for i in range(N)]
+
+    def encode_perm(p):
+        return sum(p[i] << (4 * i) for i in range(N))
 
     estimated_memory_gb = (math.factorial(N) * 3 / 8) / (2 ** 30)
     print(f"Estimated memory usage: {estimated_memory_gb:.02}GB.")
@@ -209,8 +211,7 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
 
     class CaleyGraphChunkedBfs:
         def __init__(self):
-            self.chunks = [VertexChunk(prefix) for prefix in
-                            itertools.permutations(range(N), r=N - R)]
+            self.chunks = [VertexChunk(prefix) for prefix in itertools.permutations(range(N), r=N - R)]
             self.chunk_map = {c.encoded_suffix: c for c in self.chunks}
             assert len(self.chunks) == chunks_num
 

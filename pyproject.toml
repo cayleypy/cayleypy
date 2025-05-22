@@ -4,3 +4,6 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["tensorflow.*"]
 ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["numba.*"]
+ignore_missing_imports = true

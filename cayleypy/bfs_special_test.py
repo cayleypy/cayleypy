@@ -30,5 +30,3 @@ def test_bfs_bitmask_lrx_10():
 def test_bfs_bitmask_pancake_9():
     graph = prepare_graph("pancake", n=9)
     assert bfs_bitmask(graph) == load_dataset("pancake_cayley_growth")["9"]
-
-
