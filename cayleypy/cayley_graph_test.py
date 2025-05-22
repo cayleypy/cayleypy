@@ -198,9 +198,6 @@ def test_generators_not_inverse_closed():
         graph.bfs()
 
 
-
-
-
 # Tests below compare growth function for small graphs with stored pre-computed results.
 def test_lrx_cayley_growth():
     expected = load_dataset("lrx_cayley_growth")
@@ -274,10 +271,11 @@ def test_cube333_htm():
     assert result.layer_sizes == [1, 18, 243, 3240, 43239]
 
 
-def test_all_transpositions():
+@pytest.mark.skipif(FAST_RUN, reason="slow test")
+def test_all_transpositions_10():
     graph = prepare_graph("all_transpositions", n=10)
     result = graph.bfs()
-    assert result.layer_sizes == [1, 45, 870, 9450, 63273, 269325, 723680, 1172700, 1026576, 362880]
+    assert result.layer_sizes == load_dataset("lrx_cayley_growth")["10"]
     assert result.num_vertices == math.factorial(10)
 
 

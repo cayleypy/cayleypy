@@ -17,3 +17,7 @@ def inverse_permutation(p: Sequence[int]) -> list[int]:
     for i in range(n):
         ans[p[i]] = i
     return ans
+
+
+def is_permutation(p):
+    return sorted(list(p)) == list(range(len(p)))
