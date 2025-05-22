@@ -86,6 +86,11 @@ def test_bfs_max_layer_size_to_store():
     assert ans.diameter() == 17
     assert ans.layers.keys() == {0, 1, 2, 3, 12, 13, 14, 15, 16, 17}
 
+    ans = graph.bfs(max_layer_size_to_store=None)
+    assert ans.bfs_completed
+    assert ans.diameter() == 17
+    assert ans.layers.keys() == set(range(18))
+
 
 def test_bfs_start_state():
     graph = prepare_graph("lrx", n=5)
