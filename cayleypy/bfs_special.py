@@ -76,7 +76,7 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
     """
     R = 8  # Chunk prefix size.
     N = len(graph.destination_state)
-    assert N > R, f"This algorithm works only for N>={R}."
+    assert N > R, f"This algorithm works only for N>{R}."
 
     graph_size = math.factorial(N)
     chunk_size = math.factorial(R)
