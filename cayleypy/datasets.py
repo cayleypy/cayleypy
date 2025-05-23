@@ -63,7 +63,7 @@ def _compute_lrx_cayley_growth(n: str) -> list[int]:
 
 
 def _compute_top_spin_cayley_growth(n: str) -> list[int]:
-    return prepare_graph("lrx", n=int(n)).bfs().layer_sizes
+    return prepare_graph("top_spin", n=int(n)).bfs().layer_sizes
 
 
 def _compute_all_transpositions_cayley_growth(n: str) -> list[int]:

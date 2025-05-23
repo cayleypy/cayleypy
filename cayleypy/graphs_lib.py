@@ -87,8 +87,7 @@ def prepare_graph(name, n=0) -> CayleyGraph:
         generator_names = []
         for i in range(n):
             for j in range(i + 1, n):
-                perm = list(range(n))
-                perm[i], perm[j] = j, i
+                perm = list(range(i)) + list(range(j, i - 1, -1)) + list(range(j + 1, n))
                 generators.append(perm)
                 generator_names.append(f"R[{i}..{j}]")
         return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
