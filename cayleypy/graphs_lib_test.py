@@ -26,7 +26,7 @@ def test_full_reversals():
     assert graph.n_generators == 6
     assert graph.generator_names == ["R[0..1]", "R[0..2]", "R[0..3]", "R[1..2]", "R[1..3]", "R[2..3]"]
     assert torch.equal(graph.generators, torch.tensor([
-        [1, 0, 2, 3], [2, 1, 0, 3], [3, 1, 2, 0], [0, 2, 1, 3], [0, 3, 2, 1], [0, 1, 3, 2]
+        [1, 0, 2, 3], [2, 1, 0, 3], [3, 2, 1, 0], [0, 2, 1, 3], [0, 3, 2, 1], [0, 1, 3, 2]
     ]))
 
 
