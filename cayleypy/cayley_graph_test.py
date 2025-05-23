@@ -198,18 +198,6 @@ def test_generators_not_inverse_closed():
         graph.bfs()
 
 
-def test_bfs_numpy():
-    graph = prepare_graph("lrx", n=7)
-    assert graph.bfs_numpy() == load_dataset("lrx_cayley_growth")["7"]
-
-    graph = prepare_graph("top_spin", n=7)
-    assert graph.bfs_numpy() == load_dataset("top_spin_cayley_growth")["7"]
-
-    dest = "000000000111111111"
-    graph = CayleyGraph(prepare_graph("top_spin", n=18).generators, dest=dest)
-    assert graph.bfs_numpy() == load_dataset("top_spin_coset_growth")[dest]
-
-
 # Tests below compare growth function for small graphs with stored pre-computed results.
 def test_lrx_cayley_growth():
     expected = load_dataset("lrx_cayley_growth")
@@ -283,7 +271,7 @@ def test_cube333_htm():
     assert result.layer_sizes == [1, 18, 243, 3240, 43239]
 
 
-def test_all_transpositions():
+def test_all_transpositions_8():
     graph = prepare_graph("all_transpositions", n=8)
     result = graph.bfs()
     assert result.layer_sizes == load_dataset("all_transpositions_cayley_growth")["8"]

@@ -1,2 +1,3 @@
+numba
 numpy
 torch
