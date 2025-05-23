@@ -66,8 +66,18 @@ def _compute_top_spin_cayley_growth(n: str) -> list[int]:
     return prepare_graph("top_spin", n=int(n)).bfs().layer_sizes
 
 
+@functools.cache
+def _stirling(n, k):
+    """Computes unsigned Stirling number of the first kind."""
+    if n == k == 0: return 1
+    if n == 0 or k == 0: return 0
+    return (n - 1) * _stirling(n - 1, k) + _stirling(n - 1, k - 1)
+
+
 def _compute_all_transpositions_cayley_growth(n: str) -> list[int]:
-    return prepare_graph("all_transpositions", n=int(n)).bfs().layer_sizes
+    # Growth function is given by Stirling numbers, see https://oeis.org/A094638.
+    n = int(n)
+    return [_stirling(n, n + 1 - k) for k in range(1, n + 1)]
 
 
 def _compute_pancake_cayley_growth(n: str) -> list[int]:
@@ -92,7 +102,8 @@ def generate_datasets():
     _update_dataset("lrx_cayley_growth", keys, _compute_lrx_cayley_growth)
     keys = [str(n) for n in range(4, 12)]
     _update_dataset("top_spin_cayley_growth", keys, _compute_top_spin_cayley_growth)
-    keys = [str(n) for n in range(2, 11)]
+    keys = [str(n) for n in range(2, 31)]
     _update_dataset("all_transpositions_cayley_growth", keys, _compute_all_transpositions_cayley_growth)
+    keys = [str(n) for n in range(2, 11)]
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)

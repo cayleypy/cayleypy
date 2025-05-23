@@ -286,8 +286,7 @@ def test_cube333_htm():
 def test_all_transpositions():
     graph = prepare_graph("all_transpositions", n=10)
     result = graph.bfs()
-    assert result.layer_sizes == [1, 45, 870, 9450, 63273, 269325, 723680, 1172700, 1026576, 362880]
-    assert result.num_vertices == math.factorial(10)
+    assert result.layer_sizes == load_dataset("lrx_cayley_growth")["10"]
 
 
 def test_generator_names():
