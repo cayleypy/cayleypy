@@ -110,7 +110,7 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
         return sum(p[i] << (4 * i) for i in range(N))
 
     estimated_memory_gb = (math.factorial(N) * 3 / 8) / (2 ** 30)
-    print(f"Estimated memory usage: {estimated_memory_gb:.02}GB.")
+    print(f"Estimated memory usage: {estimated_memory_gb:.02f}GB.")
 
     # Credit: https://nimrod.blog/posts/algorithms-behind-popcount/
     @numba.jit("i8(u8[:])")
