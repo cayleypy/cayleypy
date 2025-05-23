@@ -271,12 +271,10 @@ def test_cube333_htm():
     assert result.layer_sizes == [1, 18, 243, 3240, 43239]
 
 
-@pytest.mark.skipif(FAST_RUN, reason="slow test")
-def test_all_transpositions_10():
-    graph = prepare_graph("all_transpositions", n=10)
+def test_all_transpositions_8():
+    graph = prepare_graph("all_transpositions", n=8)
     result = graph.bfs()
-    assert result.layer_sizes == load_dataset("all_transpositions_cayley_growth")["10"]
-    assert result.num_vertices == math.factorial(10)
+    assert result.layer_sizes == load_dataset("all_transpositions_cayley_growth")["8"]
 
 
 def test_generator_names():

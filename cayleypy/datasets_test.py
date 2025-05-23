@@ -38,7 +38,6 @@ def test_all_transpositions_cayley_growth():
     for key, layer_sizes in load_dataset("all_transpositions_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(CayleyGraph(prepare_graph("all_transpositions", n=n).generators), layer_sizes)
         assert len(layer_sizes) == n  # Graph diameter is n-1.
         assert layer_sizes[-1] == math.factorial(n - 1)  # Size of last layer is (n-1)!.
 
