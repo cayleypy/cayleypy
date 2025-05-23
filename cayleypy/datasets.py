@@ -69,14 +69,16 @@ def _compute_top_spin_cayley_growth(n: str) -> list[int]:
 @functools.cache
 def _stirling(n, k):
     """Computes unsigned Stirling number of the first kind."""
-    if n == k == 0: return 1
-    if n == 0 or k == 0: return 0
+    if n == k == 0:
+        return 1
+    if n == 0 or k == 0:
+        return 0
     return (n - 1) * _stirling(n - 1, k) + _stirling(n - 1, k - 1)
 
 
-def _compute_all_transpositions_cayley_growth(n: str) -> list[int]:
+def _compute_all_transpositions_cayley_growth(n_str: str) -> list[int]:
     # Growth function is given by Stirling numbers, see https://oeis.org/A094638.
-    n = int(n)
+    n = int(n_str)
     return [_stirling(n, n + 1 - k) for k in range(1, n + 1)]
 
 
