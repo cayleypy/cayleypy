@@ -104,7 +104,7 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
     enc = graph.string_encoder
     assert enc is not None
     perm_funcs = [enc.implement_permutation_1d(p) for p in perms]
-    perm_funcs = [numba.jit("i8[:](i8[:])")(f) for f in perm_funcs]
+    perm_funcs = [numba.njit("i8[:](i8[:])")(f) for f in perm_funcs]
 
     def encode_perm(p):
         return sum(p[i] << (4 * i) for i in range(N))
@@ -113,7 +113,7 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
     print(f"Estimated memory usage: {estimated_memory_gb:.02f}GB.")
 
     # Credit: https://nimrod.blog/posts/algorithms-behind-popcount/
-    @numba.jit("i8(u8[:])")
+    @numba.njit("i8(u8[:])")
     def _bit_count(x):
         ans = 0
         for i in range(len(x)):
@@ -125,14 +125,14 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
         return ans
 
     # Ignores suffix.
-    @numba.jit("i8(i8,i8[:])", inline="always")
+    @numba.njit("i8(i8,i8[:])", inline="always")
     def permutation_to_rank(p, chunk_map2):
         encoded_prefix = 0
         for i in range(R):
             encoded_prefix |= chunk_map2[(p >> (4 * i)) & 15] << (THREE * i)
         return prefix_map2[encoded_prefix]
 
-    @numba.jit("i8(i8,i8[:])", inline="always")
+    @numba.njit("i8(i8,i8[:])", inline="always")
     def rank_to_permutation(rank, chunk_map1):
         encoded_prefix = prefix_map1[rank]
         ans = 0
@@ -140,7 +140,7 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
             ans |= chunk_map1[(encoded_prefix >> (THREE * i)) & THREE_MASK] << (4 * i)
         return ans
 
-    @numba.jit("(i8[:],u8[:],i8[:])")
+    @numba.njit("(i8[:],u8[:],i8[:])")
     def _materialize_permutations(ans, black, map1):
         ctr = 0
         for i1 in range(chunk_size // 64):
@@ -154,11 +154,11 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
                     ctr += 1
         assert ctr == len(ans)
 
-    @numba.jit("u8(u8)", inline="always")
+    @numba.njit("u8(u8)", inline="always")
     def pow2(x):
         return 1 << x
 
-    @numba.jit("(i8[:],u8[:],i8[:])", inline="always")
+    @numba.njit("(i8[:],u8[:],i8[:])", inline="always")
     def _paint_gray(perms, gray, map2):
         for i in range(len(perms)):
             perm = perms[i]
