@@ -297,6 +297,12 @@ def test_generator_names():
     assert graph.generator_names == ["L", "R", "X"]
 
 
+def test_bfs_small_hash_chunk_size():
+    graph = prepare_graph("lrx", n=20)
+    graph = CayleyGraph(graph.generators, hash_chunk_size=100)
+    assert graph.bfs(max_diameter=8).layer_sizes == [1, 3, 6, 12, 24, 48, 91, 172, 325]
+
+
 # Below is the benchmark code. To tun: `BENCHMARK=1 pytest . -k benchmark`
 @pytest.mark.skipif(not BENCHMARK_RUN, reason="benchmark")
 @pytest.mark.parametrize("benchmark_mode", ["baseline", "bit_encoded", "bfs_numpy"])
