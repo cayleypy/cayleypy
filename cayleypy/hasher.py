@@ -34,12 +34,12 @@ class StateHasher:
         if states.shape[0] <= self.chunk_size:
             return (states @ self.vec_hasher).reshape(-1)
         else:
-            parts = int(math.ceil(self.chunk_size / states.shape[0]))
-            return torch.hstack([z @ self.vec_hasher for z in torch.tensor_split(states, parts)]).reshape(-1)
+            parts = int(math.ceil(states.shape[0] / self.chunk_size))
+            return torch.vstack([z @ self.vec_hasher for z in torch.tensor_split(states, parts)]).reshape(-1)
 
     def _make_hashes_older_gpu(self, states: torch.Tensor) -> torch.Tensor:
         if states.shape[0] <= self.chunk_size:
             return torch.sum(states * self.vec_hasher, dim=1)
         else:
-            parts = int(math.ceil(self.chunk_size / states.shape[0]))
+            parts = int(math.ceil(states.shape[0] / self.chunk_size))
             return torch.hstack([torch.sum(z * self.vec_hasher, dim=1) for z in torch.tensor_split(states, parts)])
