@@ -5,6 +5,12 @@ import os
 FAST_RUN = os.getenv("FAST") == "1"
 
 
+def test_bfs_bitmask_lrx_10_first_5_layers():
+    graph = prepare_graph("lrx", n=10)
+    result = bfs_bitmask(graph, max_diameter=5)
+    assert result == load_dataset("lrx_cayley_growth")["10"][:6]
+
+
 @pytest.mark.skipif(FAST_RUN, reason="slow test")
 def test_bfs_bitmask_lrx_10():
     graph = prepare_graph("lrx", n=10)
