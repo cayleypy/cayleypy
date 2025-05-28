@@ -109,8 +109,9 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
     def encode_perm(p):
         return sum(p[i] << (4 * i) for i in range(N))
 
-    estimated_memory_gb = (math.factorial(N) * 3 / 8) / (2 ** 30)
-    print(f"Estimated memory usage: {estimated_memory_gb:.02f}GB.")
+    if graph.verbose >= 2:
+        estimated_memory_gb = (math.factorial(N) * 3 / 8) / (2 ** 30)
+        print(f"Estimated memory usage: {estimated_memory_gb:.02f}GB.")
 
     # Credit: https://nimrod.blog/posts/algorithms-behind-popcount/
     @numba.njit("i8(u8[:])")
@@ -259,7 +260,8 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
                 if layer_size == 0:
                     break
                 layer_sizes.append(layer_size)
-                print(f"Layer {i} - size {layer_size}.")
+                if graph.verbose >= 2:
+                    print(f"Layer {i} - size {layer_size}.")
             return layer_sizes
 
     return CaleyGraphChunkedBfs().bfs()
