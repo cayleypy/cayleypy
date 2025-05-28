@@ -45,10 +45,13 @@ def test_all_transpositions_cayley_growth():
 def test_pancake_cayley_growth():
     # See https://oeis.org/A058986
     oeis_a058986 = [None, 0, 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 22]
+    # See https://oeis.org/A067607
+    oeis_a067607 = [None, 1, 1, 1, 3, 20, 2, 35, 455, 5804, 73232, 6, 167, 2001, 24974, 339220, 4646117, 65758725]
     for key, layer_sizes in load_dataset("pancake_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
         assert len(layer_sizes) - 1 == oeis_a058986[n]
+        assert layer_sizes[-1] == oeis_a067607[n]
         _verify_layers_fast(CayleyGraph(prepare_graph("pancake", n=n).generators), layer_sizes)
 
 
