@@ -221,7 +221,7 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
             if len(perms) == 1:
                 self.chunk_map[perms[0] & suffix_mask].paint_gray(perms)
                 return
-            perms = np.sort(perms)
+            perms = np.unique(perms)
             keys = perms & suffix_mask
             group_starts = np.where(np.roll(keys, 1) != keys)[0]
             for i in range(len(group_starts) - 1):
