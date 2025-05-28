@@ -104,7 +104,7 @@ def bfs_bitmask(graph: CayleyGraph) -> list[int]:
     enc = graph.string_encoder
     assert enc is not None
     perm_funcs = [enc.implement_permutation_1d(p) for p in perms]
-    perm_funcs = [numba.vectorize("i8(i8)")(f) for f in perm_funcs]
+    perm_funcs = [numba.njit("i8[:](i8[:])")(f) for f in perm_funcs]
 
     def encode_perm(p):
         return sum(p[i] << (4 * i) for i in range(N))
