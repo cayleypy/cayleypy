@@ -57,20 +57,20 @@ class StringEncoder:
             orig[:, i // w] |= ((encoded[:, i // cl] >> (i % cl)) & 1) << (i % w)
         return orig
 
-    def prepare_shift_to_mask(self, p: list[int]):
+    def prepare_shift_to_mask(self, p: list[int]) -> dict[tuple[int, int, int], int]:
         assert len(p) == self.n
-        shift_to_mask: dict[tuple[int, int, int], np.int64] = dict()
+        shift_to_mask: dict[tuple[int, int, int], int] = dict()
         for i in range(self.n):
             for j in range(self.w):
-                start_bit = p[i] * self.w + j
+                start_bit = int(p[i] * self.w + j)
                 end_bit = i * self.w + j
                 start_cw_id = start_bit // CODEWORD_LENGTH
                 end_cw_id = end_bit // CODEWORD_LENGTH
                 shift = (end_bit % CODEWORD_LENGTH) - (start_bit % CODEWORD_LENGTH)
                 key = (start_cw_id, end_cw_id, shift)
                 if key not in shift_to_mask:
-                    shift_to_mask[key] = np.int64(0)
-                shift_to_mask[key] |= (np.int64(1) << (start_bit % CODEWORD_LENGTH))
+                    shift_to_mask[key] = 0
+                shift_to_mask[key] |= (1 << (start_bit % CODEWORD_LENGTH))
         return shift_to_mask
 
     def implement_permutation(self, p: list[int]) -> Callable[[torch.Tensor, torch.Tensor], None]:
