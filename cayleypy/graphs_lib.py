@@ -91,7 +91,7 @@ def prepare_graph(name, n=0) -> CayleyGraph:
             perm = list(range(n+prefix_len,n-1,-1)) + list(range(prefix_len+1,n,1)) + \
             list(range(prefix_len,-1,-1)) + list(range(n+prefix_len+1,2*n,1))
             generators.append(perm)
-            generator_names.append("R" + str(prefix_len))
+            generator_names.append("R" + str(prefix_len+1))
         return CayleyGraph(generators, dest=list(range(2*n)), generator_names=generator_names)
     elif name == "full_reversals":
         assert n >= 2
