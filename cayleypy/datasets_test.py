@@ -82,3 +82,11 @@ def test_top_spin_coset_growth():
         if n >= 6:
             assert sum(layer_sizes) == math.comb(n, k)
         _verify_layers_fast(CayleyGraph(prepare_graph("top_spin", n=n).generators, dest=initial_state), layer_sizes)
+
+
+def test_coxeter_cayley_growth():
+    for key, layer_sizes in load_dataset("coxeter_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        _verify_layers_fast(CayleyGraph(prepare_graph("coxeter", n=n).generators), layer_sizes)
+        assert len(layer_sizes) - 1 == n * (n - 1) // 2
