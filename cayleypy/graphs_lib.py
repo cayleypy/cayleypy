@@ -161,8 +161,47 @@ def generate_cube_permutations_oneline(n: int):
     sorted_moves = collections.OrderedDict(sorted(moves.items(), key=lambda t: move_names_ordered.index(t[0])))
     return dict(sorted_moves)
 
+def help_cyclic(start_pos, finish_pos, N):
+    lst = []
+    for i in range(start_pos):
+        lst.append(i)
+    for i in range(start_pos, finish_pos+1):
+        lst.append((i+1) if i != finish_pos else start_pos)
+    for i in range(finish_pos+1, N):
+        lst.append(i)
+    return lst
 
-def prepare_graph(name, n=0) -> CayleyGraph:
+
+def globe_gens(A, B):
+    gens = {}
+    x_count = 2 * B
+    y_count = A + 1
+    N = 2 * (A + 1) * B
+    for r_count in range(y_count):
+        gens[f'r{r_count}'] = help_cyclic(r_count * x_count, (r_count + 1) * x_count - 1, N)
+
+    total_A = y_count - 1
+    for f_count in range(x_count):
+        lst = list(range(N))
+
+        for i in range(y_count // 2):
+            block1 = []
+            block2 = []
+            for k in range(B):
+                idx1 = i * x_count + (f_count + k) % x_count
+                block1.append(idx1)
+                idx2 = (total_A - i) * x_count + (f_count + k) % x_count
+                block2.append(idx2)
+            for k in range(B):
+                idx1 = block1[k]
+                idx2 = block2[B - 1 - k]
+                lst[idx1], lst[idx2] = lst[idx2], lst[idx1]
+        gens[f'f{f_count}'] = lst
+
+    return gens
+
+
+def prepare_graph(name, **kwargs) -> CayleyGraph:
     """Returns pre-defined Cayley or Schreier coset graph.
 
     Supported graphs:
@@ -184,12 +223,29 @@ def prepare_graph(name, n=0) -> CayleyGraph:
       * "cube_n/n/n_gensQSTM" - QSTM(short for Quarter Slice Turn Metric),
           is a move count metric for the 3x3x3 in which any clockwise or counterclockwise 90-degree turn of any layer counts as one turn,
           and rotations do not count as moves.
-      
+      * "globeA/B" - Globe puzzle group, A + 1 cycle and 2B order 2 generators
 
     :param name: name of pre-defined graph.
     :param n: parameter (if applicable).
     :return: requested graph as `CayleyGraph`.
     """
+    PARAM_REQUIREMENTS = {
+        "all_transpositions": ["n"],
+        "pancake": ["n"],
+        "full_reversals": ["n"],
+        "lrx": ["n"],
+        "top_spin": ["n"],
+        "cube_n/n/n_gensQSTM": ["n"],
+        "globeA/B": ["A", "B"],
+        
+    }
+    required_params = PARAM_REQUIREMENTS.get(name, [])
+    for param in required_params:
+        if param not in kwargs:
+            raise ValueError(f"Parameter '{param}' is required for graph type '{name}'")
+    params = {k: v for k, v in kwargs.items() if k in required_params}
+    locals().update(params)
+    
     if name == "all_transpositions":
         assert n >= 2
         generators = []
@@ -266,6 +322,19 @@ def prepare_graph(name, n=0) -> CayleyGraph:
         generators = [list(map(int, i.split())) for i  in list(generate_cube_permutations_oneline(n).values())]
         generator_names = list(generate_cube_permutations_oneline(n).keys())
         initial_state = list(range(6*n**2))
+        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+    elif name == "cube_n/n/n_gensQSTM":
+        assert n >= 2
+        generators = [list(map(int, i.split())) for i  in list(generate_cube_permutations_oneline(n).values())]
+        generator_names = list(generate_cube_permutations_oneline(n).keys())
+        initial_state = list(range(6*n**2))
+        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+    elif name == "globeA/B":
+        assert A >= 1
+        assert B >= 1
+        generators = list(globe_gens(A, B).values())
+        generator_names = list(globe_gens(A, B).keys())
+        initial_state = list(range(2*B*(A+1)))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     else:
         raise ValueError(f"Unknown generator set: {name}")
