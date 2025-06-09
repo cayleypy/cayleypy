@@ -265,7 +265,7 @@ def prepare_graph(name, n=0) -> CayleyGraph:
         generator_names = [f"({i},{i+1})" for i in range(n-1)]
         initial_state = list(range(n))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
-    elif name == "cube_n/n/n_gensQSTM"
+    elif name == "cube_n/n/n_gensQSTM":
         assert n >= 2
         generators = list(generate_cube_permutations_oneline(n).values())
         generator_names = list(generate_cube_permutations_oneline(n).keys())
