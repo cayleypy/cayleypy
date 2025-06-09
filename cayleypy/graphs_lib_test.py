@@ -39,7 +39,7 @@ def test_cube333():
 
 def test_cube_nnn_qstm():
     graph = prepare_graph("cube_n/n/n_gensQSTM", 2)
-    assert graph.n_generators = 6
+    assert graph.n_generators == 6
     assert graph.generator_names == ["f0", "f1", "r0", "r1", "d0", "d1"]
     assert torch.equal(graph.generators, torch.tensor([
         [0, 1, 19, 17, 6, 4, 7, 5, 2, 9, 3, 11, 12, 13, 14, 15, 16, 20, 18, 21, 10, 8, 22, 23],
@@ -50,7 +50,7 @@ def test_cube_nnn_qstm():
         [1, 3, 0, 2, 16, 17, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13, 18, 19, 20, 21, 22, 23]
     ]))
     graph = prepare_graph("cube_n/n/n_gensQSTM", 3)
-    assert graph.n_generators = 9
+    assert graph.n_generators == 9
     assert graph.generator_names == ["f0", "f1", "f2", "r0", "r1", "r2", "d0", "d1", "d2"]
     assert torch.equal(graph.generators, torch.tensor([
         [0, 1, 2, 3, 4, 5, 44, 41, 38, 15, 12, 9, 16, 13, 10, 17, 14, 11, 6, 19, 20, 7, 22, 23, 8, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 45, 39, 40, 46, 42, 43, 47, 24, 21, 18, 48, 49, 50, 51, 52, 53],
