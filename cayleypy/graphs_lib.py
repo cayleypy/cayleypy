@@ -47,6 +47,8 @@ def _create_coxeter_generators(n: int) -> list[list[int]]:
         gens.append(perm)
     return gens
 
+import collections
+
 def generate_cube_permutations_oneline(n: int):
     """
     Generates permutations for the basic moves of the n x n x n Rubik's cube.
@@ -58,6 +60,9 @@ def generate_cube_permutations_oneline(n: int):
       A dictionary where keys are the names of the moves (e.g. 'f0', 'r1')
       and values ​​are strings representing the permutations in single-line notation.
     """
+    if n < 2:
+        print("Wrong n")
+        return
 
     faces = ['U', 'F', 'R', 'B', 'L', 'D']
     face_map = {name: i for i, name in enumerate(faces)}
@@ -86,16 +91,12 @@ def generate_cube_permutations_oneline(n: int):
                 if len(cycle) > 1:
                     cycles.append(tuple(cycle))
         return cycles
-
-    moves = dict()
+    moves = collections.OrderedDict()
     move_names_ordered = [f'{move_type}{i}' for move_type in ['f', 'r', 'd'] for i in range(n)]
-
     for move_name in move_names_ordered:
         move_type = move_name[0]
         s = int(move_name[1:])
-
         all_cycles = []
-
         if move_type == 'f':
             for k in range(n):
                 cycle = (
@@ -105,7 +106,6 @@ def generate_cube_permutations_oneline(n: int):
                     get_sticker_index('L', n - 1 - k, n - 1 - s)
                 )
                 all_cycles.append(cycle[::-1])
-
         elif move_type == 'r':
             side_cycles = []
             for k in range(n):
@@ -115,14 +115,12 @@ def generate_cube_permutations_oneline(n: int):
                 s4 = get_sticker_index('B', n - 1 - k, n - 1 - s)
                 side_cycles.append((s1, s2, s3, s4))
             all_cycles.extend(side_cycles)
-
             if s == n - 1:
                 face_cycles_cw = rotate_face_cw('R')
                 all_cycles.extend([c[::-1] for c in face_cycles_cw])
             if s == 0:
                 face_cycles_cw = rotate_face_cw('L')
                 all_cycles.extend(face_cycles_cw)
-
         elif move_type == 'd':
             for k in range(n):
                 cycle = (
@@ -132,7 +130,6 @@ def generate_cube_permutations_oneline(n: int):
                     get_sticker_index('R', n - 1 - s, k)
                 )
                 all_cycles.append(cycle)
-
         face_to_rotate = None
         if move_type == 'f' and s == 0: face_to_rotate = 'F'
         if move_type == 'f' and s == n - 1: face_to_rotate = 'B'
@@ -157,13 +154,12 @@ def generate_cube_permutations_oneline(n: int):
             if len(cycle) < 2: continue
             for i in range(len(cycle)):
                 p[cycle[i]] = cycle[(i + 1) % len(cycle)]
-
         output_move_name = move_name
         if move_type == 'r':
             output_move_name = f'r{n-1-s}'
-
         moves[output_move_name] = ' '.join(map(str, p))
-    return moves
+    sorted_moves = collections.OrderedDict(sorted(moves.items(), key=lambda t: move_names_ordered.index(t[0])))
+    return dict(sorted_moves)
 
 
 def prepare_graph(name, n=0) -> CayleyGraph:
