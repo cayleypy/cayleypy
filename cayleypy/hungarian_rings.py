@@ -84,3 +84,20 @@ def hungarian_rings_permutations(left_size: int, left_index: int,
 
     return left_rotation, right_rotation
 
+def hungarian_rings_generators(ring_size):
+    """
+    Generators are similar to those used in the santa_2023 competition.
+    The rings are the same size and intersect at one third(one fourth in santa). Indexes are shifted by 1.
+    """
+    if ring_size <= 3:
+        raise ValueError(f"ring_size must be greater than 3. ring_size:{ring_size}")
+
+    left_index = ring_size // 3 # the rings intersect with one third
+    right_index = left_index + 1
+    forth_l, forth_r = hungarian_rings_permutations(left_size=ring_size, left_index=left_index,
+                                                    right_size=ring_size, right_index=right_index)
+    back_l, back_r = hungarian_rings_permutations(left_size=ring_size, left_index=left_index,
+                                                  right_size=ring_size, right_index=right_index, step=-1)
+    generators = [forth_l, forth_r, back_l, back_r]
+    generator_names = ["L", "R", "-L", "-R"]
+    return generators, generator_names

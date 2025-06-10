@@ -94,6 +94,10 @@ def _compute_coxeter_cayley_growth(n: str) -> list[int]:
     return prepare_graph("coxeter", n=int(n)).bfs().layer_sizes
 
 
+def _compute_hungarian_rings_growth(n: str) -> list[int]:
+    return prepare_graph("hungarian_rings", n=int(n)).bfs().layer_sizes
+
+
 def generate_datasets():
     """Generates datasets for small n, keeping existing values."""
     keys = []
@@ -113,3 +117,5 @@ def generate_datasets():
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
     _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
+    keys = [str(n) for n in range(4, 8)]
+    _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
