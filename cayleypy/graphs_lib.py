@@ -316,6 +316,7 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
         initial_state = [color for color in range(6) for _ in range(9)]
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "coxeter":
+        n = params['n']
         assert n >= 2
         generators = _create_coxeter_generators(n)
         generator_names = [f"({i},{i+1})" for i in range(n-1)]
