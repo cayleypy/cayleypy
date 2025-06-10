@@ -331,7 +331,8 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
         initial_state = list(range(6*n**2))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "globeA/B":
-        A, B = params['globeA/B']
+        A = params['A']
+        B = params['B']
         assert A >= 1
         assert B >= 1
         generators = list(globe_gens(A, B).values())
