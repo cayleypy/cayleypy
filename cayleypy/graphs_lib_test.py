@@ -93,7 +93,8 @@ def test_cubic_pancake():
             [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 12, 13, 14]
         ]
     ))
-    
+
+
 def test_full_reversals():
     graph = prepare_graph("full_reversals", n=4)
     assert graph.n_generators == 6
