@@ -96,6 +96,10 @@ def _compute_coxeter_cayley_growth(n: str) -> list[int]:
 def _compute_qstm_ncubes_cayley_growth(n: str) -> list[int]:
     return prepare_graph("cube_n/n/n_gensQSTM", n=int(n)).bfs().layer_sizes
 
+def _compute_globe_cayley_growth(arg_s: str) -> list[int]:
+    A, B = map(int, arg_s.split(','))
+    return prepare_graph("globeA/B", A=A, B=B).bfs().layer_sizes
+
 
 def generate_datasets():
     """Generates datasets for small n, keeping existing values."""
@@ -117,4 +121,6 @@ def generate_datasets():
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
     _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     keys = ["2"]
-    _update_dataset("cube_nnn_qstm", keys, _compute_qstm_ncubes_cayley_growth)
+    _update_dataset("cube_nnn_qstm_cayley_growth", keys, _compute_qstm_ncubes_cayley_growth)
+    keys = ["1,2", "2,3", "4,4", "3,5"]
+    _update_dataset("globeAB_cayley_growth", keys, _compute_globe_cayley_growth)
