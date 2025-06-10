@@ -38,7 +38,7 @@ def test_cube333():
     assert graph.n_generators == 18
 
 def test_cube_nnn_qstm():
-    graph = prepare_graph("cube_n/n/n_gensQSTM", 2)
+    graph = prepare_graph("cube_n/n/n_gensQSTM", n=2)
     assert graph.n_generators == 6
     assert graph.generator_names == ['f0', 'f1', 'r0', 'r1', 'd0', 'd1']
     assert torch.equal(graph.generators, torch.tensor([
@@ -49,7 +49,7 @@ def test_cube_nnn_qstm():
         [0, 1, 2, 3, 4, 5, 18, 19, 8, 9, 6, 7, 12, 13, 10, 11, 16, 17, 14, 15, 22, 20, 23, 21],
         [1, 3, 0, 2, 16, 17, 6, 7, 4, 5, 10, 11, 8, 9, 14, 15, 12, 13, 18, 19, 20, 21, 22, 23]
     ]))
-    graph = prepare_graph("cube_n/n/n_gensQSTM", 3)
+    graph = prepare_graph("cube_n/n/n_gensQSTM", n=3)
     assert graph.n_generators == 9
     assert graph.generator_names == ["f0", "f1", "f2", "r0", "r1", "r2", "d0", "d1", "d2"]
     assert torch.equal(graph.generators, torch.tensor([
@@ -65,7 +65,7 @@ def test_cube_nnn_qstm():
     ]))
 
 def test_globeAB():
-    graph = prepare_graph("globeA/B", 3, 4)
+    graph = prepare_graph("globeA/B", A=3, B=4)
     assert graph.n_generators == 12
     assert graph.generator_names == ["r0", "r1", "r2", "r3", "f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7"]
     assert torch.equal(graph.generators, torch.tensor([
