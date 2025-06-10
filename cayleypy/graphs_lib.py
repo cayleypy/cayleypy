@@ -235,6 +235,7 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
         "full_reversals": ["n"],
         "lrx": ["n"],
         "top_spin": ["n"],
+        "coxeter": ["n"],
         "cube_n/n/n_gensQSTM": ["n"],
         "globeA/B": ["A", "B"],
         
