@@ -242,11 +242,11 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
     required_params = PARAM_REQUIREMENTS.get(name, [])
     for param in required_params:
         if param not in kwargs:
-            raise ValueError(f"Parameter '{param}' is required for graph type '{name}'")
+            raise ValueError(f"Параметр '{param}' обязателен для графа типа '{name}'")
     params = {k: v for k, v in kwargs.items() if k in required_params}
-    locals().update(params)
     
     if name == "all_transpositions":
+        n = params['n']
         assert n >= 2
         generators = []
         generator_names = []
@@ -258,6 +258,7 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
                 generator_names.append(f"({i},{j})")
         return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
     elif name == "pancake":
+        n = params['n']
         assert n >= 2
         generators = []
         generator_names = []
@@ -267,6 +268,7 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
             generator_names.append("R" + str(prefix_len - 1))
         return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
     elif name == "full_reversals":
+        n = params['n']
         assert n >= 2
         generators = []
         generator_names = []
@@ -277,11 +279,13 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
                 generator_names.append(f"R[{i}..{j}]")
         return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
     elif name == "lrx":
+        n = params['n']
         assert n >= 3
         generators = [list(range(1, n)) + [0], [n - 1] + list(range(0, n - 1)), [1, 0] + list(range(2, n))]
         generator_names = ["L", "R", "X"]
         return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
     elif name == "top_spin":
+        n = params['n']
         assert n >= 4
         generators = [list(range(1, n)) + [0], [n - 1] + list(range(0, n - 1)), [3, 2, 1, 0] + list(range(4, n))]
         return CayleyGraph(generators, dest=list(range(n)))
@@ -318,18 +322,14 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
         initial_state = list(range(n))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "cube_n/n/n_gensQSTM":
-        assert n >= 2
-        generators = [list(map(int, i.split())) for i  in list(generate_cube_permutations_oneline(n).values())]
-        generator_names = list(generate_cube_permutations_oneline(n).keys())
-        initial_state = list(range(6*n**2))
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
-    elif name == "cube_n/n/n_gensQSTM":
+        n = params['n']
         assert n >= 2
         generators = [list(map(int, i.split())) for i  in list(generate_cube_permutations_oneline(n).values())]
         generator_names = list(generate_cube_permutations_oneline(n).keys())
         initial_state = list(range(6*n**2))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "globeA/B":
+        A, B = params['globeA/B']
         assert A >= 1
         assert B >= 1
         generators = list(globe_gens(A, B).values())
