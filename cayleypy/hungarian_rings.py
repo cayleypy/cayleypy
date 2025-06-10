@@ -42,10 +42,12 @@ def hungarian_rings_permutations(left_size: int, left_index: int,
     Creates permutations for left and right ring rotation. Rotation is clockwise with a positive step.
     Args:
         left_size: number of elements in the left ring
-        left_index: Index of the second intersection on the left ring. Taken counterclockwise from the first intersection. If there is only one intersection, the value is zero
+        left_index: Index of the second intersection on the left ring.
+            Taken counterclockwise from the first intersection. If there is only one intersection, the value is zero
         right_size: number of elements in the right ring
         right_index: Index of the second intersection on the right ring. Taken clockwise from the first intersection.
-        step: Rotation value in a clockwise direction. If the value is negative, the rotation is in the opposite direction.
+        step: Rotation value in a clockwise direction.
+            If the value is negative, the rotation is in the opposite direction.
     Returns:
         left_rotation: permutations for left ring rotation
         right_rotation: permutations for right ring rotation
@@ -58,7 +60,8 @@ def hungarian_rings_permutations(left_size: int, left_index: int,
 
     if left_size <= left_index or right_size <= right_index:
         raise ValueError(
-            f"Ring size is too small. left_size:{left_size} right_size:{right_size} left_index:{left_index} right_index:{right_index}")
+            f"Ring size is too small. left_size:{left_size} right_size:{right_size} " +
+            f"left_index:{left_index} right_index:{right_index}")
 
     intersections = _get_intersections(left_index=left_index, right_index=right_index)
     full_size = left_size + right_size - intersections
@@ -84,6 +87,7 @@ def hungarian_rings_permutations(left_size: int, left_index: int,
 
     return left_rotation, right_rotation
 
+
 def hungarian_rings_generators(ring_size):
     """
     Generators are similar to those used in the santa_2023 competition.
@@ -92,7 +96,7 @@ def hungarian_rings_generators(ring_size):
     if ring_size <= 3:
         raise ValueError(f"ring_size must be greater than 3. ring_size:{ring_size}")
 
-    left_index = ring_size // 3 # the rings intersect with one third
+    left_index = ring_size // 3  # the rings intersect with one third
     right_index = left_index + 1
     forth_l, forth_r = hungarian_rings_permutations(left_size=ring_size, left_index=left_index,
                                                     right_size=ring_size, right_index=right_index)
