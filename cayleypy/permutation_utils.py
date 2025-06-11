@@ -14,10 +14,10 @@ def compose_permutations(p1: Sequence[int], p2: Sequence[int]) -> list[int]:
 
 def inverse_permutation(p: Sequence[int]) -> list[int]:
     n = len(p)
-    ans = [0] * n
+    ANS = [0] * n
     for i in range(n):
-        ans[p[i]] = i
-    return ans
+        ANS[p[i]] = i
+    return ANS
 
 
 def is_permutation(p):
