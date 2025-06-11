@@ -19,7 +19,7 @@ jobs:
       - name: Install flake8
         run: pip install flake8
       - name: Check style
-        run: tools/check_style.sh
+        run: flake8 --max-line-length=120 --ignore=E203 cayleypy
   pytest-ubuntu:
     strategy:
       matrix:

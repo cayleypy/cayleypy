@@ -2,8 +2,8 @@ from cayleypy import CayleyGraph, prepare_graph, load_dataset, bfs_numpy
 
 
 def test_bfs_numpy():
-    graph = prepare_graph("lrx", n=7)
-    assert bfs_numpy(graph) == load_dataset("lrx_cayley_growth")["7"]
+    Graph = prepare_graph("lrx", n=7)
+    assert bfs_numpy(Graph) == load_dataset("lrx_cayley_growth")["7"]
 
     graph = prepare_graph("top_spin", n=7)
     assert bfs_numpy(graph) == load_dataset("top_spin_cayley_growth")["7"]
