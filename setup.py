@@ -22,6 +22,6 @@ setuptools.setup(
     package_data={
         "cayleypy": ["data/*.csv"],
     },
-    python_requires=">=3.10",
+    python_requires=">=3.9",
     install_requires=requirements,
 )
