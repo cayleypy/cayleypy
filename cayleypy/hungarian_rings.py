@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 
 
 def _circular_shift(items: List, step: int) -> List:
@@ -37,7 +37,7 @@ def _create_right_ring(left_size: int, left_index: int,
 
 def hungarian_rings_permutations(left_size: int, left_index: int,
                                  right_size: int, right_index: int,
-                                 step: int = 1):
+                                 step: int = 1) -> Tuple[List[int], List[int]]:
     """
     Creates permutations for left and right ring rotation. Rotation is clockwise with a positive step.
     Args:
@@ -88,7 +88,7 @@ def hungarian_rings_permutations(left_size: int, left_index: int,
     return left_rotation, right_rotation
 
 
-def hungarian_rings_generators(ring_size):
+def hungarian_rings_generators(ring_size: int):
     """
     Generators are similar to those used in the santa_2023 competition.
     The rings are the same size and intersect at one third(one fourth in santa). Indexes are shifted by 1.

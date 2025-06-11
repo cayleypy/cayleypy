@@ -147,9 +147,10 @@ def prepare_graph(name, n=0) -> CayleyGraph:
         initial_state = list(range(n))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "hungarian_rings":
-        assert n >= 4
-        generators, generator_names = hungarian_rings_generators(ring_size=n)
-        initial_state = list(range(0, n*2 - 2))
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+        assert n % 2 == 0
+        ring_size = (n + 2)//2
+        assert ring_size >= 4
+        generators, generator_names = hungarian_rings_generators(ring_size=ring_size)
+        return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
     else:
         raise ValueError(f"Unknown generator set: {name}")
