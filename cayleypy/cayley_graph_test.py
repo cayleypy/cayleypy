@@ -129,7 +129,11 @@ def test_bfs_lrx_n40_layers5(bit_encoding_width):
     # We need 6*40=240 bits for encoding, so each states is encoded by four int64's.
     n = 40
     graph = prepare_graph("lrx", n=n)
-    graph = CayleyGraph(graph.generators, dest=graph.destination_state, bit_encoding_width=bit_encoding_width)
+    graph = CayleyGraph(
+        graph.generators,
+        dest=graph.destination_state,
+        bit_encoding_width=bit_encoding_width,
+    )
     assert graph.bfs(max_diameter=5).layer_sizes == [1, 3, 6, 12, 24, 48]
 
 
@@ -140,7 +144,12 @@ def test_bfs_last_layer_lrx_n8():
 
 def test_bfs_last_layer_lrx_coset_n8():
     graph = CayleyGraph(prepare_graph("lrx", n=8).generators, dest="01230123")
-    assert set(graph.bfs().last_layer()) == {"11003322", "22110033", "33221100", "00332211"}
+    assert set(graph.bfs().last_layer()) == {
+        "11003322",
+        "22110033",
+        "33221100",
+        "00332211",
+    }
 
 
 @pytest.mark.parametrize("bit_encoding_width", [None, 3, 10, "auto"])
@@ -318,20 +327,7 @@ def test_cube222_htm():
     result = graph.bfs()
     assert result.num_vertices == 3674160
     assert result.diameter() == 11
-    assert result.layer_sizes == [
-        1,
-        9,
-        54,
-        321,
-        1847,
-        9992,
-        50136,
-        227536,
-        870072,
-        1887748,
-        623800,
-        2644,
-    ]
+    assert result.layer_sizes == [1, 9, 54, 321, 1847, 9992, 50136, 227536, 870072, 1887748, 623800, 2644]
 
 
 def test_cube333_qtm():
