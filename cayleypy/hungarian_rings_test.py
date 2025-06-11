@@ -1,3 +1,5 @@
+import itertools
+
 import pytest
 import os
 
@@ -113,11 +115,6 @@ def test_hr_permutations_value_errors(left_size, left_index, right_size, right_i
                                  step=step)
 
 
-# @pytest.mark.parametrize("left_size", range(2, 6))
-# @pytest.mark.parametrize("left_index", range(1, 5))
-# @pytest.mark.parametrize("right_size", range(2, 6))
-# @pytest.mark.parametrize("right_index", range(1, 5))
-# @pytest.mark.parametrize("step", range(-7, 8))
 @pytest.mark.parametrize("left_size, left_index, right_size, right_index, step", [
     (6, 3, 6, 2, 2),
     (6, 1, 5, 2, -7),
@@ -139,3 +136,24 @@ def test_hr_permutations_compensation(left_size: int, left_index: int, right_siz
     assert len(l_permutations) == len(r_permutations) == full_size
     assert compose_permutations(l_permutations, l_counter_perm) == list(range(full_size))
     assert compose_permutations(r_permutations, r_counter_perm) == list(range(full_size))
+
+
+@pytest.mark.skipif(FAST_RUN, reason="slow test")
+def test_hr_permutations_compensation_bf():
+    parameters = [range(2, 6), range(1, 5), range(2, 6), range(1, 5), range(-7, 8)]
+    for left_size, left_index, right_size, right_index, step in list(itertools.product(*parameters)):
+        if left_index >= left_size or right_index >= right_size:
+            continue
+        l_permutations, r_permutations = hungarian_rings_permutations(left_size=left_size, left_index=left_index,
+                                                                      right_size=right_size, right_index=right_index,
+                                                                      step=step)
+        intersections = _get_intersections(left_index=left_index, right_index=right_index)
+        full_size = left_size + right_size - intersections
+
+        l_counter_perm, r_counter_perm = hungarian_rings_permutations(left_size=left_size, left_index=left_index,
+                                                                      right_size=right_size, right_index=right_index,
+                                                                      step=-step)
+
+        assert len(l_permutations) == len(r_permutations) == full_size
+        assert compose_permutations(l_permutations, l_counter_perm) == list(range(full_size))
+        assert compose_permutations(r_permutations, r_counter_perm) == list(range(full_size))
