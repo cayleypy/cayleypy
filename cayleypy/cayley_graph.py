@@ -1,8 +1,7 @@
 import functools
 import gc
 import math
-import time
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 import numpy as np
 import torch
@@ -33,10 +32,10 @@ class CayleyGraph:
 
     def __init__(
             self,
-            generators: list[list[int]] | torch.Tensor | np.ndarray,
+            generators: Union[list[list[int]], torch.Tensor, np.ndarray],
             *,
-            generator_names: list[str] | None = None,
-            dest: list[int] | torch.Tensor | np.ndarray | str | None = None,
+            generator_names: Optional[list[str]] = None,
+            dest: Union[list[int], torch.Tensor, np.ndarray, str, None] = None,
             device: str = "auto",
             random_seed: Optional[int] = None,
             bit_encoding_width: Optional[int] | str = "auto",
