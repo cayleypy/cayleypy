@@ -1,4 +1,3 @@
-import math
 import os
 
 import numpy as np
@@ -57,7 +56,26 @@ def test_bfs_lrx_coset_10():
     graph = CayleyGraph(prepare_graph("lrx", n=10).generators, dest="0110110110")
     ans = graph.bfs()
     assert ans.diameter() == 17
-    assert ans.layer_sizes == [1, 3, 4, 6, 11, 16, 19, 23, 31, 29, 20, 14, 10, 10, 6, 3, 3, 1]
+    assert ans.layer_sizes == [
+        1,
+        3,
+        4,
+        6,
+        11,
+        16,
+        19,
+        23,
+        31,
+        29,
+        20,
+        14,
+        10,
+        10,
+        6,
+        3,
+        3,
+        1,
+    ]
     assert ans.get_layer(0) == ["0110110110"]
     assert set(ans.get_layer(1)) == {"0011011011", "1010110110", "1101101100"}
     assert set(ans.get_layer(15)) == {"0001111110", "0111111000", "1110000111"}
@@ -125,22 +143,22 @@ def test_bfs_last_layer_lrx_coset_n8():
     assert set(graph.bfs().last_layer()) == {"11003322", "22110033", "33221100", "00332211"}
 
 
-@pytest.mark.parametrize("bit_encoding_width", [None, 3, 10, 'auto'])
+@pytest.mark.parametrize("bit_encoding_width", [None, 3, 10, "auto"])
 def test_bfs_bit_encoding(bit_encoding_width):
     generators = prepare_graph("lrx", n=8).generators
     result = CayleyGraph(generators, bit_encoding_width=bit_encoding_width).bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
-@pytest.mark.parametrize("bit_encoding_width", [None, 'auto'])
-@pytest.mark.parametrize("batch_size", [100, 1000, 10 ** 9])
+@pytest.mark.parametrize("bit_encoding_width", [None, "auto"])
+@pytest.mark.parametrize("batch_size", [100, 1000, 10**9])
 def test_bfs_batching(bit_encoding_width, batch_size: int):
     generators = prepare_graph("lrx", n=8).generators
     result = CayleyGraph(generators, bit_encoding_width=bit_encoding_width, batch_size=batch_size).bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
-@pytest.mark.parametrize("hash_chunk_size", [100, 1000, 10 ** 9])
+@pytest.mark.parametrize("hash_chunk_size", [100, 1000, 10**9])
 def test_bfs_hash_chunking(hash_chunk_size: int):
     generators = prepare_graph("lrx", n=8).generators
     result = CayleyGraph(generators, hash_chunk_size=hash_chunk_size).bfs()
@@ -163,32 +181,61 @@ def test_get_neighbors(bit_encoding_width):
     result = graph._decode_states(graph._get_neighbors_batched(states))
     if bit_encoding_width == 5:
         # When using StringEncoder, we go over the generators in outer loop, and over the states in inner loop.
-        assert torch.equal(result, torch.tensor(
-            [[11, 10, 12, 13, 14], [16, 15, 17, 18, 19], [10, 11, 12, 14, 13], [15, 16, 17, 19, 18]]))
+        assert torch.equal(
+            result,
+            torch.tensor(
+                [
+                    [11, 10, 12, 13, 14],
+                    [16, 15, 17, 18, 19],
+                    [10, 11, 12, 14, 13],
+                    [15, 16, 17, 19, 18],
+                ]
+            ),
+        )
     else:
         # When operating on ints directly, it's the other way around.
-        assert torch.equal(result, torch.tensor(
-            [[11, 10, 12, 13, 14], [10, 11, 12, 14, 13], [16, 15, 17, 18, 19], [15, 16, 17, 19, 18]]))
+        assert torch.equal(
+            result,
+            torch.tensor(
+                [
+                    [11, 10, 12, 13, 14],
+                    [10, 11, 12, 14, 13],
+                    [16, 15, 17, 18, 19],
+                    [15, 16, 17, 19, 18],
+                ]
+            ),
+        )
 
 
 def test_edges_list_n2():
     graph = CayleyGraph([[1, 0]], dest="01")
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
-    assert result.named_undirected_edges() == {('01', '10')}
+    assert result.named_undirected_edges() == {("01", "10")}
 
 
 def test_edges_list_n3():
     graph = CayleyGraph(prepare_graph("lrx", n=3).generators, dest="001")
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
-    assert result.named_undirected_edges() == {('001', '001'), ('001', '010'), ('001', '100'), ('010', '100')}
+    assert result.named_undirected_edges() == {
+        ("001", "001"),
+        ("001", "010"),
+        ("001", "100"),
+        ("010", "100"),
+    }
 
 
 def test_edges_list_n4():
     graph = CayleyGraph(prepare_graph("top_spin", n=4).generators, dest="0011")
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
     assert result.named_undirected_edges() == {
-        ('0011', '0110'), ('0011', '1001'), ('0011', '1100'), ('0110', '0110'), ('0110', '1100'), ('1001', '1001'),
-        ('1001', '1100')}
+        ("0011", "0110"),
+        ("0011", "1001"),
+        ("0011", "1100"),
+        ("0110", "0110"),
+        ("0110", "1100"),
+        ("1001", "1001"),
+        ("1001", "1100"),
+    }
 
 
 def test_generators_not_inverse_closed():
@@ -247,7 +294,22 @@ def test_cube222_qtm():
     assert result.num_vertices == 3674160
     assert result.diameter() == 14
     assert result.layer_sizes == [
-        1, 6, 27, 120, 534, 2256, 8969, 33058, 114149, 360508, 930588, 1350852, 782536, 90280, 276]
+        1,
+        6,
+        27,
+        120,
+        534,
+        2256,
+        8969,
+        33058,
+        114149,
+        360508,
+        930588,
+        1350852,
+        782536,
+        90280,
+        276,
+    ]
 
 
 @pytest.mark.skipif(FAST_RUN, reason="slow test")
@@ -256,7 +318,20 @@ def test_cube222_htm():
     result = graph.bfs()
     assert result.num_vertices == 3674160
     assert result.diameter() == 11
-    assert result.layer_sizes == [1, 9, 54, 321, 1847, 9992, 50136, 227536, 870072, 1887748, 623800, 2644]
+    assert result.layer_sizes == [
+        1,
+        9,
+        54,
+        321,
+        1847,
+        9992,
+        50136,
+        227536,
+        870072,
+        1887748,
+        623800,
+        2644,
+    ]
 
 
 def test_cube333_qtm():

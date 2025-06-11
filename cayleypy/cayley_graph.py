@@ -8,7 +8,7 @@ import torch
 
 from .bfs_result import BfsResult
 from .hasher import StateHasher
-from .permutation_utils import *
+from .permutation_utils import inverse_permutation
 from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted
 

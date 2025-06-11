@@ -1,12 +1,8 @@
 """Special BFS algorithms, optimized for low memory usage."""
-import itertools
-import math
-
-import numba
 import numpy as np
 
 from .cayley_graph import CayleyGraph
-from .permutation_utils import inverse_permutation, is_permutation
+from .permutation_utils import inverse_permutation
 
 
 def bfs_numpy(graph: CayleyGraph, max_diameter: int = 1000000) -> list[int]:

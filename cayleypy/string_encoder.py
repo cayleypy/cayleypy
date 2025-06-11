@@ -1,5 +1,5 @@
 import math
-from typing import Callable, Sequence
+from typing import Callable
 
 import numpy as np
 import torch
