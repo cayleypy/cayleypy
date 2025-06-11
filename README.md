@@ -44,7 +44,7 @@ FAST=1 pytest
 Before commiting, run these checks:
 
 ```
-./lint.sh
+tools/lint.sh
 pytest 
 ```
 
