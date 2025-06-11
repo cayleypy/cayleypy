@@ -1,3 +1,5 @@
+import math
+
 import torch
 
 from cayleypy import prepare_graph
@@ -36,3 +38,14 @@ def test_cube333():
 
     graph = prepare_graph("cube_3/3/3_18gensHTM")
     assert graph.n_generators == 18
+
+
+def test_three_cycles():
+    for name in ["three_cycles", "three_cycles_0ij"]:
+        graph = prepare_graph(name, n=3)
+        b = graph.bfs()
+        total_size = sum(b.layer_sizes)
+        expected_size = math.factorial(graph.state_size) / 2
+        assert total_size == expected_size, (
+            f"{name}: sum layer_sizes {total_size} != n! {expected_size}"
+        )
