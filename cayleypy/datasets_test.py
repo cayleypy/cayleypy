@@ -90,3 +90,12 @@ def test_coxeter_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         _verify_layers_fast(CayleyGraph(prepare_graph("coxeter", n=n).generators), layer_sizes)
         assert len(layer_sizes) - 1 == n * (n - 1) // 2
+
+
+def test_hungarian_rings_growth():
+    for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
+        n = int(key)
+        assert n % 2 == 0
+        ring_size = (n + 2) // 2
+        assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
+        _verify_layers_fast(CayleyGraph(prepare_graph("hungarian_rings", n=n).generators), layer_sizes)
