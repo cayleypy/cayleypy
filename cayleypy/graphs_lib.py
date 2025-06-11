@@ -789,7 +789,7 @@ def prepare_graph(name, n=0) -> CayleyGraph:
     elif name == "coxeter":
         assert n >= 2
         generators = _create_coxeter_generators(n)
-        generator_names = [f"({i},{i+1})" for i in range(n - 1)]
+        generator_names = [f"({i},{i + 1})" for i in range(n - 1)]
         initial_state = list(range(n))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     else:
