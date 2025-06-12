@@ -224,11 +224,12 @@ def full_set_of_perm_globe(A, B):
     original_dict = globe_gens(A, B)
     new_dict = {}
     for key, value in original_dict.items():
-        new_dict[key] = list(map(int, value.split()))
-        inv_key = key + '_inv'
-        new_dict[inv_key] = inverse_permutation(list(map(int, value.split())))
+        new_dict[key] = value
+        if 'r' in key:
+            inv_key = key + '_inv'
+            new_dict[inv_key] = inverse_permutation(value)
     return new_dict
-
+    
 
 def prepare_graph(name, **kwargs) -> CayleyGraph:
     """Returns pre-defined Cayley or Schreier coset graph.
