@@ -1,6 +1,6 @@
 """Library of pre-defined graphs."""
 from cayleypy import CayleyGraph
-from cayleypy.permutation_utils import compose_permutations, apply_permutation
+from cayleypy.permutation_utils import compose_permutations, apply_permutation, all_transpositions
 
 CUBE222_ALLOWED_MOVES = {
     'f0': [0, 1, 19, 17, 6, 4, 7, 5, 2, 9, 3, 11, 12, 13, 14, 15, 16, 20, 18, 21, 10, 8, 22, 23],
@@ -74,14 +74,7 @@ def prepare_graph(name, n=0) -> CayleyGraph:
     """
     if name == "all_transpositions":
         assert n >= 2
-        generators = []
-        generator_names = []
-        for i in range(n):
-            for j in range(i + 1, n):
-                perm = list(range(n))
-                perm[i], perm[j] = j, i
-                generators.append(perm)
-                generator_names.append(f"({i},{j})")
+        generators, generator_names = all_transpositions(n)
         return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
     elif name == "pancake":
         assert n >= 2
