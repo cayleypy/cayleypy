@@ -1,5 +1,5 @@
 """Helper functions."""
-from typing import Any, Sequence
+from typing import Any, Sequence, Tuple, List
 
 
 def apply_permutation(p: Any, x: Sequence[Any]) -> list[Any]:
@@ -23,9 +23,9 @@ def is_permutation(p):
     return sorted(list(p)) == list(range(len(p)))
 
 
-def transpositions(n):
+def all_transpositions(n: int) -> Tuple[List[List[int]], List[str]]:
     """
-    Returns all transpositions (single swaps) of n numbers (counting from 0).
+    Returns all transpositions (single swaps) of n numbers (counting from 0) and list or string.
     Example:
     transpositions(4) returns
     [
@@ -33,12 +33,15 @@ def transpositions(n):
         [3, 1, 2, 0], [0, 2, 1, 3],
         [0, 3, 2, 1], [0, 1, 3, 2]
     ]
+    ['(0,1)', '(0,2)', '(0,3)', '(1,2)', '(1,3)', '(2,3)'])
     """
     result = []
+    names = []
     for i in range(n):
         for j in range(i+1, n):
             p = list(range(n))
             p[i], p[j] = p[j], p[i]
             result.append(p)
+            names.append(f"({i},{j})")
     assert len(result) == n * (n-1) // 2
-    return result
+    return result, names
