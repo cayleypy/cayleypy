@@ -122,5 +122,5 @@ def generate_datasets():
     _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     # keys = ["2"]
     # _update_dataset("cube_nnn_qstm_cayley_growth", keys, _compute_qstm_ncubes_cayley_growth)
-    # keys = ["1,2", "2,3", "4,4", "3,5"]
-    # _update_dataset("globeAB_cayley_growth", keys, _compute_globe_cayley_growth)
+    keys = ["1,2", "2,3"]
+    _update_dataset("globeAB_cayley_growth", keys, _compute_globe_cayley_growth)
