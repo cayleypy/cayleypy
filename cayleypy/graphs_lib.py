@@ -49,6 +49,17 @@ def _create_coxeter_generators(n: int) -> list[list[int]]:
 
 import collections
 
+def inverse_permutation(perm):
+    # Create an empty list to hold the inverse permutation
+    inverse = [0] * len(perm)
+    
+    # Iterate over the original permutation
+    for i, p in enumerate(perm):
+        # Place the index at the correct position in the inverse permutation
+        inverse[p] = i
+    
+    return inverse
+
 def generate_cube_permutations_oneline(n: int):
     """
     Generates permutations for the basic moves of the n x n x n Rubik's cube.
@@ -200,6 +211,24 @@ def globe_gens(A, B):
 
     return gens
 
+def full_set_of_perm_cube(cube_size):
+    original_dict = generate_cube_permutations_oneline(cube_size)
+    new_dict = {}
+    for key, value in original_dict.items():
+        new_dict[key] = list(map(int, value.split()))
+        inv_key = key + '_inv'
+        new_dict[inv_key] = inverse_permutation(list(map(int, value.split())))
+    return new_dict
+
+def full_set_of_perm_globe(A, B):
+    original_dict = globe_gens(A, B)
+    new_dict = {}
+    for key, value in original_dict.items():
+        new_dict[key] = list(map(int, value.split()))
+        inv_key = key + '_inv'
+        new_dict[inv_key] = inverse_permutation(list(map(int, value.split())))
+    return new_dict
+
 
 def prepare_graph(name, **kwargs) -> CayleyGraph:
     """Returns pre-defined Cayley or Schreier coset graph.
@@ -326,8 +355,8 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
     elif name == "cube_n/n/n_gensQSTM":
         n = params['n']
         assert n >= 2
-        generators = [list(map(int, i.split())) for i  in list(generate_cube_permutations_oneline(n).values())]
-        generator_names = list(generate_cube_permutations_oneline(n).keys())
+        generators = [list(map(int, i.split())) for i  in list(full_set_of_perm_cube(n).values())]
+        generator_names = list(full_set_of_perm_cube(n).keys())
         initial_state = list(range(6*n**2))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "globeA/B":
@@ -335,8 +364,8 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
         B = params['B']
         assert A >= 1
         assert B >= 1
-        generators = list(globe_gens(A, B).values())
-        generator_names = list(globe_gens(A, B).keys())
+        generators = list(full_set_of_perm_globe(A, B).values())
+        generator_names = list(full_set_of_perm_globe(A, B).keys())
         initial_state = list(range(2*B*(A+1)))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     else:
