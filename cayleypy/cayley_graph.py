@@ -262,12 +262,14 @@ class CayleyGraph:
                     print(f"batch_size={batch_size}")
                     for j in range(self.n_generators):
                         layer2_batch = self.encoded_generators_1d[j](layer1_batch)
-                        mask = ~isin_via_searchsorted(layer2_batch, layer1_hashes)
+                        mask = ~torch.isin(layer2_batch, layer1_hashes)
                         if i > 1:
-                            mask &= ~isin_via_searchsorted(layer2_batch, layer0_hashes)
+                            mask &= ~torch.isin(layer2_batch, layer0_hashes)
                         for other_batch in layer2_batches:
-                            mask &= ~isin_via_searchsorted(layer2_batch, other_batch)
+                            mask &= ~torch.isin(layer2_batch, other_batch)
+                        #print("After masking: ", layer2_batch[mask])    
                         layer2_batches.append(layer2_batch[mask])
+                #print("All batches: ", layer2_batches)  
                 layer2_hashes = torch.hstack(layer2_batches)
                 layer2 = layer2_hashes.reshape((-1, 1))
             else:
@@ -294,7 +296,7 @@ class CayleyGraph:
                 break
             if self.verbose >= 2:
                 print(f"Layer {i}: {len(layer2)} states.")
-                print("States:", self._decode_states(layer2))
+                #print("States:", self._decode_states(layer2))
             layer_sizes.append(len(layer2))
             if len(layer2) <= max_layer_size_to_store:
                 layers[i] = self._decode_states(layer2)
