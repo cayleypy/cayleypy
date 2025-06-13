@@ -262,6 +262,7 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
     PARAM_REQUIREMENTS = {
         "all_transpositions": ["n"],
         "pancake": ["n"],
+        "burnt_pancake": ["n"],
         "full_reversals": ["n"],
         "lrx": ["n"],
         "top_spin": ["n"],
@@ -288,6 +289,20 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
                 generators.append(perm)
                 generator_names.append(f"({i},{j})")
         return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
+    elif name == "burnt_pancake":
+        n = params['n']
+        assert n >= 1
+        generators = []
+        generator_names = []
+        for prefix_len in range(0, n):
+            perm = []
+            perm += list(range(n+prefix_len, n-1, -1))
+            perm += list(range(prefix_len+1, n, 1))
+            perm += list(range(prefix_len, -1, -1))
+            perm += list(range(n+prefix_len+1, 2*n, 1))
+            generators.append(perm)
+            generator_names.append("R" + str(prefix_len+1))
+        return CayleyGraph(generators, dest=list(range(2*n)), generator_names=generator_names)
     elif name == "pancake":
         n = params['n']
         assert n >= 2
