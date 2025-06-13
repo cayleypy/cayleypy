@@ -86,6 +86,10 @@ def _compute_pancake_cayley_growth(n: str) -> list[int]:
     return prepare_graph("pancake", n=int(n)).bfs().layer_sizes
 
 
+def _compute_burnt_pancake_cayley_growth(n: str) -> list[int]:
+    return prepare_graph("burnt_pancake", n=int(n)).bfs().layer_sizes
+
+
 def _compute_full_reversals_cayley_growth(n: str) -> list[int]:
     return prepare_graph("full_reversals", n=int(n)).bfs().layer_sizes
 
@@ -120,7 +124,7 @@ def generate_datasets():
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
     _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
-    # keys = ["2"]
-    # _update_dataset("cube_nnn_qstm_cayley_growth", keys, _compute_qstm_ncubes_cayley_growth)
+    keys = [str(n) for n in range(1, 8)]
+    _update_dataset("burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth)
     keys = ["2,1"]
     _update_dataset("globeAB_cayley_growth", keys, _compute_globe_cayley_growth)

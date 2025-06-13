@@ -23,6 +23,15 @@ def test_lrx_cayley_growth():
         _verify_layers_fast(CayleyGraph(prepare_graph("lrx", n=n).generators), layer_sizes)
 
 
+def test_burnt_pancake_cayley_growth():
+    oeis_a078941 = [None, 1, 4, 6, 8, 10, 12, 14, 15, 17, 18, 19, 21]
+    for key, layer_sizes in load_dataset("burnt_pancake_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)*2**n
+        assert len(layer_sizes) - 1 == oeis_a078941[n]
+        _verify_layers_fast(CayleyGraph(prepare_graph("burnt_pancake", n=n).generators), layer_sizes)
+
+
 # TopSpin Cayley graphs contain all permutations for even n>=6, and half of all permutations for odd n>=7.
 def test_top_spin_cayley_growth():
     for key, layer_sizes in load_dataset("top_spin_cayley_growth").items():

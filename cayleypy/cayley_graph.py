@@ -1,8 +1,7 @@
 import functools
 import gc
 import math
-import time
-from typing import Callable, Optional
+from typing import Callable, Optional, Union
 
 import numpy as np
 import torch
@@ -33,13 +32,13 @@ class CayleyGraph:
 
     def __init__(
             self,
-            generators: list[list[int]] | torch.Tensor | np.ndarray,
+            generators: Union[list[list[int]], torch.Tensor, np.ndarray],
             *,
-            generator_names: list[str] | None = None,
-            dest: list[int] | torch.Tensor | np.ndarray | str | None = None,
+            generator_names: Optional[list[str]] = None,
+            dest: Union[list[int], torch.Tensor, np.ndarray, str, None] = None,
             device: str = "auto",
             random_seed: Optional[int] = None,
-            bit_encoding_width: Optional[int] | str = "auto",
+            bit_encoding_width: Union[Optional[int], str] = "auto",
             verbose: int = 0,
             batch_size: int = 2 ** 25,
             hash_chunk_size: int = 2 ** 25,
@@ -142,7 +141,7 @@ class CayleyGraph:
         unique_hashes = self.hasher.make_hashes(unique_states) if self.hasher.is_identity else hashes[unique_idx]
         return unique_states, unique_hashes, unique_idx
 
-    def _encode_states(self, states: torch.Tensor | np.ndarray | list) -> torch.Tensor:
+    def _encode_states(self, states: Union[torch.Tensor, np.ndarray, list]) -> torch.Tensor:
         states = torch.as_tensor(states, device=self.device)
         if len(states.shape) == 1:  # In case when only one state was passed.
             states = states.reshape(1, -1)
@@ -194,8 +193,8 @@ class CayleyGraph:
 
     def bfs(self,
             *,
-            start_states: None | torch.Tensor | np.ndarray | list = None,
-            max_layer_size_to_store: None | int = 1000,
+            start_states: Union[None, torch.Tensor, np.ndarray, list] = None,
+            max_layer_size_to_store: Optional[int] = 1000,
             max_layer_size_to_explore: int = 10 ** 9,
             max_diameter: int = 1000000,
             return_all_edges: bool = False,
