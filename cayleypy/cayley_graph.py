@@ -10,7 +10,7 @@ from .bfs_result import BfsResult
 from .hasher import StateHasher
 from .permutation_utils import *
 from .string_encoder import StringEncoder
-from .torch_utils import isin_via_searchsorted
+from .torch_utils import isin_via_searchsorted, sort_and_unique
 
 
 class CayleyGraph:
@@ -259,16 +259,18 @@ class CayleyGraph:
                 layer2_batches = []
                 for layer1_batch in layer1_hashes.tensor_split(num_batches, dim=0):
                     batch_size = layer1_batch.shape[0]
+                    layer2_batch = torch.zeros((self.n_generators * batch_size,), dtype=torch.int64, device=self.device)
                     print(f"batch_size={batch_size}")
                     for j in range(self.n_generators):
-                        layer2_batch = self.encoded_generators_1d[j](layer1_batch)
-                        mask = ~torch.isin(layer2_batch, layer1_hashes)
-                        if i > 1:
-                            mask &= ~torch.isin(layer2_batch, layer0_hashes)
-                        for other_batch in layer2_batches:
-                            mask &= ~torch.isin(layer2_batch, other_batch)
-                        #print("After masking: ", layer2_batch[mask])    
-                        layer2_batches.append(layer2_batch[mask])
+                        layer2_batch[batch_size*j : batch_size*(j+1)] = self.encoded_generators_1d[j](layer1_batch)
+                    layer2_batch = sort_and_unique(layer2_batch)
+                    mask = ~isin_via_searchsorted(layer2_batch, layer1_hashes)
+                    if i > 1:
+                        mask &= ~isin_via_searchsorted(layer2_batch, layer0_hashes)
+                    for other_batch in layer2_batches:
+                        mask &= ~isin_via_searchsorted(layer2_batch, other_batch)
+                    #print("After masking: ", layer2_batch[mask])    
+                    layer2_batches.append(layer2_batch[mask])
                 #print("All batches: ", layer2_batches)  
                 layer2_hashes = torch.hstack(layer2_batches)
                 layer2 = layer2_hashes.reshape((-1, 1))
