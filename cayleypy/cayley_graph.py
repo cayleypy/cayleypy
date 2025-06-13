@@ -113,6 +113,8 @@ class CayleyGraph:
         if bit_encoding_width is not None:
             self.string_encoder = StringEncoder(code_width=int(bit_encoding_width), n=self.state_size)
             self.encoded_generators = [self.string_encoder.implement_permutation(perm) for perm in generators]
+            if self.string_encoder.encoded_length == 1:
+                self.encoded_generators_1d = [self.string_encoder.implement_permutation_1d(perm) for perm in generators]
             encoded_state_size = self.string_encoder.encoded_length
 
         self.hasher = StateHasher(encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
@@ -200,6 +202,7 @@ class CayleyGraph:
             return_all_edges: bool = False,
             return_all_hashes: bool = False,
             keep_alive_func: Callable[[], None] = lambda: None,
+            tmp_use_batching = False,
             ) -> BfsResult:
         """Runs bread-first search (BFS) algorithm from given `start_states`.
 
@@ -239,31 +242,59 @@ class CayleyGraph:
         all_layers_hashes = []
         max_layer_size_to_store = max_layer_size_to_store or 10 ** 15
 
+        if tmp_use_batching:
+            assert self.string_encoder is not None
+            assert self.hasher.is_identity
+            assert not return_all_edges
+
+        # BFS iteration: layer2 := neighbors(layer1)-layer0-layer1.
         for i in range(1, max_diameter + 1):
-            layer1_neighbors = self._get_neighbors_batched(layer1)
-            layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
-            if return_all_edges:
-                if self.string_encoder is not None:
-                    edges_list_starts += [layer1_hashes] * self.n_generators
-                else:
-                    edges_list_starts.append(layer1_hashes.repeat_interleave(self.n_generators))
-                edges_list_ends.append(layer1_neighbors_hashes)
+            num_batches = int(math.ceil(layer1_hashes.shape[0] / self.batch_size))
+            if tmp_use_batching:
+                print(f"Do batching! num_batches={num_batches}")
+                #estimated_result_size = layer1_hashes.shape[0] * self.n_generators * 8
+                #if estimated_result_size > self.memory_limit_bytes:
+                #    self._free_memory()
+
+                layer2_batches = []
+                for layer1_batch in layer1_hashes.tensor_split(num_batches, dim=0):
+                    batch_size = layer1_batch.shape[0]
+                    print(f"batch_size={batch_size}")
+                    for j in range(self.n_generators):
+                        layer2_batch = self.encoded_generators_1d[j](layer1_batch)
+                        mask = ~isin_via_searchsorted(layer2_batch, layer1_hashes)
+                        if i > 1:
+                            mask &= ~isin_via_searchsorted(layer2_batch, layer0_hashes)
+                        for other_batch in layer2_batches:
+                            mask &= ~isin_via_searchsorted(layer2_batch, other_batch)
+                        layer2_batches.append(layer2_batch[mask])
+                layer2_hashes = torch.hstack(layer2_batches)
+                layer2 = layer2_hashes.reshape((-1, 1))
+            else:
+                layer1_neighbors = self._get_neighbors_batched(layer1)
+                layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
+                if return_all_edges:
+                    if self.string_encoder is not None:
+                        edges_list_starts += [layer1_hashes] * self.n_generators
+                    else:
+                        edges_list_starts.append(layer1_hashes.repeat_interleave(self.n_generators))
+                    edges_list_ends.append(layer1_neighbors_hashes)
+
+                layer2, layer2_hashes, _ = self.get_unique_states(layer1_neighbors, hashes=layer1_neighbors_hashes)
+                mask = ~isin_via_searchsorted(layer2_hashes, layer1_hashes)
+                if i > 1:
+                    mask &= ~isin_via_searchsorted(layer2_hashes, layer0_hashes)
+                layer2 = layer2[mask]
+                layer2_hashes = self.hasher.make_hashes(layer2) if self.hasher.is_identity else layer2_hashes[mask]
+
             if return_all_hashes:
                 all_layers_hashes.append(layer1_hashes)
-
-            # BFS iteration: layer2 := neighbors(layer1)-layer0-layer1.
-            layer2, layer2_hashes, _ = self.get_unique_states(layer1_neighbors, hashes=layer1_neighbors_hashes)
-            mask = ~isin_via_searchsorted(layer2_hashes, layer1_hashes)
-            if i > 1:
-                mask &= ~isin_via_searchsorted(layer2_hashes, layer0_hashes)
-            layer2 = layer2[mask]
-            layer2_hashes = self.hasher.make_hashes(layer2) if self.hasher.is_identity else layer2_hashes[mask]
-
             if len(layer2) == 0:
                 full_graph_explored = True
                 break
             if self.verbose >= 2:
                 print(f"Layer {i}: {len(layer2)} states.")
+                print("States:", self._decode_states(layer2))
             layer_sizes.append(len(layer2))
             if len(layer2) <= max_layer_size_to_store:
                 layers[i] = self._decode_states(layer2)
