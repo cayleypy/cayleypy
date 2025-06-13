@@ -11,6 +11,18 @@ def test_all_transpositions():
     graph = prepare_graph("all_transpositions", n=20)
     assert graph.n_generators == (20 * 19) // 2
 
+def test_burnt_pancake():
+    graph = prepare_graph("burnt_pancake", n=6)
+    assert graph.n_generators == 6
+    assert graph.generator_names == ["R1", "R2", "R3", "R4", "R5", "R6"]
+    assert torch.equal(graph.generators, torch.tensor(
+        [[6, 1, 2, 3, 4, 5, 0, 7, 8, 9, 10, 11],
+         [7, 6, 2, 3, 4, 5, 1, 0, 8, 9, 10, 11],
+         [8, 7, 6, 3, 4, 5, 2, 1, 0, 9, 10, 11],
+         [9, 8, 7, 6, 4, 5, 3, 2, 1, 0, 10, 11],
+         [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 11],
+         [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]]
+    ))
 
 def test_pancake():
     graph = prepare_graph("pancake", n=6)
