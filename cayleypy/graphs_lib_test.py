@@ -50,3 +50,23 @@ def test_cube333():
 
     graph = prepare_graph("cube_3/3/3_18gensHTM")
     assert graph.n_generators == 18
+
+
+def test_cyclic_coxeter():
+    graph = prepare_graph("cyclic_coxeter", n=4)
+    assert graph.n_generators == 4
+    assert graph.generator_names == ["(0,1)", "(1,2)", "(2,3)", "(0,3)"]
+    assert torch.equal(graph.generators, torch.tensor([
+        [1, 0, 2, 3],
+        [0, 2, 1, 3],
+        [0, 1, 3, 2],
+        [3, 1, 2, 0]
+    ]))
+
+    graph = prepare_graph("cyclic_coxeter", n=3)
+    assert graph.n_generators == 3
+    assert torch.equal(graph.generators, torch.tensor([
+        [1, 0, 2],
+        [0, 2, 1],
+        [2, 1, 0]
+    ]))

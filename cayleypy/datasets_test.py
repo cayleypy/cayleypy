@@ -99,3 +99,10 @@ def test_coxeter_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         _verify_layers_fast(CayleyGraph(prepare_graph("coxeter", n=n).generators), layer_sizes)
         assert len(layer_sizes) - 1 == n * (n - 1) // 2
+
+
+def test_cyclic_coxeter_cayley_growth():
+    for key, layer_sizes in load_dataset("cyclic_coxeter_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        _verify_layers_fast(CayleyGraph(prepare_graph("cyclic_coxeter", n=n).generators), layer_sizes)
