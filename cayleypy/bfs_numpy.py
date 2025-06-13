@@ -14,7 +14,7 @@ def bfs_numpy(graph: CayleyGraph, max_diameter: int = 1000000) -> list[int]:
     assert graph.generators_inverse_closed, "Only supports undirected graph."
     assert graph.string_encoder is not None
     assert graph.string_encoder.encoded_length == 1, "Only works on states encoded by single int64."
-    perms = [list(x.numpy()) for x in graph.generators]
+    perms = [list(x) for x in graph.generators.cpu().numpy()]
     perm_funcs = [
         graph.string_encoder.implement_permutation_1d(p) for p in perms]
     pn = len(perms)

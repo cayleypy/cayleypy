@@ -174,7 +174,7 @@ class CayleyGraphChunkedBfs:
         return sum([c.last_layer_count for c in self.chunks])
 
     def bfs(self, max_diameter=10 ** 6):
-        initial_states = np.array([_encode_perm(self.graph.destination_state)], dtype=np.int64)
+        initial_states = np.array([_encode_perm(self.graph.destination_state.cpu().numpy())], dtype=np.int64)
         self.paint_gray(initial_states)
         self.flush_gray_to_black()
         layer_sizes = [self.count_last_layer()]

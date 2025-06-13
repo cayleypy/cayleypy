@@ -163,11 +163,11 @@ def test_get_neighbors(bit_encoding_width):
     result = graph._decode_states(graph._get_neighbors_batched(states))
     if bit_encoding_width == 5:
         # When using StringEncoder, we go over the generators in outer loop, and over the states in inner loop.
-        assert torch.equal(result, torch.tensor(
+        assert torch.equal(result.cpu(), torch.tensor(
             [[11, 10, 12, 13, 14], [16, 15, 17, 18, 19], [10, 11, 12, 14, 13], [15, 16, 17, 19, 18]]))
     else:
         # When operating on ints directly, it's the other way around.
-        assert torch.equal(result, torch.tensor(
+        assert torch.equal(result.cpu(), torch.tensor(
             [[11, 10, 12, 13, 14], [10, 11, 12, 14, 13], [16, 15, 17, 18, 19], [15, 16, 17, 19, 18]]))
 
 
