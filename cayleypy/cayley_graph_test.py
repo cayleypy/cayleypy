@@ -133,12 +133,18 @@ def test_bfs_bit_encoding(bit_encoding_width):
 
 
 @pytest.mark.parametrize("batch_size", [100, 1000, 10 ** 9])
-def test_bfs_batching(batch_size: int):
+def test_bfs_batching_lrx(batch_size: int):
     generators = prepare_graph("lrx", n=8).generators
     graph = CayleyGraph(generators, batch_size=batch_size)
     result = graph.bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
+
+def test_bfs_batching_lrx_all_transpositions():
+    graph = prepare_graph("all_transpositions", n=8)
+    graph.batch_size=2**10
+    result = graph.bfs()
+    assert result.layer_sizes == load_dataset("all_transpositions_cayley_growth")["8"]
 
 @pytest.mark.parametrize("hash_chunk_size", [100, 1000, 10 ** 9])
 def test_bfs_hash_chunking(hash_chunk_size: int):

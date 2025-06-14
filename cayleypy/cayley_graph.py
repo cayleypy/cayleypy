@@ -229,7 +229,7 @@ class CayleyGraph:
         max_layer_size_to_store = max_layer_size_to_store or 10 ** 15
 
         # When state fits in a single int64 and we don't need edges, we can apply more memory-efficient algorithm
-        # with batching. This algorithm find neighbors in batches and removes duplicates from batches before
+        # with batching. This algorithm finds neighbors in batches and removes duplicates from batches before
         # stacking them.
         do_batching = (self.string_encoder is not None) and self.string_encoder.encoded_length == 1 and not return_all_edges
 
@@ -238,17 +238,22 @@ class CayleyGraph:
             if do_batching and len(layer1) > self.batch_size:
                 num_batches = int(math.ceil(layer1_hashes.shape[0] / self.batch_size))
                 layer2_batches = []
-                for layer1_batch in layer1_hashes.tensor_split(num_batches, dim=0):
-                    layer2_batch = self._get_neighbors(layer1_batch.reshape((-1, 1))).reshape((-1, ))
+                for layer1_batch in layer1.tensor_split(num_batches, dim=0):
+                    layer2_batch = self._get_neighbors(layer1_batch).reshape((-1,))
                     layer2_batch = torch.unique(layer2_batch, sorted=True)
                     mask = ~isin_via_searchsorted(layer2_batch, layer1_hashes)
                     if i > 1:
                         mask &= ~isin_via_searchsorted(layer2_batch, layer0_hashes)
                     for other_batch in layer2_batches:
                         mask &= ~isin_via_searchsorted(layer2_batch, other_batch)
-                    layer2_batches.append(layer2_batch[mask])
-                layer2_hashes = torch.hstack(layer2_batches)
-                layer2_hashes, _ = torch.sort(layer2_hashes)
+                    layer2_batch = layer2_batch[mask]
+                    if len(layer2_batch) > 0:
+                        layer2_batches.append(layer2_batch)
+                if len(layer2_batches) == 0:
+                    layer2_hashes = torch.empty((0,))
+                else:
+                    layer2_hashes = torch.hstack(layer2_batches)
+                    layer2_hashes, _ = torch.sort(layer2_hashes)
                 layer2 = layer2_hashes.reshape((-1, 1))
             else:
                 layer1_neighbors = self._get_neighbors(layer1)
@@ -274,7 +279,6 @@ class CayleyGraph:
                 break
             if self.verbose >= 2:
                 print(f"Layer {i}: {len(layer2)} states.")
-                #print("States:", self._decode_states(layer2))
             layer_sizes.append(len(layer2))
             if len(layer2) <= max_layer_size_to_store:
                 layers[i] = self._decode_states(layer2)
