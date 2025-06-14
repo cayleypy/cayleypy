@@ -98,6 +98,10 @@ def _compute_coxeter_cayley_growth(n: str) -> list[int]:
     return prepare_graph("coxeter", n=int(n)).bfs().layer_sizes
 
 
+def _compute_mini_paramorphix_cayley_growth(_: str) -> list[int]:
+    return prepare_graph("mini_paramorphix").bfs().layer_sizes
+
+
 def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
     return prepare_graph("cyclic_coxeter", n=int(n)).bfs().layer_sizes
 
@@ -124,3 +128,4 @@ def generate_datasets():
     _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
     keys = [str(n) for n in range(1, 8)]
     _update_dataset("burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth)
+    _update_dataset("mini_paramorphix_cayley_growth", ["24"], _compute_mini_paramorphix_cayley_growth)

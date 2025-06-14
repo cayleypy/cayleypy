@@ -1,6 +1,8 @@
 import numpy as np
 
 from cayleypy import prepare_graph
+from cayleypy.permutation_utils import inverse_permutation
+from cayleypy.graphs_lib import MINI_PARAMORPHIX_ALLOWED_MOVES
 
 
 def test_all_transpositions():
@@ -73,4 +75,22 @@ def test_cyclic_coxeter():
         [1, 0, 2],
         [0, 2, 1],
         [2, 1, 0]
-    ])
+    ]))
+
+
+def test_mini_paramorphix():
+    graph = prepare_graph("mini_paramorphix")
+    assert graph.n_generators == len(MINI_PARAMORPHIX_ALLOWED_MOVES)
+    assert graph.generator_names == list(MINI_PARAMORPHIX_ALLOWED_MOVES.keys())
+    expected_generators = np.array([MINI_PARAMORPHIX_ALLOWED_MOVES[k] for k in graph.generator_names])
+    assert np.array_equal(graph.generators, expected_generators)
+    for gen in graph.generators:
+        assert len(gen) == 24
+        assert sorted(gen.tolist()) == list(range(24))
+    identity = list(range(24))
+    assert any(gen.tolist() != identity for gen in graph.generators)
+    for gen in graph.generators:
+        inverse = inverse_permutation(gen.tolist())
+        restored = [gen[i] for i in inverse]
+        assert restored == list(range(24))
+    assert set(graph.generator_names) == set(MINI_PARAMORPHIX_ALLOWED_MOVES.keys())
