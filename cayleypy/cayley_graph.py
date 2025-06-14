@@ -10,7 +10,7 @@ from .bfs_result import BfsResult
 from .hasher import StateHasher
 from .permutation_utils import *
 from .string_encoder import StringEncoder
-from .torch_utils import isin_via_searchsorted, sort_and_unique
+from .torch_utils import isin_via_searchsorted
 
 
 class CayleyGraph:
@@ -40,7 +40,7 @@ class CayleyGraph:
             random_seed: Optional[int] = None,
             bit_encoding_width: Union[Optional[int], str] = "auto",
             verbose: int = 0,
-            batch_size: int = 2 ** 25,
+            batch_size: int = 2 ** 20,
             hash_chunk_size: int = 2 ** 25,
             memory_limit_gb: float = 16):
         """Initializes CayleyGraph.
@@ -158,7 +158,7 @@ class CayleyGraph:
             return self.string_encoder.decode(states)
         return states
 
-    def _get_neighbors(self, states: torch.Tensor, dest: torch.Tensor):
+    def _get_neighbors_tmp(self, states: torch.Tensor, dest: torch.Tensor):
         """Calculates all neighbors of `states`, writes them to `dest`, which must be initialized to zeros."""
         states_num = states.shape[0]
         assert dest.shape[0] == states_num * self.n_generators
@@ -173,25 +173,12 @@ class CayleyGraph:
                 moves.unsqueeze(0).expand(states.size(0), moves.shape[0], states.size(1))
             ).flatten(end_dim=1)
 
-    def _get_neighbors_batched(self, states: torch.Tensor) -> torch.Tensor:
-        estimated_result_size = states.shape[0] * states.shape[1] * self.n_generators * 8
-        if 5 * estimated_result_size > self.memory_limit_bytes:
-            self._free_memory()
-
-        if self.string_encoder is not None or states.shape[0] <= self.batch_size:
-            neighbors = torch.zeros((states.shape[0] * self.n_generators, states.shape[1]), dtype=torch.int64,
-                                    device=self.device)
-            self._get_neighbors(states, neighbors)
-        else:
-            num_batches = int(math.ceil(states.shape[0] / self.batch_size))
-            neighbors = torch.zeros((self.n_generators * states.shape[0], states.shape[1]), dtype=torch.int64,
-                                    device=self.device)
-            i = 0
-            for batch in states.tensor_split(num_batches, dim=0):
-                num_neighbors = self.n_generators * batch.shape[0]
-                self._get_neighbors(batch, neighbors[i:i + num_neighbors, :])
-                i += num_neighbors
+    def _get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
+        neighbors = torch.zeros((states.shape[0] * self.n_generators, states.shape[1]), dtype=torch.int64,
+                                device=self.device)
+        self._get_neighbors_tmp(states, neighbors)
         return neighbors
+
 
     def bfs(self,
             *,
@@ -202,7 +189,6 @@ class CayleyGraph:
             return_all_edges: bool = False,
             return_all_hashes: bool = False,
             keep_alive_func: Callable[[], None] = lambda: None,
-            tmp_use_batching = False,
             ) -> BfsResult:
         """Runs bread-first search (BFS) algorithm from given `start_states`.
 
@@ -242,42 +228,30 @@ class CayleyGraph:
         all_layers_hashes = []
         max_layer_size_to_store = max_layer_size_to_store or 10 ** 15
 
-        if tmp_use_batching:
-            assert self.string_encoder is not None
-            assert self.hasher.is_identity
-            assert not return_all_edges
+        # When state fits in a single int64 and we don't need edges, we can apply more memory-efficient algorithm
+        # with batching. This algorithm find neighbors in batches and removes duplicates from batches before
+        # stacking them.
+        do_batching = (self.string_encoder is not None) and self.string_encoder.encoded_length == 1 and not return_all_edges
 
         # BFS iteration: layer2 := neighbors(layer1)-layer0-layer1.
         for i in range(1, max_diameter + 1):
-            num_batches = int(math.ceil(layer1_hashes.shape[0] / self.batch_size))
-            if tmp_use_batching:
-                print(f"Do batching! num_batches={num_batches}")
-                #estimated_result_size = layer1_hashes.shape[0] * self.n_generators * 8
-                #if estimated_result_size > self.memory_limit_bytes:
-                #    self._free_memory()
-
+            if do_batching and len(layer1) > self.batch_size:
+                num_batches = int(math.ceil(layer1_hashes.shape[0] / self.batch_size))
                 layer2_batches = []
                 for layer1_batch in layer1_hashes.tensor_split(num_batches, dim=0):
-                    batch_size = layer1_batch.shape[0]
-                    layer2_batch = torch.zeros((self.n_generators * batch_size,), dtype=torch.int64, device=self.device)
-                    print(f"batch_size={batch_size}")
-                    for j in range(self.n_generators):
-                        layer2_batch[batch_size*j : batch_size*(j+1)] = self.encoded_generators_1d[j](layer1_batch)
+                    layer2_batch = self._get_neighbors(layer1_batch.reshape((-1, 1))).reshape((-1, ))
                     layer2_batch = torch.unique(layer2_batch, sorted=True)
                     mask = ~isin_via_searchsorted(layer2_batch, layer1_hashes)
                     if i > 1:
                         mask &= ~isin_via_searchsorted(layer2_batch, layer0_hashes)
                     for other_batch in layer2_batches:
                         mask &= ~isin_via_searchsorted(layer2_batch, other_batch)
-                    #print("After masking: ", layer2_batch[mask])    
                     layer2_batches.append(layer2_batch[mask])
-                #print("All batches: ", layer2_batches)  
                 layer2_hashes = torch.hstack(layer2_batches)
                 layer2_hashes, _ = torch.sort(layer2_hashes)
                 layer2 = layer2_hashes.reshape((-1, 1))
-                print("SHAPES:", layer2_hashes.shape, layer2.shape)
             else:
-                layer1_neighbors = self._get_neighbors_batched(layer1)
+                layer1_neighbors = self._get_neighbors(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
                 if return_all_edges:
                     if self.string_encoder is not None:

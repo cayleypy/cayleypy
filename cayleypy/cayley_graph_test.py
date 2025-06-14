@@ -132,11 +132,11 @@ def test_bfs_bit_encoding(bit_encoding_width):
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
-@pytest.mark.parametrize("bit_encoding_width", [None, 'auto'])
 @pytest.mark.parametrize("batch_size", [100, 1000, 10 ** 9])
-def test_bfs_batching(bit_encoding_width, batch_size: int):
+def test_bfs_batching(batch_size: int):
     generators = prepare_graph("lrx", n=8).generators
-    result = CayleyGraph(generators, bit_encoding_width=bit_encoding_width, batch_size=batch_size).bfs()
+    graph = CayleyGraph(generators, batch_size=batch_size)
+    result = graph.bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
@@ -147,12 +147,6 @@ def test_bfs_hash_chunking(hash_chunk_size: int):
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
-def test_free_memory():
-    generators = prepare_graph("lrx", n=8).generators
-    result = CayleyGraph(generators, memory_limit_gb=0.0001).bfs()
-    assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
-
-
 @pytest.mark.parametrize("bit_encoding_width", [None, 5])
 def test_get_neighbors(bit_encoding_width):
     # Directly check _get_neighbors_batched.
@@ -160,7 +154,7 @@ def test_get_neighbors(bit_encoding_width):
     # generating the edges list.
     graph = CayleyGraph([[1, 0, 2, 3, 4], [0, 1, 2, 4, 3]], bit_encoding_width=bit_encoding_width)
     states = graph._encode_states(torch.tensor([[10, 11, 12, 13, 14], [15, 16, 17, 18, 19]], dtype=torch.int64))
-    result = graph._decode_states(graph._get_neighbors_batched(states))
+    result = graph._decode_states(graph._get_neighbors(states))
     if bit_encoding_width == 5:
         # When using StringEncoder, we go over the generators in outer loop, and over the states in inner loop.
         assert torch.equal(result.cpu(), torch.tensor(
