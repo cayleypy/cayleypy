@@ -249,7 +249,7 @@ class CayleyGraph:
         for i in range(1, max_diameter + 1):
             if do_batching and len(layer1) > self.batch_size:
                 num_batches = int(math.ceil(layer1_hashes.shape[0] / self.batch_size))
-                layer2_batches = []
+                layer2_batches = []  # type: list[torch.Tensor]
                 for layer1_batch in layer1.tensor_split(num_batches, dim=0):
                     layer2_batch = self._get_neighbors(layer1_batch).reshape((-1,))
                     layer2_batch = torch.unique(layer2_batch, sorted=True)
