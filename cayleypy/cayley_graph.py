@@ -113,8 +113,6 @@ class CayleyGraph:
         if bit_encoding_width is not None:
             self.string_encoder = StringEncoder(code_width=int(bit_encoding_width), n=self.state_size)
             self.encoded_generators = [self.string_encoder.implement_permutation(perm) for perm in generators]
-            if self.string_encoder.encoded_length == 1:
-                self.encoded_generators_1d = [self.string_encoder.implement_permutation_1d(perm) for perm in generators]
             encoded_state_size = self.string_encoder.encoded_length
 
         self.hasher = StateHasher(encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
@@ -174,11 +172,21 @@ class CayleyGraph:
             ).flatten(end_dim=1)
 
     def _get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
-        neighbors = torch.zeros((states.shape[0] * self.n_generators, states.shape[1]), dtype=torch.int64,
+        """Calculates all neighbors of `states`."""
+        states_num = states.shape[0]
+        neighbors = torch.zeros((states_num * self.n_generators, states.shape[1]), dtype=torch.int64,
                                 device=self.device)
-        self._get_neighbors_tmp(states, neighbors)
+        if self.string_encoder is not None:
+            for i in range(self.n_generators):
+                self.encoded_generators[i](states, neighbors[i * states_num:(i + 1) * states_num])
+        else:
+            moves = self.generators
+            neighbors[:, :] = torch.gather(
+                states.unsqueeze(1).expand(states.size(0), moves.shape[0], states.size(1)),
+                2,
+                moves.unsqueeze(0).expand(states.size(0), moves.shape[0], states.size(1))
+            ).flatten(end_dim=1)
         return neighbors
-
 
     def bfs(self,
             *,
@@ -231,7 +239,11 @@ class CayleyGraph:
         # When state fits in a single int64 and we don't need edges, we can apply more memory-efficient algorithm
         # with batching. This algorithm finds neighbors in batches and removes duplicates from batches before
         # stacking them.
-        do_batching = (self.string_encoder is not None) and self.string_encoder.encoded_length == 1 and not return_all_edges
+        do_batching = (
+                self.string_encoder is not None
+                and self.string_encoder.encoded_length == 1
+                and not return_all_edges
+        )
 
         # BFS iteration: layer2 := neighbors(layer1)-layer0-layer1.
         for i in range(1, max_diameter + 1):
