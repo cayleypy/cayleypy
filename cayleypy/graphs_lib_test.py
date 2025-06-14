@@ -75,7 +75,7 @@ def test_cyclic_coxeter():
         [1, 0, 2],
         [0, 2, 1],
         [2, 1, 0]
-    ]))
+    ])
 
 
 def test_mini_paramorphix():
