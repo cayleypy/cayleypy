@@ -5,6 +5,24 @@ from cayleypy.permutation_utils import inverse_permutation
 from cayleypy.graphs_lib import MINI_PARAMORPHIX_ALLOWED_MOVES
 
 
+def test_lrx():
+    graph = prepare_graph("lrx", n=4)
+    assert np.array_equal(graph.generators, [[1, 2, 3, 0], [3, 0, 1, 2], [1, 0, 2, 3]])
+    assert graph.generator_names == ["L", "R", "X"]
+
+    graph = prepare_graph("lrx", n=5, k=3)
+    assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 1, 2, 0, 4]])
+    assert graph.generator_names == ["L", "R", "X"]
+
+
+def test_top_spin():
+    graph = prepare_graph("top_spin", n=5)
+    assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 2, 1, 0, 4]])
+
+    graph = prepare_graph("top_spin", n=5, k=3)
+    assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [2, 1, 0, 3, 4]])
+
+
 def test_all_transpositions():
     graph = prepare_graph("all_transpositions", n=3)
     assert np.array_equal(graph.generators, [[1, 0, 2], [2, 1, 0], [0, 2, 1]])
