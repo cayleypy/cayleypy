@@ -82,7 +82,8 @@ class CayleyGraph:
             generators_list = [list(generators[i, :]) for i in range(generators.shape[0])]
         else:
             raise ValueError('Unsupported format for "generators" ' + str(type(generators)))
-        self.generators = torch.tensor(generators_list, dtype=torch.int64, device=self.device)
+        self.generators = np.array(generators_list, dtype=np.int64)
+        self.generators_torch = torch.tensor(generators_list, dtype=torch.int64, device=self.device)
 
         # Validate generators.
         self.state_size = len(generators_list[0])  # Size of permutations.
@@ -112,7 +113,7 @@ class CayleyGraph:
         encoded_state_size: int = self.state_size
         if bit_encoding_width is not None:
             self.string_encoder = StringEncoder(code_width=int(bit_encoding_width), n=self.state_size)
-            self.encoded_generators = [self.string_encoder.implement_permutation(perm) for perm in generators]
+            self.encoded_generators = [self.string_encoder.implement_permutation(perm) for perm in generators_list]
             encoded_state_size = self.string_encoder.encoded_length
 
         self.hasher = StateHasher(encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
@@ -165,7 +166,7 @@ class CayleyGraph:
             for i in range(self.n_generators):
                 self.encoded_generators[i](states, neighbors[i * states_num:(i + 1) * states_num])
         else:
-            moves = self.generators
+            moves = self.generators_torch
             neighbors[:, :] = torch.gather(
                 states.unsqueeze(1).expand(states.size(0), moves.shape[0], states.size(1)),
                 2,

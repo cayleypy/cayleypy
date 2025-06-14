@@ -16,8 +16,8 @@ def test_generators_format():
     graph1 = CayleyGraph(generators)
     graph2 = CayleyGraph(np.array(generators))
     graph3 = CayleyGraph(torch.tensor(generators))
-    assert torch.equal(graph1.generators, graph2.generators)
-    assert torch.equal(graph1.generators, graph3.generators)
+    assert np.array_equal(graph1.generators, graph2.generators)
+    assert np.array_equal(graph1.generators, graph3.generators)
 
 
 def test_destination_format():
