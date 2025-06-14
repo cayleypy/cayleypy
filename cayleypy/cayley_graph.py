@@ -284,6 +284,8 @@ class CayleyGraph:
                 layer2 = layer2[mask]
                 layer2_hashes = self.hasher.make_hashes(layer2) if self.hasher.is_identity else layer2_hashes[mask]
 
+            if layer2.shape[0] * layer2.shape[1] * 8 > 0.1 * self.memory_limit_bytes:
+                self._free_memory()
             if return_all_hashes:
                 all_layers_hashes.append(layer1_hashes)
             if len(layer2) == 0:
