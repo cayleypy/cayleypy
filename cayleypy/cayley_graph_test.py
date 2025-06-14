@@ -140,7 +140,7 @@ def test_bfs_batching_lrx(batch_size: int):
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
-def test_bfs_batching_lrx_all_transpositions():
+def test_bfs_batching_all_transpositions():
     graph = prepare_graph("all_transpositions", n=8)
     graph.batch_size = 2 ** 10
     result = graph.bfs()
