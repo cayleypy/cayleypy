@@ -263,7 +263,7 @@ class CayleyGraph:
                     print(f"batch_size={batch_size}")
                     for j in range(self.n_generators):
                         layer2_batch[batch_size*j : batch_size*(j+1)] = self.encoded_generators_1d[j](layer1_batch)
-                    layer2_batch = sort_and_unique(layer2_batch)
+                    layer2_batch = torch.unique(layer2_batch, sorted=True)
                     mask = ~isin_via_searchsorted(layer2_batch, layer1_hashes)
                     if i > 1:
                         mask &= ~isin_via_searchsorted(layer2_batch, layer0_hashes)
@@ -273,7 +273,9 @@ class CayleyGraph:
                     layer2_batches.append(layer2_batch[mask])
                 #print("All batches: ", layer2_batches)  
                 layer2_hashes = torch.hstack(layer2_batches)
+                layer2_hashes, _ = torch.sort(layer2_hashes)
                 layer2 = layer2_hashes.reshape((-1, 1))
+                print("SHAPES:", layer2_hashes.shape, layer2.shape)
             else:
                 layer1_neighbors = self._get_neighbors_batched(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
