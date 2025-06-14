@@ -156,21 +156,6 @@ class CayleyGraph:
             return self.string_encoder.decode(states)
         return states
 
-    def _get_neighbors_tmp(self, states: torch.Tensor, dest: torch.Tensor):
-        """Calculates all neighbors of `states`, writes them to `dest`, which must be initialized to zeros."""
-        states_num = states.shape[0]
-        assert dest.shape[0] == states_num * self.n_generators
-        if self.string_encoder is not None:
-            for i in range(self.n_generators):
-                self.encoded_generators[i](states, dest[i * states_num:(i + 1) * states_num])
-        else:
-            moves = self.generators
-            dest[:, :] = torch.gather(
-                states.unsqueeze(1).expand(states.size(0), moves.shape[0], states.size(1)),
-                2,
-                moves.unsqueeze(0).expand(states.size(0), moves.shape[0], states.size(1))
-            ).flatten(end_dim=1)
-
     def _get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates all neighbors of `states`."""
         states_num = states.shape[0]
