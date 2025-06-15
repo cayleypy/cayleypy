@@ -1,6 +1,7 @@
 """Library of pre-defined graphs."""
 from cayleypy import CayleyGraph
-from cayleypy.permutation_utils import compose_permutations, apply_permutation
+import collections
+from cayleypy.permutation_utils import compose_permutations, apply_permutation, inverse_permutation
 
 CUBE222_ALLOWED_MOVES = {
     'f0': [0, 1, 19, 17, 6, 4, 7, 5, 2, 9, 3, 11, 12, 13, 14, 15, 16, 20, 18, 21, 10, 8, 22, 23],
@@ -47,20 +48,7 @@ def _create_coxeter_generators(n: int) -> list[list[int]]:
         gens.append(perm)
     return gens
 
-import collections
-
-def inverse_permutation(perm):
-    # Create an empty list to hold the inverse permutation
-    inverse = [0] * len(perm)
-    
-    # Iterate over the original permutation
-    for i, p in enumerate(perm):
-        # Place the index at the correct position in the inverse permutation
-        inverse[p] = i
-    
-    return inverse
-
-def generate_cube_permutations_oneline(n: int):
+def generate_cube_permutations_oneline(n: int) -> Dict[str, list[int]]:
     """
     Generates permutations for the basic moves of the n x n x n Rubik's cube.
 
@@ -172,7 +160,7 @@ def generate_cube_permutations_oneline(n: int):
     sorted_moves = collections.OrderedDict(sorted(moves.items(), key=lambda t: move_names_ordered.index(t[0])))
     return dict(sorted_moves)
 
-def help_cyclic(start_pos, finish_pos, N):
+def help_cyclic(start_pos: int, finish_pos: int, N: int) -> list[int]:
     lst = []
     for i in range(start_pos):
         lst.append(i)
@@ -183,7 +171,7 @@ def help_cyclic(start_pos, finish_pos, N):
     return lst
 
 
-def globe_gens(A, B):
+def globe_gens(A: int, B: int) -> Dict[str, list[int]]:
     gens = {}
     x_count = 2 * B
     y_count = A + 1
@@ -211,7 +199,7 @@ def globe_gens(A, B):
 
     return gens
 
-def full_set_of_perm_cube(cube_size):
+def full_set_of_perm_cube(cube_size: int) -> Dict[str, list[int]]:
     original_dict = generate_cube_permutations_oneline(cube_size)
     new_dict = {}
     for key, value in original_dict.items():
@@ -220,7 +208,7 @@ def full_set_of_perm_cube(cube_size):
         new_dict[inv_key] = inverse_permutation(list(map(int, value.split())))
     return new_dict
 
-def full_set_of_perm_globe(A, B):
+def full_set_of_perm_globe(A: int, B: int) -> Dict[str, list[int]]:
     original_dict = globe_gens(A, B)
     new_dict = {}
     for key, value in original_dict.items():
@@ -231,7 +219,7 @@ def full_set_of_perm_globe(A, B):
     return new_dict
     
 
-def prepare_graph(name, **kwargs) -> CayleyGraph:
+def prepare_graph(name: str, **kwargs) -> CayleyGraph:
     """Returns pre-defined Cayley or Schreier coset graph.
 
     Supported graphs:
