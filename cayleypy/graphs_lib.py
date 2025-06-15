@@ -278,7 +278,7 @@ def prepare_graph(name, **kwargs) -> CayleyGraph:
     required_params = PARAM_REQUIREMENTS.get(name, [])
     for param in required_params:
         if param not in kwargs:
-            raise ValueError(f"Параметр '{param}' обязателен для графа типа '{name}'")
+            raise ValueError(f"Parameter '{param}' required for graph type '{name}'")
     params = {k: v for k, v in kwargs.items() if k in required_params}
     
     if name == "all_transpositions":
