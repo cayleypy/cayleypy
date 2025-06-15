@@ -164,5 +164,13 @@ def get_cube_generators(cube_size, metric):
             return CUBE333_ALLOWED_MOVES
     elif metric == "HTM":
         assert cube_size == 2 or cube_size == 3
-    
-    
+        if cube_size==2:
+            full_gens = CUBE222_ALLOWED_MOVES
+            for move_id in ['f0', 'r1', 'd0']:
+                full_gens[move_id + '^2'] = compose_permutations(CUBE222_ALLOWED_MOVES[move_id], CUBE222_ALLOWED_MOVES[move_id])
+            return full_gens
+        elif cube_size==3:
+            full_gens = CUBE333_ALLOWED_MOVES
+            for move_id in ['U', 'D', 'L', 'R', 'B', 'F']:
+                full_gens[move_id + "^2"] = compose_permutations(CUBE333_ALLOWED_MOVES[move_id], CUBE333_ALLOWED_MOVES[move_id])
+            return full_gens
