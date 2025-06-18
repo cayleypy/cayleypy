@@ -1,5 +1,5 @@
 from typing import Dict
-from cayleypy.permutation_utils import inverse_permutation
+from cayleypy.permutation_utils import compose_permutations, apply_permutation, inverse_permutation
 
 def help_cyclic(start_pos: int, finish_pos: int, N: int) -> list[int]:
     lst = []
