@@ -177,4 +177,4 @@ def get_cube_generators(cube_size, metric):
     elif metric == "QSTM":
         return full_set_of_perm_cube(cube_size)
     else:
-        raise ValueError(f"Unknown metric : {metric}")
+        raise ValueError(f"Unknown metric: {metric}")
