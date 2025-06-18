@@ -62,7 +62,7 @@ class BfsResult:
         """Dictionary used to remap vertex hashes to indexes."""
         n = self.num_vertices
         assert self.vertices_hashes is not None, "Run bfs with return_all_hashes=True."
-        assert len(self.vertices_hashes) == n
+        assert len(self.vertices_hashes) == n, "Number of vertices hashes must be the same as the number of veritces"
         ans: dict[int, int] = dict()
         for i in range(n):
             ans[int(self.vertices_hashes[i])] = i
