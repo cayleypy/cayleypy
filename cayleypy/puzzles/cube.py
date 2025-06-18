@@ -174,3 +174,7 @@ def get_cube_generators(cube_size, metric):
             for move_id in ['U', 'D', 'L', 'R', 'B', 'F']:
                 full_gens[move_id + "^2"] = compose_permutations(CUBE333_ALLOWED_MOVES[move_id], CUBE333_ALLOWED_MOVES[move_id])
             return full_gens
+    elif metric == "QSTM":
+        return full_set_of_perm_cube(cube_size)
+    else:
+        raise ValueError(f"Unknown metric : {metric}")
