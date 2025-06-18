@@ -273,7 +273,7 @@ class CayleyGraph:
             layer1 = layer2
             layer0_hashes, layer1_hashes = layer1_hashes, layer2_hashes
             keep_alive_func()
-        
+
         if return_all_hashes and not full_graph_explored:
             all_layers_hashes.append(layer1_hashes)
 
