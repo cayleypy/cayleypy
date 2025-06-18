@@ -1,5 +1,3 @@
-
-
 def help_cyclic(start_pos: int, finish_pos: int, N: int) -> list[int]:
     lst = []
     for i in range(start_pos):
