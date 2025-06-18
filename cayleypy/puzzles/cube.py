@@ -1,5 +1,5 @@
 from typing import Dict
-from cayleypy.permutation_utils import inverse_permutation
+from cayleypy.permutation_utils import compose_permutations, apply_permutation, inverse_permutation
 import collections
 CUBE222_ALLOWED_MOVES = {
     'f0': [0, 1, 19, 17, 6, 4, 7, 5, 2, 9, 3, 11, 12, 13, 14, 15, 16, 20, 18, 21, 10, 8, 22, 23],
