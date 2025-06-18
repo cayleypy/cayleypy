@@ -2,8 +2,8 @@
 from cayleypy import CayleyGraph
 import collections
 from cayleypy.permutation_utils import compose_permutations, apply_permutation, inverse_permutation
-from puzzles.cube import get_cube_generators
-from puzzles.globe import full_set_of_perm_globe
+from puzzles import get_cube_generators
+from puzzles import full_set_of_perm_globe
 
 def _create_coxeter_generators(n: int) -> list[list[int]]:
     gens = []
