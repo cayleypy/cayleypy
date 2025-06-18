@@ -171,6 +171,7 @@ def prepare_graph(name: str, **kwargs) -> CayleyGraph:
         dict_of_gens = get_cube_generators(n, "QSTM")
         generator_names = list(dict_of_gens.keys())
         generators = [dict_of_gens[k] for k in generator_names]
+        initial_state = list(range(6*n**2))
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "globeA/B":
         A = params['A']
