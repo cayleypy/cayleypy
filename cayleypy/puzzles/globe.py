@@ -1,4 +1,6 @@
 from typing import Dict
+from cayleypy.permutation_utils import inverse_permutation
+
 def help_cyclic(start_pos: int, finish_pos: int, N: int) -> list[int]:
     lst = []
     for i in range(start_pos):
