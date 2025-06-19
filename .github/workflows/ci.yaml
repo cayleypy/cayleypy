@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  style-check:
-    name: Check style
+  pylint-check:
+    name: Check style (pylint)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -16,10 +16,10 @@ jobs:
         with:
           python-version: '3.12'
           architecture: 'x64'
-      - name: Install pycodestyle
-        run: pip install pycodestyle
+      - name: Install pylint
+        run: pip install pylint
       - name: Check style
-        run: pycodestyle --max-line-length=120 ./cayleypy
+        run: pylint ./cayleypy
   lint:
     name: Lint
     runs-on: ubuntu-latest
