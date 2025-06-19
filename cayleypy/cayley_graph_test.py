@@ -11,6 +11,10 @@ FAST_RUN = os.getenv("FAST") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
 
 
+def _layer_to_set(layer: np.ndarray) -> set[str]:
+    return set("".join(str(x) for x in state) for state in layer)
+
+
 def test_generators_format():
     generators = [[1, 2, 0], [2, 0, 1], [1, 0, 2]]
     graph1 = CayleyGraph(generators)
@@ -113,10 +117,6 @@ def test_bfs_lrx_n40_layers5(bit_encoding_width):
     graph = prepare_graph("lrx", n=n)
     graph = CayleyGraph(graph.generators, dest=graph.destination_state, bit_encoding_width=bit_encoding_width)
     assert graph.bfs(max_diameter=5).layer_sizes == [1, 3, 6, 12, 24, 48]
-
-
-def _layer_to_set(layer: np.ndarray) -> set[str]:
-    return set("".join(str(x) for x in state) for state in layer)
 
 
 def test_bfs_last_layer_lrx_n8():
