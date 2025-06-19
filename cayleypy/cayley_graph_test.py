@@ -305,3 +305,27 @@ def test_benchmark_top_spin(benchmark, benchmark_mode, n):
         bit_encoding_width = 1 if benchmark_mode == "bit_encoded" else None
         graph = CayleyGraph(generators, dest=dest, bit_encoding_width=bit_encoding_width)
         benchmark.pedantic(lambda: graph.bfs(), iterations=1, rounds=5)
+
+
+def test_hashes_list_len():
+    graph = CayleyGraph(prepare_graph("lrx", n=10).generators, dest="0110110110")
+    result = graph.bfs(return_all_edges=True, return_all_hashes=True)
+    assert result.bfs_completed
+    assert result.num_vertices == len(result.vertices_hashes)
+    assert result.num_vertices == len(result.vertex_names)
+
+
+def test_hashes_list_len_max_radius():
+    graph = CayleyGraph(prepare_graph("lrx", n=10).generators, dest="0110110110")
+    result = graph.bfs(return_all_edges=True, return_all_hashes=True, max_diameter=2)
+    assert not result.bfs_completed
+    assert result.num_vertices == len(result.vertices_hashes)
+    assert result.num_vertices == len(result.vertex_names)
+
+
+def test_hashes_list_len_max_layer_size_to_explore():
+    graph = CayleyGraph(prepare_graph("lrx", n=10).generators, dest="0110110110")
+    result = graph.bfs(return_all_edges=True, return_all_hashes=True, max_layer_size_to_explore=2)
+    assert not result.bfs_completed
+    assert result.num_vertices == len(result.vertices_hashes)
+    assert result.num_vertices == len(result.vertex_names)

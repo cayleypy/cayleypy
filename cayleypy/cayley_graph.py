@@ -267,11 +267,12 @@ class CayleyGraph:
             layer_sizes.append(len(layer2))
             if len(layer2) <= max_layer_size_to_store:
                 layers[i] = self._decode_states(layer2)
-            if len(layer2) >= max_layer_size_to_explore:
-                break
 
             layer1 = layer2
             layer0_hashes, layer1_hashes = layer1_hashes, layer2_hashes
+            if len(layer2) >= max_layer_size_to_explore:
+                break
+
             keep_alive_func()
 
         if return_all_hashes and not full_graph_explored:
