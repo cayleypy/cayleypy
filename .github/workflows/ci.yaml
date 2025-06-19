@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  style-check:
-    name: Check style
+  format-check:
+    name: Format check
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -16,10 +16,25 @@ jobs:
         with:
           python-version: '3.12'
           architecture: 'x64'
-      - name: Install pycodestyle
-        run: pip install pycodestyle
-      - name: Check style
-        run: pycodestyle --max-line-length=120 ./cayleypy
+      - name: Install black
+        run: pip install black
+      - name: Run black
+        run: black --check .
+  lint:
+    name: Lint (black+pylint+mypy)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Install requirements
+        run: |
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+      - name: Lint
+        run: ./lint.sh
   pytest-ubuntu:
     strategy:
       matrix:
@@ -35,10 +50,7 @@ jobs:
       - name: Install requirements
         run: |
           pip install -r requirements.txt
-          pip install -r requirements-dev.txt
-      - name: Lint
-        if: ${{ matrix.python-version == '3.12' }}
-        run: ./lint.sh
+          pip install pytest
       - name: Run tests
         run: pytest
   pytest-windows:

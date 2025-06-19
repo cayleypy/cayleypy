@@ -1,4 +1,5 @@
 """Helpers for computing and loading pre-computed results."""
+
 import csv
 import functools
 import json
@@ -8,16 +9,16 @@ from typing import Any, Callable
 from .cayley_graph import CayleyGraph
 from .graphs_lib import prepare_graph
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 
 @functools.cache
 def load_dataset(dataset_name: str, error_if_not_found=True) -> dict[str, Any]:
     """Loads named dataset."""
-    file_name = os.path.join(DATA_DIR, dataset_name + '.csv')
-    data: dict[str, str] = dict()
+    file_name = os.path.join(DATA_DIR, dataset_name + ".csv")
+    data: dict[str, str] = {}
     if os.path.exists(file_name):
-        with open(file_name, "r") as csvfile:
+        with open(file_name, "r", encoding="utf-8") as csvfile:
             for key, value in csv.reader(csvfile):
                 data[key] = json.loads(value)
     else:
@@ -27,14 +28,14 @@ def load_dataset(dataset_name: str, error_if_not_found=True) -> dict[str, Any]:
 
 
 def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str], Any]):
-    file_name = os.path.join(DATA_DIR, dataset_name + '.csv')
+    file_name = os.path.join(DATA_DIR, dataset_name + ".csv")
     data = load_dataset(dataset_name, error_if_not_found=False)
     for key in keys:
         if key not in data:
             data[key] = json.dumps(eval_func(key))
-    rows = [(key, value) for key, value in data.items()]
+    rows = list(data.items())
     rows.sort(key=lambda x: (len(x[0]), x[0]))
-    with open(file_name, "w") as csvfile:
+    with open(file_name, "w", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         for row in rows:
             writer.writerow(row)
@@ -98,6 +99,14 @@ def _compute_coxeter_cayley_growth(n: str) -> list[int]:
     return prepare_graph("coxeter", n=int(n)).bfs().layer_sizes
 
 
+def _compute_mini_paramorphix_cayley_growth(_: str) -> list[int]:
+    return prepare_graph("mini_paramorphix").bfs().layer_sizes
+
+
+def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
+    return prepare_graph("cyclic_coxeter", n=int(n)).bfs().layer_sizes
+
+
 def generate_datasets():
     """Generates datasets for small n, keeping existing values."""
     keys = []
@@ -117,5 +126,7 @@ def generate_datasets():
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
     _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
+    _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
     keys = [str(n) for n in range(1, 8)]
     _update_dataset("burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth)
+    _update_dataset("mini_paramorphix_cayley_growth", ["24"], _compute_mini_paramorphix_cayley_growth)

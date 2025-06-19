@@ -1,4 +1,5 @@
+black
 mypy==1.15.0
-pycodestyle
+pylint
 pytest
 pytest-benchmark
