@@ -78,7 +78,7 @@ def _materialize_permutations(ans, black, map1):
 def _paint_gray(perms, gray, map2):
     for i in range(len(perms)):
         rank = permutation_to_rank(perms[i], map2)
-        gray[rank // 64] |= (1 << (rank % 64))
+        gray[rank // 64] |= 1 << (rank % 64)
 
 
 def _encode_perm(p):
@@ -90,6 +90,7 @@ class VertexChunk:
 
     We do not store them explicitly, but materialize each time.
     """
+
     def __init__(self, n, suffix):
         self.black = np.zeros((CHUNK_SIZE // 64,), dtype=np.uint64)
         self.last_layer = np.zeros((CHUNK_SIZE // 64,), dtype=np.uint64)
@@ -135,6 +136,7 @@ class VertexChunk:
 
 class CayleyGraphChunkedBfs:
     """Class to run the special BFS algorithm."""
+
     def __init__(self, graph: CayleyGraph):
         n = len(graph.destination_state)
         self.graph = graph
@@ -176,7 +178,7 @@ class CayleyGraphChunkedBfs:
     def count_last_layer(self):
         return sum(c.last_layer_count for c in self.chunks)
 
-    def bfs(self, max_diameter=10 ** 6):
+    def bfs(self, max_diameter=10**6):
         initial_states = np.array([_encode_perm(self.graph.destination_state.cpu().numpy())], dtype=np.int64)
         self.paint_gray(initial_states)
         self.flush_gray_to_black()
@@ -204,7 +206,7 @@ class CayleyGraphChunkedBfs:
         return layer_sizes
 
 
-def bfs_bitmask(graph: CayleyGraph, max_diameter: int = 10 ** 6) -> list[int]:
+def bfs_bitmask(graph: CayleyGraph, max_diameter: int = 10**6) -> list[int]:
     """Version of BFS storing all vertices explicitly as bitmasks, using 3 bits of memory per state.
 
     See https://www.kaggle.com/code/fedimser/memory-efficient-bfs-on-caley-graphs-3bits-per-vx
@@ -216,6 +218,6 @@ def bfs_bitmask(graph: CayleyGraph, max_diameter: int = 10 ** 6) -> list[int]:
     n = len(graph.destination_state)
     assert n > R, f"This algorithm works only for N>{R}."
     if graph.verbose >= 2:
-        estimated_memory_gb = (math.factorial(n) * 3 / 8) / (2 ** 30)
+        estimated_memory_gb = (math.factorial(n) * 3 / 8) / (2**30)
         print(f"Estimated memory usage: {estimated_memory_gb:.02f}GB.")
     return CayleyGraphChunkedBfs(graph).bfs(max_diameter=max_diameter)

@@ -1,4 +1,5 @@
 """Helpers for computing and loading pre-computed results."""
+
 import csv
 import functools
 import json
@@ -8,13 +9,13 @@ from typing import Any, Callable
 from .cayley_graph import CayleyGraph
 from .graphs_lib import prepare_graph
 
-DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
+DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 
 @functools.cache
 def load_dataset(dataset_name: str, error_if_not_found=True) -> dict[str, Any]:
     """Loads named dataset."""
-    file_name = os.path.join(DATA_DIR, dataset_name + '.csv')
+    file_name = os.path.join(DATA_DIR, dataset_name + ".csv")
     data: dict[str, str] = {}
     if os.path.exists(file_name):
         with open(file_name, "r", encoding="utf-8") as csvfile:
@@ -27,7 +28,7 @@ def load_dataset(dataset_name: str, error_if_not_found=True) -> dict[str, Any]:
 
 
 def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str], Any]):
-    file_name = os.path.join(DATA_DIR, dataset_name + '.csv')
+    file_name = os.path.join(DATA_DIR, dataset_name + ".csv")
     data = load_dataset(dataset_name, error_if_not_found=False)
     for key in keys:
         if key not in data:

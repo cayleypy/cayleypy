@@ -38,7 +38,7 @@ class StringEncoder:
         assert s.shape[1] == self.n
         assert torch.min(s) >= 0, "Cannot encode negative values."
         max_value = torch.max(s)
-        assert max_value < 2 ** self.w, f"Width {self.w} is not sufficient to encode value {max_value}."
+        assert max_value < 2**self.w, f"Width {self.w} is not sufficient to encode value {max_value}."
 
         encoded = torch.zeros((s.shape[0], self.encoded_length), dtype=torch.int64, device=s.device)
         w, cl = self.w, CODEWORD_LENGTH
@@ -70,7 +70,7 @@ class StringEncoder:
                 key = (start_cw_id, end_cw_id, shift)
                 if key not in shift_to_mask:
                     shift_to_mask[key] = 0
-                shift_to_mask[key] |= (1 << (start_bit % CODEWORD_LENGTH))
+                shift_to_mask[key] |= 1 << (start_bit % CODEWORD_LENGTH)
         return shift_to_mask
 
     def implement_permutation(self, p: list[int]) -> Callable[[torch.Tensor, torch.Tensor], None]:

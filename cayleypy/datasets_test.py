@@ -1,4 +1,5 @@
 """Sanity checks for datasets."""
+
 import math
 
 from cayleypy import load_dataset, CayleyGraph, prepare_graph
@@ -9,7 +10,7 @@ def _verify_layers_fast(graph: CayleyGraph, layer_sizes: list[int]):
         assert layer_sizes == graph.bfs().layer_sizes
     else:
         first_layers = graph.bfs(max_layer_size_to_explore=100).layer_sizes
-        assert first_layers == layer_sizes[:len(first_layers)]
+        assert first_layers == layer_sizes[: len(first_layers)]
 
 
 # LRX Cayley graphs contain all permutations.
@@ -27,7 +28,7 @@ def test_burnt_pancake_cayley_growth():
     oeis_a078941 = [None, 1, 4, 6, 8, 10, 12, 14, 15, 17, 18, 19, 21]
     for key, layer_sizes in load_dataset("burnt_pancake_cayley_growth").items():
         n = int(key)
-        assert sum(layer_sizes) == math.factorial(n)*2**n
+        assert sum(layer_sizes) == math.factorial(n) * 2**n
         assert len(layer_sizes) - 1 == oeis_a078941[n]
         _verify_layers_fast(CayleyGraph(prepare_graph("burnt_pancake", n=n).generators), layer_sizes)
 
@@ -78,7 +79,7 @@ def test_full_reversals_cayley_growth():
 def test_lrx_coset_growth():
     for initial_state, layer_sizes in load_dataset("lrx_coset_growth").items():
         n = len(initial_state)
-        k = initial_state.count('1')
+        k = initial_state.count("1")
         assert sum(layer_sizes) == math.comb(n, k)
         _verify_layers_fast(CayleyGraph(prepare_graph("lrx", n=n).generators, dest=initial_state), layer_sizes)
 
@@ -87,7 +88,7 @@ def test_lrx_coset_growth():
 def test_top_spin_coset_growth():
     for initial_state, layer_sizes in load_dataset("top_spin_coset_growth").items():
         n = len(initial_state)
-        k = initial_state.count('1')
+        k = initial_state.count("1")
         if n >= 6:
             assert sum(layer_sizes) == math.comb(n, k)
         _verify_layers_fast(CayleyGraph(prepare_graph("top_spin", n=n).generators, dest=initial_state), layer_sizes)

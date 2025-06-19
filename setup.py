@@ -6,7 +6,7 @@ with open("README.md", "r", encoding="utf-8") as readme_file:
 with open("requirements.txt", "r", encoding="utf-8") as req_file:
     # Temporarily remove requirements for faster development iteration on Kaggle.
     # Kaggle has torch, but for some reason if it's here, it spends a lot of time installing it.
-    requirements = [] #[r.strip() for r in req_file.readlines()]
+    requirements = []  # [r.strip() for r in req_file.readlines()]
 
 setuptools.setup(
     name="cayleypy",
