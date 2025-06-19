@@ -7,6 +7,19 @@ on:
     branches: [ main ]
 
 jobs:
+  format-check:
+    name: Format check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Install black
+        run: pip install black
+      - name: Run black
+        run: black --check .
   lint:
     name: Lint
     runs-on: ubuntu-latest
