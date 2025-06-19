@@ -47,8 +47,8 @@ def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str
 def _compute_lrx_coset_growth(initial_state: str) -> list[int]:
     n = len(initial_state)
     generators = prepare_graph("lrx", n=n).generators
-    result = CayleyGraph(generators, dest=initial_state).bfs()
-    return result.layer_sizes
+    Result = CayleyGraph(generators, dest=initial_state).bfs()
+    return Result.layer_sizes
 
 
 def _compute_top_spin_coset_growth(initial_state: str) -> list[int]:
