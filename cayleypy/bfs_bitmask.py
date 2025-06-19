@@ -7,7 +7,7 @@ import numba
 import numpy as np
 
 from .cayley_graph import CayleyGraph
-from .permutation_utils import inverse_permutation, is_permutation
+from .permutation_utils import is_permutation
 
 R = 8  # Chunk prefix size.
 CHUNK_SIZE = math.factorial(R)
@@ -85,9 +85,11 @@ def _encode_perm(p):
     return sum(p[i] << (4 * i) for i in range(len(p)))
 
 
-# All possible permutations sharing common suffix of length N-R.
-# We do not store them explicitly, but materialize each time.
 class VertexChunk:
+    """All possible permutations sharing common suffix of length N-R.
+
+    We do not store them explicitly, but materialize each time.
+    """
     def __init__(self, n, suffix):
         self.black = np.zeros((CHUNK_SIZE // 64,), dtype=np.uint64)
         self.last_layer = np.zeros((CHUNK_SIZE // 64,), dtype=np.uint64)
@@ -132,6 +134,7 @@ class VertexChunk:
 
 
 class CayleyGraphChunkedBfs:
+    """Class to run the special BFS algorithm."""
     def __init__(self, graph: CayleyGraph):
         n = len(graph.destination_state)
         self.graph = graph
@@ -171,7 +174,7 @@ class CayleyGraphChunkedBfs:
             c.flush_gray_to_black()
 
     def count_last_layer(self):
-        return sum([c.last_layer_count for c in self.chunks])
+        return sum(c.last_layer_count for c in self.chunks)
 
     def bfs(self, max_diameter=10 ** 6):
         initial_states = np.array([_encode_perm(self.graph.destination_state.cpu().numpy())], dtype=np.int64)

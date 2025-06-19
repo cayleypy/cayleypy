@@ -1,12 +1,8 @@
 """Special BFS algorithms, optimized for low memory usage."""
-import itertools
-import math
-
-import numba
 import numpy as np
 
 from .cayley_graph import CayleyGraph
-from .permutation_utils import inverse_permutation, is_permutation
+from .permutation_utils import inverse_permutation
 
 
 def bfs_numpy(graph: CayleyGraph, max_diameter: int = 1000000) -> list[int]:
@@ -18,7 +14,7 @@ def bfs_numpy(graph: CayleyGraph, max_diameter: int = 1000000) -> list[int]:
     perm_funcs = [
         graph.string_encoder.implement_permutation_1d(p) for p in perms]
     pn = len(perms)
-    start_state_tensor = graph._encode_states(graph.destination_state).cpu().numpy().reshape(-1)
+    start_state_tensor = graph.encode_states(graph.destination_state).cpu().numpy().reshape(-1)
     start_state = np.array(start_state_tensor, dtype=np.int64)
 
     # For each generating permutation store which one is its inverse.
@@ -62,6 +58,6 @@ def bfs_numpy(graph: CayleyGraph, max_diameter: int = 1000000) -> list[int]:
             print(f"Layer {i}: {layer2_size} states.")
         layer0, layer1 = layer1, layer2
         if layer2_size >= 10 ** 9:
-            graph._free_memory()
+            graph.free_memory()
 
     return layer_sizes

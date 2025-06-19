@@ -15,9 +15,9 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'data')
 def load_dataset(dataset_name: str, error_if_not_found=True) -> dict[str, Any]:
     """Loads named dataset."""
     file_name = os.path.join(DATA_DIR, dataset_name + '.csv')
-    data: dict[str, str] = dict()
+    data: dict[str, str] = {}
     if os.path.exists(file_name):
-        with open(file_name, "r") as csvfile:
+        with open(file_name, "r", encoding="utf-8") as csvfile:
             for key, value in csv.reader(csvfile):
                 data[key] = json.loads(value)
     else:
@@ -32,9 +32,9 @@ def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str
     for key in keys:
         if key not in data:
             data[key] = json.dumps(eval_func(key))
-    rows = [(key, value) for key, value in data.items()]
+    rows = list(data.items())
     rows.sort(key=lambda x: (len(x[0]), x[0]))
-    with open(file_name, "w") as csvfile:
+    with open(file_name, "w", encoding="utf-8") as csvfile:
         writer = csv.writer(csvfile)
         for row in rows:
             writer.writerow(row)

@@ -1,4 +1,3 @@
-import math
 import os
 
 import numpy as np
@@ -164,8 +163,8 @@ def test_get_neighbors(bit_encoding_width):
     # In what order it generates neighbours is an implementation detail. However, we rely on this convention when
     # generating the edges list.
     graph = CayleyGraph([[1, 0, 2, 3, 4], [0, 1, 2, 4, 3]], bit_encoding_width=bit_encoding_width)
-    states = graph._encode_states(torch.tensor([[10, 11, 12, 13, 14], [15, 16, 17, 18, 19]], dtype=torch.int64))
-    result = graph._decode_states(graph._get_neighbors(states))
+    states = graph.encode_states(torch.tensor([[10, 11, 12, 13, 14], [15, 16, 17, 18, 19]], dtype=torch.int64))
+    result = graph.decode_states(graph.get_neighbors(states))
     if bit_encoding_width == 5:
         # When using StringEncoder, we go over the generators in outer loop, and over the states in inner loop.
         assert torch.equal(result.cpu(), torch.tensor(
@@ -224,24 +223,24 @@ def test_top_spin_cayley_growth():
 
 def test_lrx_coset_growth():
     expected = load_dataset("lrx_coset_growth")
-    for initial_state in expected.keys():
+    for initial_state, expected_layer_sizes in expected.items():
         if len(initial_state) > 15:
             continue
         generators = prepare_graph("lrx", n=len(initial_state)).generators
         graph = CayleyGraph(generators, dest=initial_state)
         result = graph.bfs()
-        assert result.layer_sizes == expected[initial_state]
+        assert result.layer_sizes == expected_layer_sizes
 
 
 def test_top_spin_coset_growth():
     expected = load_dataset("top_spin_coset_growth")
-    for initial_state in expected.keys():
+    for initial_state, expected_layer_sizes in expected.items():
         if len(initial_state) > 15:
             continue
         generators = prepare_graph("top_spin", n=len(initial_state)).generators
         graph = CayleyGraph(generators, dest=initial_state)
         result = graph.bfs()
-        assert result.layer_sizes == expected[initial_state]
+        assert result.layer_sizes == expected_layer_sizes
 
 
 # To skip slower tests ike this, do `FAST=1 pytest`
@@ -309,4 +308,4 @@ def test_benchmark_top_spin(benchmark, benchmark_mode, n):
     else:
         bit_encoding_width = 1 if benchmark_mode == "bit_encoded" else None
         graph = CayleyGraph(generators, dest=dest, bit_encoding_width=bit_encoding_width)
-        benchmark.pedantic(lambda: graph.bfs(), iterations=1, rounds=5)
+        benchmark.pedantic(graph.bfs, iterations=1, rounds=5)

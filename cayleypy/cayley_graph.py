@@ -1,4 +1,3 @@
-import functools
 import gc
 import math
 from typing import Callable, Optional, Union
@@ -8,7 +7,7 @@ import torch
 
 from .bfs_result import BfsResult
 from .hasher import StateHasher
-from .permutation_utils import *
+from .permutation_utils import inverse_permutation
 from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted
 
@@ -99,7 +98,7 @@ class CayleyGraph:
         # Prepare destination state.
         if dest is None:
             dest = list(range(self.state_size))  # Identity permutation.
-        elif type(dest) is str:
+        elif isinstance(dest, str):
             dest = [int(x) for x in dest]
         self.destination_state = torch.as_tensor(dest, device=self.device, dtype=torch.int64)
         assert self.destination_state.shape == (self.state_size,)
@@ -142,7 +141,8 @@ class CayleyGraph:
         unique_hashes = self.hasher.make_hashes(unique_states) if self.hasher.is_identity else hashes[unique_idx]
         return unique_states, unique_hashes, unique_idx
 
-    def _encode_states(self, states: Union[torch.Tensor, np.ndarray, list]) -> torch.Tensor:
+    def encode_states(self, states: Union[torch.Tensor, np.ndarray, list]) -> torch.Tensor:
+        """Converts states from human-readable to internal representation."""
         states = torch.as_tensor(states, device=self.device)
         if len(states.shape) == 1:  # In case when only one state was passed.
             states = states.reshape(1, -1)
@@ -152,13 +152,14 @@ class CayleyGraph:
             return self.string_encoder.encode(states)
         return states
 
-    def _decode_states(self, states: torch.Tensor) -> torch.Tensor:
+    def decode_states(self, states: torch.Tensor) -> torch.Tensor:
+        """Converts states from internal to human-readable representation."""
         if self.string_encoder is not None:
             return self.string_encoder.decode(states)
         return states
 
-    def _get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
-        """Calculates all neighbors of `states`."""
+    def get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
+        """Calculates all neighbors of `states` (in internal representation)."""
         states_num = states.shape[0]
         neighbors = torch.zeros((states_num * self.n_generators, states.shape[1]), dtype=torch.int64,
                                 device=self.device)
@@ -211,11 +212,11 @@ class CayleyGraph:
         # This version of BFS is correct only for undirected graph.
         assert self.generators_inverse_closed, "BFS is supported only when generators are inverse-closed."
 
-        start_states = self._encode_states(start_states or self.destination_state)
+        start_states = self.encode_states(start_states or self.destination_state)
         layer0_hashes = torch.empty((0,), dtype=torch.int64, device=self.device)
         layer1, layer1_hashes, _ = self.get_unique_states(start_states)
         layer_sizes = [len(layer1)]
-        layers = {0: self._decode_states(layer1)}
+        layers = {0: self.decode_states(layer1)}
         full_graph_explored = False
         edges_list_starts = []
         edges_list_ends = []
@@ -237,7 +238,7 @@ class CayleyGraph:
                 num_batches = int(math.ceil(layer1_hashes.shape[0] / self.batch_size))
                 layer2_batches = []  # type: list[torch.Tensor]
                 for layer1_batch in layer1.tensor_split(num_batches, dim=0):
-                    layer2_batch = self._get_neighbors(layer1_batch).reshape((-1,))
+                    layer2_batch = self.get_neighbors(layer1_batch).reshape((-1,))
                     layer2_batch = torch.unique(layer2_batch, sorted=True)
                     mask = ~isin_via_searchsorted(layer2_batch, layer1_hashes)
                     if i > 1:
@@ -254,7 +255,7 @@ class CayleyGraph:
                     layer2_hashes, _ = torch.sort(layer2_hashes)
                 layer2 = layer2_hashes.reshape((-1, 1))
             else:
-                layer1_neighbors = self._get_neighbors(layer1)
+                layer1_neighbors = self.get_neighbors(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
                 if return_all_edges:
                     if self.string_encoder is not None:
@@ -271,7 +272,7 @@ class CayleyGraph:
                 layer2_hashes = self.hasher.make_hashes(layer2) if self.hasher.is_identity else layer2_hashes[mask]
 
             if layer2.shape[0] * layer2.shape[1] * 8 > 0.1 * self.memory_limit_bytes:
-                self._free_memory()
+                self.free_memory()
             if return_all_hashes:
                 all_layers_hashes.append(layer1_hashes)
             if len(layer2) == 0:
@@ -281,7 +282,7 @@ class CayleyGraph:
                 print(f"Layer {i}: {len(layer2)} states.")
             layer_sizes.append(len(layer2))
             if len(layer2) <= max_layer_size_to_store:
-                layers[i] = self._decode_states(layer2)
+                layers[i] = self.decode_states(layer2)
             if len(layer2) >= max_layer_size_to_explore:
                 break
 
@@ -299,7 +300,7 @@ class CayleyGraph:
         if return_all_hashes:
             vertices_hashes = torch.hstack(all_layers_hashes)
 
-        layers[len(layer_sizes) - 1] = self._decode_states(layer1)
+        layers[len(layer_sizes) - 1] = self.decode_states(layer1)
 
         return BfsResult(
             layer_sizes=layer_sizes,
@@ -309,12 +310,11 @@ class CayleyGraph:
             edges_list_hashes=edges_list_hashes,
             graph=self)
 
-    @functools.cache
     def to_networkx_graph(self):
         return self.bfs(max_layer_size_to_store=10 ** 18, return_all_edges=True,
                         return_all_hashes=True).to_networkx_graph()
 
-    def _free_memory(self):
+    def free_memory(self):
         if self.verbose >= 1:
             print("Freeing memory...")
         gc.collect()

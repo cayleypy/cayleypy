@@ -26,7 +26,7 @@ class StateHasher:
             trial_states = torch.zeros((2, state_size), device=device, dtype=torch.int64)
             _ = self._make_hashes_cpu_and_modern_gpu(trial_states)
             self.make_hashes = self._make_hashes_cpu_and_modern_gpu
-        except RuntimeError as e:
+        except RuntimeError:
             self.vec_hasher = self.vec_hasher.reshape((state_size,))
             self.make_hashes = self._make_hashes_older_gpu
 

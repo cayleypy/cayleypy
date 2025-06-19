@@ -1,6 +1,8 @@
-from cayleypy import prepare_graph, load_dataset, bfs_bitmask
-import pytest
 import os
+
+import pytest
+
+from cayleypy import prepare_graph, load_dataset, bfs_bitmask
 
 FAST_RUN = os.getenv("FAST") == "1"
 

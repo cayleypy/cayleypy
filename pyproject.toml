@@ -7,3 +7,21 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["numba.*"]
 ignore_missing_imports = true
+
+[tool.pylint."FORMAT"]
+max-line-length = 120
+[tool.pylint."MESSAGES CONTROL"]
+disable = [
+    "consider-using-enumerate",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "no-else-return",
+    "superfluous-parens",
+    "too-few-public-methods",
+    "too-many-arguments",
+    "too-many-branches",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "too-many-return-statements",
+    "too-many-statements",
+]

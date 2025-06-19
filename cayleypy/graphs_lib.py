@@ -1,5 +1,5 @@
 """Library of pre-defined graphs."""
-from cayleypy import CayleyGraph
+from cayleypy.cayley_graph import CayleyGraph
 from cayleypy.permutation_utils import compose_permutations, transposition
 
 CUBE222_ALLOWED_MOVES = {
