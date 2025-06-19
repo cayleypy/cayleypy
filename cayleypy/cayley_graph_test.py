@@ -5,7 +5,7 @@ import numpy as np
 import pytest
 import torch
 
-from cayleypy import CayleyGraph, prepare_graph, load_dataset
+from cayleypy import CayleyGraph, prepare_graph, load_dataset, bfs_numpy
 
 FAST_RUN = os.getenv("FAST") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
@@ -37,8 +37,8 @@ def test_bfs_growth_swap():
     result = graph.bfs()
     assert result.layer_sizes == [1, 1]
     assert result.diameter() == 1
-    assert result.get_layer(0) == ["01"]
-    assert result.get_layer(1) == ["10"]
+    assert _layer_to_set(result.get_layer(0)) == {"01"}
+    assert _layer_to_set(result.get_layer(1)) == {"10"}
 
 
 def test_bfs_lrx_coset_5():
@@ -47,10 +47,10 @@ def test_bfs_lrx_coset_5():
     assert ans.bfs_completed
     assert ans.diameter() == 6
     assert ans.layer_sizes == [1, 3, 5, 8, 7, 5, 1]
-    assert ans.get_layer(0) == ["01210"]
-    assert set(ans.get_layer(1)) == {"00121", "10210", "12100"}
-    assert set(ans.get_layer(5)) == {"00112", "01120", "01201", "02011", "11020"}
-    assert ans.get_layer(6) == ["10201"]
+    assert _layer_to_set(ans.get_layer(0)) == {"01210"}
+    assert _layer_to_set(ans.get_layer(1)) == {"00121", "10210", "12100"}
+    assert _layer_to_set(ans.get_layer(5)) == {"00112", "01120", "01201", "02011", "11020"}
+    assert _layer_to_set(ans.get_layer(6)) == {"10201"}
 
 
 def test_bfs_lrx_coset_10():
@@ -58,11 +58,11 @@ def test_bfs_lrx_coset_10():
     ans = graph.bfs()
     assert ans.diameter() == 17
     assert ans.layer_sizes == [1, 3, 4, 6, 11, 16, 19, 23, 31, 29, 20, 14, 10, 10, 6, 3, 3, 1]
-    assert ans.get_layer(0) == ["0110110110"]
-    assert set(ans.get_layer(1)) == {"0011011011", "1010110110", "1101101100"}
-    assert set(ans.get_layer(15)) == {"0001111110", "0111111000", "1110000111"}
-    assert set(ans.get_layer(16)) == {"0011111100", "1111000011", "1111110000"}
-    assert ans.get_layer(17) == ["1111100001"]
+    assert _layer_to_set(ans.get_layer(0)) == {"0110110110"}
+    assert _layer_to_set(ans.get_layer(1)) == {"0011011011", "1010110110", "1101101100"}
+    assert _layer_to_set(ans.get_layer(15)) == {"0001111110", "0111111000", "1110000111"}
+    assert _layer_to_set(ans.get_layer(16)) == {"0011111100", "1111000011", "1111110000"}
+    assert _layer_to_set(ans.get_layer(17)) == {"1111100001"}
 
 
 def test_bfs_max_radius():
@@ -115,14 +115,18 @@ def test_bfs_lrx_n40_layers5(bit_encoding_width):
     assert graph.bfs(max_diameter=5).layer_sizes == [1, 3, 6, 12, 24, 48]
 
 
+def _layer_to_set(layer: np.ndarray) -> set[str]:
+    return set("".join(str(x) for x in state) for state in layer)
+
+
 def test_bfs_last_layer_lrx_n8():
     graph = prepare_graph("lrx", n=8)
-    assert graph.bfs().last_layer() == ["10765432"]
+    assert _layer_to_set(graph.bfs().last_layer()) == {"10765432"}
 
 
 def test_bfs_last_layer_lrx_coset_n8():
     graph = CayleyGraph(prepare_graph("lrx", n=8).generators, dest="01230123")
-    assert set(graph.bfs().last_layer()) == {"11003322", "22110033", "33221100", "00332211"}
+    assert _layer_to_set(graph.bfs().last_layer()) == {"11003322", "22110033", "33221100", "00332211"}
 
 
 @pytest.mark.parametrize("bit_encoding_width", [None, 3, 10, 'auto'])
@@ -292,16 +296,16 @@ def test_bfs_small_hash_chunk_size():
     assert graph.bfs(max_diameter=8).layer_sizes == [1, 3, 6, 12, 24, 48, 91, 172, 325]
 
 
-# Below is the benchmark code. To tun: `BENCHMARK=1 pytest . -k benchmark`
+# Below is the benchmark code. To run: `BENCHMARK=1 pytest . -k benchmark`
 @pytest.mark.skipif(not BENCHMARK_RUN, reason="benchmark")
 @pytest.mark.parametrize("benchmark_mode", ["baseline", "bit_encoded", "bfs_numpy"])
 @pytest.mark.parametrize("n", [26])
 def test_benchmark_top_spin(benchmark, benchmark_mode, n):
-    generators, _ = prepare_graph("lrx", n=n)
+    generators = prepare_graph("lrx", n=n).generators
     dest = [0] * (n // 2) + [1] * (n // 2)
     if benchmark_mode == "bfs_numpy":
         graph = CayleyGraph(generators, dest=dest)
-        benchmark.pedantic(lambda: graph.bfs_numpy(), iterations=1, rounds=5)
+        benchmark.pedantic(lambda: bfs_numpy(graph), iterations=1, rounds=5)
     else:
         bit_encoding_width = 1 if benchmark_mode == "bit_encoded" else None
         graph = CayleyGraph(generators, dest=dest, bit_encoding_width=bit_encoding_width)

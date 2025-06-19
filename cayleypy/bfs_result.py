@@ -38,17 +38,15 @@ class BfsResult:
         """Maximal distance from any start vertex to any other vertex."""
         return len(self.layer_sizes) - 1
 
-    def get_layer(self, layer_id: int) -> list[str]:
-        """Returns layer by index, formatted as set of strings."""
+    def get_layer(self, layer_id: int) -> np.ndarray:
+        """Returns all states in the layer with given index."""
         if not 0 <= layer_id <= self.diameter():
             raise KeyError(f"No such layer: {layer_id}.")
         if layer_id not in self.layers:
             raise KeyError(f"Layer {layer_id} was not computed because it was too large.")
-        layer = self.layers[layer_id]
-        delimiter = "" if int(layer.max()) <= 9 else ","
-        return [delimiter.join(str(int(x)) for x in state) for state in layer]
+        return self.layers[layer_id].cpu().numpy()
 
-    def last_layer(self) -> list[str]:
+    def last_layer(self) -> np.ndarray:
         """Returns last layer, formatted as set of strings."""
         return self.get_layer(self.diameter())
 
@@ -92,10 +90,12 @@ class BfsResult:
     def vertex_names(self) -> list[str]:
         """Returns names for vertices in the graph."""
         ans = []
+        delimiter = "" if int(self.graph.destination_state.max()) <= 9 else ","
         for layer_id in range(len(self.layers)):
             if layer_id not in self.layers:
                 raise ValueError("To get explicit graph, run bfs with max_layer_size_to_store=None.")
-            ans += self.get_layer(layer_id)
+            for state in self.get_layer(layer_id):
+                ans.append(delimiter.join(str(int(x)) for x in state))
         return ans
 
     @cached_property
