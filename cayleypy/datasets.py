@@ -44,11 +44,11 @@ def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str
 # The code below can be viewed as definition of what is stored in datasets.
 # It is used to compute results for small graphs. Results for larger are computed separately and added to repository
 # manually.
-def _compute_lrx_coset_growth(initial_state: str) -> list[str]:
+def _compute_lrx_coset_growth(initial_state: str) -> list[int]:
     n = len(initial_state)
     generators = prepare_graph("lrx", n=n).generators
-    Result = CayleyGraph(generators, dest=initial_state).bfs()
-    return Result.layer_sizes
+    result = CayleyGraph(generators, dest=initial_state).bfs()
+    return result.layer_sizes
 
 
 def _compute_top_spin_coset_growth(initial_state: str) -> list[int]:

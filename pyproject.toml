@@ -25,3 +25,6 @@ disable = [
     "too-many-return-statements",
     "too-many-statements",
 ]
+
+[tool.black]
+line-length = 120
