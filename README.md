@@ -54,6 +54,19 @@ To check coverage, run:
 coverage run -m pytest && coverage html
 ```
 
+### Formatting
+
+This repository uses the [Black formatter](https://github.com/psf/black).
+If you are getting error saying that some files "would be reformatted", you need to format
+your code using Black. There are few convenient ways to do that:
+* From command line - run `black .` 
+* In PyCharm - go to Setting>Tools>Black, and check "Use Black formatter": "On code reformat" 
+    (then it will run on Ctrl+Alt+L), or "On save", or both.
+* In Visual Studio code - install the
+    [Black Formatter extension](https://marketplace.visualstudio.com/items?itemName=ms-python.black-formatter),
+    then use Ctrl+Shift+I to format code. 
+    If you are  asked to configure default formatter, pick the Black formatter.
+
 ## Credits
 
 The initial code for this library is based on [cayleypy](https://github.com/iKolt/cayleypy)
