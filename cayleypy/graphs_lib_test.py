@@ -1,7 +1,8 @@
 import torch
 
 from cayleypy import prepare_graph
-
+from cayleypy.permutation_utils import compose_permutations, apply_permutation, inverse_permutation
+from cayleypy.puzzles import get_cube_generators, full_set_of_perm_globe
 
 def test_all_transpositions():
     graph = prepare_graph("all_transpositions", n=3)
@@ -57,6 +58,8 @@ def test_full_reversals():
 
 
 def test_cube333():
+    dict_of_gens = get_cube_generators(3, "QTM")
+    assert len(dict_of_gens) == 12
     graph = prepare_graph("cube_3/3/3_12gensQTM")
     assert graph.n_generators == 12
 
