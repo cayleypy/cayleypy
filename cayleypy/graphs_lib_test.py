@@ -58,14 +58,12 @@ def test_full_reversals():
 
 
 def test_cube333():
-    dict_of_gens = get_cube_generators(3, "QTM")
-    assert len(dict_of_gens) == 12
+    graph = prepare_graph("cube_3/3/3_18gensHTM")
+    assert graph.n_generators == 18
     graph = prepare_graph("cube_3/3/3_12gensQTM")
     assert graph.n_generators == 12
 
-    graph = prepare_graph("cube_3/3/3_18gensHTM")
-    assert graph.n_generators == 18
-
+    
 def test_cube_nnn_qstm():
     graph = prepare_graph("cube_n/n/n_gensQSTM", n=2)
     assert graph.n_generators == 12
