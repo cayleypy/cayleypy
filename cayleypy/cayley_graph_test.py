@@ -357,5 +357,4 @@ def test_benchmark_top_spin(benchmark, benchmark_mode, n):
     else:
         bit_encoding_width = 1 if benchmark_mode == "bit_encoded" else None
         graph = CayleyGraph(generators, dest=dest, bit_encoding_width=bit_encoding_width)
-        benchmark.pedantic(lambda: graph.bfs(), iterations=1, rounds=5)
         benchmark.pedantic(graph.bfs, iterations=1, rounds=5)
