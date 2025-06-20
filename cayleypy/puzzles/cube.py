@@ -163,7 +163,7 @@ def get_cube_generators(cube_size: int, metric: str) -> Dict[str, list[int]]:
         assert cube_size == 2 or cube_size == 3
         if cube_size==2:
             return CUBE222_ALLOWED_MOVES
-        elif cube_size===3:
+        elif cube_size==3:
             return CUBE333_ALLOWED_MOVES
     elif metric == "HTM":
         assert cube_size == 2 or cube_size == 3
