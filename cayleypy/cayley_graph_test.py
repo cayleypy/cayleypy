@@ -358,4 +358,3 @@ def test_benchmark_top_spin(benchmark, benchmark_mode, n):
         graph = CayleyGraph(generators, dest=dest, bit_encoding_width=bit_encoding_width)
         benchmark.pedantic(lambda: graph.bfs(), iterations=1, rounds=5)
         benchmark.pedantic(graph.bfs, iterations=1, rounds=5)
-
