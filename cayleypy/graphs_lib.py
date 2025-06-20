@@ -100,6 +100,7 @@ def prepare_graph(name: str, **kwargs) -> CayleyGraph:
             generator_names.append("R" + str(prefix_len - 1))
         return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
     elif name == "burnt_pancake":
+        n = params['n']
         assert n >= 1
         generators = []
         generator_names = []
