@@ -7,6 +7,9 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["numba.*"]
 ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["scipy.*"]
+ignore_missing_imports = true
 
 [tool.pylint."FORMAT"]
 max-line-length = 120

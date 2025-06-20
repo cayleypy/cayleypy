@@ -88,7 +88,7 @@ class BfsResult:
             ans[i1, i2] = 1
         return ans
 
-    def adjacency_matrix_sparse(self):
+    def adjacency_matrix_sparse(self) -> coo_array:
         """Returns adjacency matrix as a sparse SciPy array."""
         num_edges = len(self.edges_list)
         data = np.ones((num_edges,), dtype=np.int8)
