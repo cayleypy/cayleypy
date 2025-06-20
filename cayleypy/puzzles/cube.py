@@ -160,13 +160,13 @@ def full_set_of_perm_cube(cube_size: int) -> Dict[str, list[int]]:
 
 def get_cube_generators(cube_size: int, metric: str) -> Dict[str, list[int]]:
     if metric == "QTM":
-        assert cube_size == 2 or cube_size == 3
+        assert (cube_size == 2 or cube_size == 3)
         if cube_size==2:
             return CUBE222_ALLOWED_MOVES
         elif cube_size==3:
             return CUBE333_ALLOWED_MOVES
     elif metric == "HTM":
-        assert cube_size == 2 or cube_size == 3
+        assert (cube_size == 2 or cube_size == 3)
         if cube_size==2:
             full_gens = CUBE222_ALLOWED_MOVES
             for move_id in ['f0', 'r1', 'd0']:
