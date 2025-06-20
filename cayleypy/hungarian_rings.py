@@ -18,9 +18,7 @@ def _get_intersections(left_index: int, right_index: int) -> int:
     return intersections
 
 
-def _create_right_ring(left_size: int, left_index: int,
-                       right_size: int, right_index: int,
-                       full_size: int) -> List:
+def _create_right_ring(left_size: int, left_index: int, right_size: int, right_index: int, full_size: int) -> List:
     """Return indexes for the right ring only"""
     intersections = _get_intersections(left_index=left_index, right_index=right_index)
     if intersections == 2:
@@ -35,9 +33,9 @@ def _create_right_ring(left_size: int, left_index: int,
     return right_ring
 
 
-def hungarian_rings_permutations(left_size: int, left_index: int,
-                                 right_size: int, right_index: int,
-                                 step: int = 1) -> Tuple[List[int], List[int]]:
+def hungarian_rings_permutations(
+    left_size: int, left_index: int, right_size: int, right_index: int, step: int = 1
+) -> Tuple[List[int], List[int]]:
     """
     Creates permutations for left and right ring rotation. Rotation is clockwise with a positive step.
     Args:
@@ -60,17 +58,16 @@ def hungarian_rings_permutations(left_size: int, left_index: int,
 
     if left_size <= left_index or right_size <= right_index:
         raise ValueError(
-            f"Ring size is too small. left_size:{left_size} right_size:{right_size} " +
-            f"left_index:{left_index} right_index:{right_index}")
+            f"Ring size is too small. left_size:{left_size} right_size:{right_size} "
+            + f"left_index:{left_index} right_index:{right_index}"
+        )
 
     intersections = _get_intersections(left_index=left_index, right_index=right_index)
     full_size = left_size + right_size - intersections
     left_ring = list(range(0, left_size))
     left_rotation = _circular_shift(left_ring, step) + list(range(left_size, full_size))
 
-    right_ring = _create_right_ring(left_size=left_size, left_index=left_index,
-                                    right_size=right_size, right_index=right_index,
-                                    full_size=full_size)
+    right_ring = _create_right_ring(left_size, left_index, right_size, right_index, full_size)
 
     shifted_right_ring = _circular_shift(right_ring, step)
     first_intersect_value = shifted_right_ring[0]
@@ -88,7 +85,7 @@ def hungarian_rings_permutations(left_size: int, left_index: int,
     return left_rotation, right_rotation
 
 
-def hungarian_rings_generators(ring_size: int):
+def hungarian_rings_generators(ring_size: int) -> tuple[list[list[int]], list[str]]:
     """
     Generators are similar to those used in the santa_2023 competition.
     The rings are the same size and intersect at one third(one fourth in santa). Indexes are shifted by 1.
@@ -98,10 +95,12 @@ def hungarian_rings_generators(ring_size: int):
 
     left_index = ring_size // 3  # the rings intersect with one third
     right_index = left_index + 1
-    forth_l, forth_r = hungarian_rings_permutations(left_size=ring_size, left_index=left_index,
-                                                    right_size=ring_size, right_index=right_index)
-    back_l, back_r = hungarian_rings_permutations(left_size=ring_size, left_index=left_index,
-                                                  right_size=ring_size, right_index=right_index, step=-1)
+    forth_l, forth_r = hungarian_rings_permutations(
+        left_size=ring_size, left_index=left_index, right_size=ring_size, right_index=right_index
+    )
+    back_l, back_r = hungarian_rings_permutations(
+        left_size=ring_size, left_index=left_index, right_size=ring_size, right_index=right_index, step=-1
+    )
     generators = [forth_l, forth_r, back_l, back_r]
     generator_names = ["L", "R", "-L", "-R"]
     return generators, generator_names

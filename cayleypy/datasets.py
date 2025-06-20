@@ -98,7 +98,7 @@ def _compute_full_reversals_cayley_growth(n: str) -> list[int]:
 def _compute_coxeter_cayley_growth(n: str) -> list[int]:
     return prepare_graph("coxeter", n=int(n)).bfs().layer_sizes
 
-  
+
 def _compute_mini_paramorphix_cayley_growth(_: str) -> list[int]:
     return prepare_graph("mini_paramorphix").bfs().layer_sizes
 
@@ -106,7 +106,7 @@ def _compute_mini_paramorphix_cayley_growth(_: str) -> list[int]:
 def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
     return prepare_graph("cyclic_coxeter", n=int(n)).bfs().layer_sizes
 
-  
+
 def _compute_hungarian_rings_growth(n: str) -> list[int]:
     return prepare_graph("hungarian_rings", n=int(n)).bfs().layer_sizes
 

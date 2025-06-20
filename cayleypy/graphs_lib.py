@@ -194,7 +194,7 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraph:
         return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
     elif name == "hungarian_rings":
         assert n % 2 == 0
-        ring_size = (n + 2)//2
+        ring_size = (n + 2) // 2
         assert ring_size >= 4
         generators, generator_names = hungarian_rings_generators(ring_size=ring_size)
         return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
