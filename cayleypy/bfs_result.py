@@ -5,6 +5,7 @@ from typing import Optional
 
 import numpy as np
 import torch
+from scipy.sparse import coo_array
 
 from cayleypy.permutation_utils import apply_permutation
 
@@ -71,7 +72,7 @@ class BfsResult:
 
     @cached_property
     def edges_list(self) -> np.ndarray:
-        """Return list of edges, with vertices renumbered."""
+        """Returns list of edges, with vertices renumbered."""
         assert self.edges_list_hashes is not None, "Run bfs with return_all_edges=True."
         hashes_to_indices = self.hashes_to_indices_dict
         return np.array([[hashes_to_indices[int(h)] for h in row] for row in self.edges_list_hashes], dtype=np.int64)
@@ -82,11 +83,19 @@ class BfsResult:
         return {tuple(sorted([vn[i1], vn[i2]])) for i1, i2 in self.edges_list}  # type: ignore
 
     def adjacency_matrix(self) -> np.ndarray:
-        """Return adjacency matrix as a dense NumPy array."""
+        """Returns adjacency matrix as a dense NumPy array."""
         ans = np.zeros((self.num_vertices, self.num_vertices), dtype=np.int8)
         for i1, i2 in self.edges_list:
             ans[i1, i2] = 1
         return ans
+
+    def adjacency_matrix_sparse(self) -> coo_array:
+        """Returns adjacency matrix as a sparse SciPy array."""
+        num_edges = len(self.edges_list)
+        data = np.ones((num_edges,), dtype=np.int8)
+        row = self.edges_list[:, 0]
+        col = self.edges_list[:, 1]
+        return coo_array((data, (row, col)), shape=(self.num_vertices, self.num_vertices))
 
     @cached_property
     def vertex_names(self) -> list[str]:
