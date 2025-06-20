@@ -149,7 +149,7 @@ def generate_cube_permutations_oneline(n: int) -> Dict[str, list[int]]:
     sorted_moves = collections.OrderedDict(sorted(moves.items(), key=lambda t: move_names_ordered.index(t[0])))
     return dict(sorted_moves)
 
-def full_set_of_perm_cube(cube_size: int) -> Dict[str, list[int]]::
+def full_set_of_perm_cube(cube_size: int) -> Dict[str, list[int]]:
     original_dict = generate_cube_permutations_oneline(cube_size)
     new_dict = {}
     for key, value in original_dict.items():
@@ -158,7 +158,7 @@ def full_set_of_perm_cube(cube_size: int) -> Dict[str, list[int]]::
         new_dict[inv_key] = inverse_permutation(list(map(int, value.split())))
     return new_dict
 
-def get_cube_generators(cube_size: int, metric: str) -> Dict[str, list[int]]::
+def get_cube_generators(cube_size: int, metric: str) -> Dict[str, list[int]]:
     if metric == "QTM":
         assert cube_size == 2 or cube_size == 3
         if cube_size==2:
