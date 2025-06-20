@@ -319,6 +319,7 @@ def test_bfs_small_hash_chunk_size():
     graph = CayleyGraph(graph.generators, hash_chunk_size=100)
     assert graph.bfs(max_diameter=8).layer_sizes == [1, 3, 6, 12, 24, 48, 91, 172, 325]
 
+
 def test_hashes_list_len():
     graph = CayleyGraph(prepare_graph("lrx", n=10).generators, dest="0110110110")
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
