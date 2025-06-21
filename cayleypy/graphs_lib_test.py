@@ -2,7 +2,7 @@ import numpy as np
 
 from cayleypy import prepare_graph
 from cayleypy.permutation_utils import inverse_permutation
-from cayleypy.graphs_lib import MINI_PARAMORPHIX_ALLOWED_MOVES
+from cayleypy.graphs_lib import MINI_PARAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES
 
 
 def test_lrx():
@@ -103,3 +103,18 @@ def test_mini_paramorphix():
         restored = [gen[i] for i in inverse]
         assert restored == list(range(24))
     assert set(graph.generator_names) == set(MINI_PARAMORPHIX_ALLOWED_MOVES.keys())
+
+
+def test_pyraminx():
+    perm_set_length = 36
+    graph = prepare_graph("pyraminx")
+    assert graph.n_generators == len(PYRAMINX_MOVES) * 2  # inverse generators are not listed in PYRAMINX_MOVES
+
+    graph_gens = dict(zip(graph.generator_names, graph.generators))
+    gen_names = list(PYRAMINX_MOVES.keys())
+    gen_names += [x + "_inv" for x in PYRAMINX_MOVES]
+
+    for gen_name, gen in PYRAMINX_MOVES.items():
+        assert np.all(graph_gens[gen_name] == gen)
+        assert np.all(graph_gens[gen_name + "_inv"] == inverse_permutation(gen))
+        assert len(gen) == perm_set_length
