@@ -1,7 +1,7 @@
 import numpy as np
 
 from cayleypy import prepare_graph
-from cayleypy.permutation_utils import inverse_permutation
+from cayleypy.permutation_utils import inverse_permutation, is_permutation
 from cayleypy.graphs_lib import MINI_PARAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES
 
 
@@ -95,11 +95,11 @@ def test_mini_paramorphix():
     assert np.array_equal(graph.generators, expected_generators)
     for gen in graph.generators:
         assert len(gen) == 24
-        assert sorted(gen.tolist()) == list(range(24))
+        assert is_permutation(gen)
     identity = list(range(24))
-    assert any(gen.tolist() != identity for gen in graph.generators)
+    assert any(gen != identity for gen in graph.generators)
     for gen in graph.generators:
-        inverse = inverse_permutation(gen.tolist())
+        inverse = inverse_permutation(gen)
         restored = [gen[i] for i in inverse]
         assert restored == list(range(24))
     assert set(graph.generator_names) == set(MINI_PARAMORPHIX_ALLOWED_MOVES.keys())

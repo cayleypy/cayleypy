@@ -1,10 +1,11 @@
 import numpy as np
 
+from cayleypy import CayleyGraph
 from cayleypy.graphs_lib import prepare_graph
 
 
 def test_adjacency_matrix():
-    graph = prepare_graph("lrx", n=4)
+    graph = CayleyGraph(prepare_graph("lrx", n=4))
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
 
     adj_mx_1 = result.adjacency_matrix()

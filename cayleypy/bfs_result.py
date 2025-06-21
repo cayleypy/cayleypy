@@ -10,7 +10,7 @@ from scipy.sparse import coo_array
 from cayleypy.permutation_utils import apply_permutation
 
 if typing.TYPE_CHECKING:
-    from cayleypy import CayleyGraph
+    from cayleypy.cayley_graph import CayleyGraphDef
 
 
 @dataclass(frozen=True)
@@ -33,8 +33,8 @@ class BfsResult:
     # Tensor of shape (num_edges, 2) where vertices are represented by their hashes.
     edges_list_hashes: Optional[torch.Tensor]
 
-    # Reference to CayleyGraph on which BFS was run. Needed if we want to restore edge names.
-    graph: "CayleyGraph"
+    # Definition of the CayleyGraph on which BFS was run. Needed if we want to restore edge names.
+    graph: "CayleyGraphDef"
 
     def diameter(self):
         """Maximal distance from any start vertex to any other vertex."""
@@ -101,7 +101,7 @@ class BfsResult:
     def vertex_names(self) -> list[str]:
         """Returns names for vertices in the graph."""
         ans = []
-        delimiter = "" if int(self.graph.destination_state.max()) <= 9 else ","
+        delimiter = "" if max(self.graph.central_state) <= 9 else ","
         for layer_id in range(len(self.layers)):
             if layer_id not in self.layers:
                 raise ValueError("To get explicit graph, run bfs with max_layer_size_to_store=None.")

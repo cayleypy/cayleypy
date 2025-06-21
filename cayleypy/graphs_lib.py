@@ -1,7 +1,7 @@
 """Library of pre-defined graphs."""
 
+from cayleypy.cayley_graph import CayleyGraphDef
 from cayleypy.hungarian_rings import hungarian_rings_generators
-from cayleypy.cayley_graph import CayleyGraph
 from cayleypy.permutation_utils import (
     compose_permutations,
     transposition,
@@ -55,6 +55,7 @@ PYRAMINX_MOVES = {
     "D": pfc(36, [[5, 12, 7], [6, 11, 8], [16, 22, 19], [17, 23, 20], [18, 24, 21], [28, 34, 31], [29, 35, 32], [30, 36, 33]], offset=1),
 }
 
+
 def _create_coxeter_generators(n: int) -> list[list[int]]:
     return [transposition(n, k, k + 1) for k in range(n - 1)]
 
@@ -63,7 +64,7 @@ def _create_cyclic_coxeter_generators(n: int) -> list[list[int]]:
     return _create_coxeter_generators(n) + [transposition(n, 0, n - 1)]
 
 
-def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraph:
+def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
     """Returns pre-defined Cayley or Schreier coset graph.
 
     Supported graphs:
@@ -111,7 +112,7 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraph:
             for j in range(i + 1, n):
                 generators.append(transposition(n, i, j))
                 generator_names.append(f"({i},{j})")
-        return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
     elif name == "pancake":
         assert n >= 2
         generators = []
@@ -120,7 +121,7 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraph:
             perm = list(range(prefix_len - 1, -1, -1)) + list(range(prefix_len, n))
             generators.append(perm)
             generator_names.append("R" + str(prefix_len - 1))
-        return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
     elif name == "burnt_pancake":
         assert n >= 1
         generators = []
@@ -133,7 +134,7 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraph:
             perm += list(range(n + prefix_len + 1, 2 * n, 1))
             generators.append(perm)
             generator_names.append("R" + str(prefix_len + 1))
-        return CayleyGraph(generators, dest=list(range(2 * n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(2 * n)), generator_names=generator_names)
     elif name == "full_reversals":
         assert n >= 2
         generators = []
@@ -143,13 +144,13 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraph:
                 perm = list(range(i)) + list(range(j, i - 1, -1)) + list(range(j + 1, n))
                 generators.append(perm)
                 generator_names.append(f"R[{i}..{j}]")
-        return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
     elif name == "lrx":
         assert n >= 3
         k = kwargs.get("k", 1)
         generators = [list(range(1, n)) + [0], [n - 1] + list(range(0, n - 1)), transposition(n, 0, k)]
         generator_names = ["L", "R", "X"]
-        return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
     elif name == "top_spin":
         k = kwargs.get("k", 4)
         assert n >= k
@@ -158,65 +159,65 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraph:
             [n - 1] + list(range(0, n - 1)),
             list(range(k - 1, -1, -1)) + list(range(k, n)),
         ]
-        return CayleyGraph(generators, dest=list(range(n)))
+        return CayleyGraphDef.create(generators, central_state=list(range(n)))
     elif name == "cube_2/2/2_6gensQTM":
         generators, generator_names = [], []
         for move_id, perm in CUBE222_MOVES.items():
             generators += [perm, inverse_permutation(perm)]
             generator_names += [move_id, move_id + "'"]
-        initial_state = [color for color in range(6) for _ in range(4)]
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+        central_state = [color for color in range(6) for _ in range(4)]
+        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
     elif name == "cube_2/2/2_9gensHTM":
         generators, generator_names = [], []
         for move_id, perm in CUBE222_MOVES.items():
             generators += [perm, inverse_permutation(perm), compose_permutations(perm, perm)]
             generator_names += [move_id, move_id + "'", move_id + "^2"]
-        initial_state = [color for color in range(6) for _ in range(4)]
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+        central_state = [color for color in range(6) for _ in range(4)]
+        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
     elif name == "cube_3/3/3_12gensQTM":
         generators, generator_names = [], []
         for move_id, perm in CUBE333_MOVES.items():
             generators += [perm, inverse_permutation(perm)]
             generator_names += [move_id, move_id + "'"]
-        initial_state = [color for color in range(6) for _ in range(9)]
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+        central_state = [color for color in range(6) for _ in range(9)]
+        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
     elif name == "cube_3/3/3_18gensHTM":
         generators, generator_names = [], []
         for move_id, perm in CUBE333_MOVES.items():
             generators += [perm, inverse_permutation(perm), compose_permutations(perm, perm)]
             generator_names += [move_id, move_id + "'", move_id + "^2"]
-        initial_state = [color for color in range(6) for _ in range(9)]
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+        central_state = [color for color in range(6) for _ in range(9)]
+        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
     elif name == "coxeter":
         assert n >= 2
         generators = _create_coxeter_generators(n)
         generator_names = [f"({i},{i + 1})" for i in range(n - 1)]
-        initial_state = list(range(n))
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+        central_state = list(range(n))
+        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
     elif name == "cyclic_coxeter":
         assert n >= 2
         generators = _create_cyclic_coxeter_generators(n)
         generator_names = [f"({i},{i + 1})" for i in range(n - 1)] + [f"(0,{n - 1})"]
-        initial_state = list(range(n))
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+        central_state = list(range(n))
+        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
     elif name == "mini_paramorphix":
         generator_names = list(MINI_PARAMORPHIX_ALLOWED_MOVES.keys())
         generators = [MINI_PARAMORPHIX_ALLOWED_MOVES[k] for k in generator_names]
-        initial_state = list(range(len(generators[0])))
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+        central_state = list(range(len(generators[0])))
+        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
     elif name == "pyraminx":
         generator_names = []
         generators = []
         for move_id, perm in PYRAMINX_MOVES.items():
             generators += [perm, inverse_permutation(perm)]
             generator_names += [move_id, move_id + "_inv"]
-        initial_state = list(range(len(generators[0])))
-        return CayleyGraph(generators, dest=initial_state, generator_names=generator_names)
+        central_state = list(range(len(generators[0])))
+        return CayleyGraphDef(generators, central_state=central_state, generator_names=generator_names)
     elif name == "hungarian_rings":
         assert n % 2 == 0
         ring_size = (n + 2) // 2
         assert ring_size >= 4
         generators, generator_names = hungarian_rings_generators(ring_size=ring_size)
-        return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
     else:
         raise ValueError(f"Unknown generator set: {name}")

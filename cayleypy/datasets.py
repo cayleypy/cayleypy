@@ -45,26 +45,24 @@ def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str
 # The code below can be viewed as definition of what is stored in datasets.
 # It is used to compute results for small graphs. Results for larger are computed separately and added to repository
 # manually.
-def _compute_lrx_coset_growth(initial_state: str) -> list[int]:
-    n = len(initial_state)
-    generators = prepare_graph("lrx", n=n).generators
-    result = CayleyGraph(generators, dest=initial_state).bfs()
-    return result.layer_sizes
+def _compute_lrx_coset_growth(central_state: str) -> list[int]:
+    n = len(central_state)
+    graph_def = prepare_graph("lrx", n=n).with_central_state(central_state)
+    return CayleyGraph(graph_def).bfs().layer_sizes
 
 
-def _compute_top_spin_coset_growth(initial_state: str) -> list[int]:
-    n = len(initial_state)
-    generators = prepare_graph("top_spin", n=n).generators
-    result = CayleyGraph(generators, dest=initial_state).bfs()
-    return result.layer_sizes
+def _compute_top_spin_coset_growth(central_state: str) -> list[int]:
+    n = len(central_state)
+    graph_def = prepare_graph("top_spin", n=n).with_central_state(central_state)
+    return CayleyGraph(graph_def).bfs().layer_sizes
 
 
 def _compute_lrx_cayley_growth(n: str) -> list[int]:
-    return prepare_graph("lrx", n=int(n)).bfs().layer_sizes
+    return CayleyGraph(prepare_graph("lrx", n=int(n))).bfs().layer_sizes
 
 
 def _compute_top_spin_cayley_growth(n: str) -> list[int]:
-    return prepare_graph("top_spin", n=int(n)).bfs().layer_sizes
+    return CayleyGraph(prepare_graph("top_spin", n=int(n))).bfs().layer_sizes
 
 
 @functools.cache
@@ -84,35 +82,35 @@ def _compute_all_transpositions_cayley_growth(n_str: str) -> list[int]:
 
 
 def _compute_pancake_cayley_growth(n: str) -> list[int]:
-    return prepare_graph("pancake", n=int(n)).bfs().layer_sizes
+    return CayleyGraph(prepare_graph("pancake", n=int(n))).bfs().layer_sizes
 
 
 def _compute_burnt_pancake_cayley_growth(n: str) -> list[int]:
-    return prepare_graph("burnt_pancake", n=int(n)).bfs().layer_sizes
+    return CayleyGraph(prepare_graph("burnt_pancake", n=int(n))).bfs().layer_sizes
 
 
 def _compute_full_reversals_cayley_growth(n: str) -> list[int]:
-    return prepare_graph("full_reversals", n=int(n)).bfs().layer_sizes
+    return CayleyGraph(prepare_graph("full_reversals", n=int(n))).bfs().layer_sizes
 
 
 def _compute_coxeter_cayley_growth(n: str) -> list[int]:
-    return prepare_graph("coxeter", n=int(n)).bfs().layer_sizes
+    return CayleyGraph(prepare_graph("coxeter", n=int(n))).bfs().layer_sizes
 
 
 def _compute_mini_paramorphix_cayley_growth(_: str) -> list[int]:
-    return prepare_graph("mini_paramorphix").bfs().layer_sizes
+    return CayleyGraph(prepare_graph("mini_paramorphix")).bfs().layer_sizes
 
 
 def _compute_pyraminx_cayley_growth(max_diam: str) -> list[int]:
-    return prepare_graph("pyraminx").bfs(max_diameter=int(max_diam)).layer_sizes
+    return CayleyGraph(prepare_graph("pyraminx")).bfs(max_diameter=int(max_diam)).layer_sizes
 
 
 def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
-    return prepare_graph("cyclic_coxeter", n=int(n)).bfs().layer_sizes
+    return CayleyGraph(prepare_graph("cyclic_coxeter", n=int(n))).bfs().layer_sizes
 
 
 def _compute_hungarian_rings_growth(n: str) -> list[int]:
-    return prepare_graph("hungarian_rings", n=int(n)).bfs().layer_sizes
+    return CayleyGraph(prepare_graph("hungarian_rings", n=int(n))).bfs().layer_sizes
 
 
 def generate_datasets():

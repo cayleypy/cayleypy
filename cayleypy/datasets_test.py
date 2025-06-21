@@ -2,10 +2,11 @@
 
 import math
 
-from cayleypy import load_dataset, CayleyGraph, prepare_graph
+from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph
 
 
-def _verify_layers_fast(graph: CayleyGraph, layer_sizes: list[int]):
+def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int]):
+    graph = CayleyGraph(graph_def)
     if max(layer_sizes) < 100:
         assert layer_sizes == graph.bfs().layer_sizes
     else:
@@ -21,7 +22,7 @@ def test_lrx_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         if n >= 4:
             assert len(layer_sizes) - 1 == n * (n - 1) // 2
-        _verify_layers_fast(CayleyGraph(prepare_graph("lrx", n=n).generators), layer_sizes)
+        _verify_layers_fast(prepare_graph("lrx", n=n), layer_sizes)
 
 
 def test_burnt_pancake_cayley_growth():
@@ -30,7 +31,7 @@ def test_burnt_pancake_cayley_growth():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n) * 2**n
         assert len(layer_sizes) - 1 == oeis_a078941[n]
-        _verify_layers_fast(CayleyGraph(prepare_graph("burnt_pancake", n=n).generators), layer_sizes)
+        _verify_layers_fast(prepare_graph("burnt_pancake", n=n), layer_sizes)
 
 
 # TopSpin Cayley graphs contain all permutations for even n>=6, and half of all permutations for odd n>=7.
@@ -41,7 +42,7 @@ def test_top_spin_cayley_growth():
             assert sum(layer_sizes) == math.factorial(n)
         if n % 2 == 1 and n >= 7:
             assert sum(layer_sizes) == math.factorial(n) // 2
-        _verify_layers_fast(CayleyGraph(prepare_graph("top_spin", n=n).generators), layer_sizes)
+        _verify_layers_fast(prepare_graph("top_spin", n=n), layer_sizes)
 
 
 def test_all_transpositions_cayley_growth():
@@ -62,14 +63,14 @@ def test_pancake_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         assert len(layer_sizes) - 1 == oeis_a058986[n]
         assert layer_sizes[-1] == oeis_a067607[n]
-        _verify_layers_fast(CayleyGraph(prepare_graph("pancake", n=n).generators), layer_sizes)
+        _verify_layers_fast(prepare_graph("pancake", n=n), layer_sizes)
 
 
 def test_full_reversals_cayley_growth():
     for key, layer_sizes in load_dataset("full_reversals_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(CayleyGraph(prepare_graph("full_reversals", n=n).generators), layer_sizes)
+        _verify_layers_fast(prepare_graph("full_reversals", n=n), layer_sizes)
         assert len(layer_sizes) == n  # Graph diameter is n-1.
         if n >= 3:
             assert layer_sizes[-1] == 2  # Size of last layer is 2.
@@ -77,28 +78,28 @@ def test_full_reversals_cayley_growth():
 
 # Number of elements in coset graph for LRX and binary strings is binomial coefficient.
 def test_lrx_coset_growth():
-    for initial_state, layer_sizes in load_dataset("lrx_coset_growth").items():
-        n = len(initial_state)
-        k = initial_state.count("1")
+    for central_state, layer_sizes in load_dataset("lrx_coset_growth").items():
+        n = len(central_state)
+        k = central_state.count("1")
         assert sum(layer_sizes) == math.comb(n, k)
-        _verify_layers_fast(CayleyGraph(prepare_graph("lrx", n=n).generators, dest=initial_state), layer_sizes)
+        _verify_layers_fast(prepare_graph("lrx", n=n).with_central_state(central_state), layer_sizes)
 
 
 # Number of elements in coset graph for TopSpin and binary strings is binomial coefficient, for n>=6.
 def test_top_spin_coset_growth():
-    for initial_state, layer_sizes in load_dataset("top_spin_coset_growth").items():
-        n = len(initial_state)
-        k = initial_state.count("1")
+    for central_state, layer_sizes in load_dataset("top_spin_coset_growth").items():
+        n = len(central_state)
+        k = central_state.count("1")
         if n >= 6:
             assert sum(layer_sizes) == math.comb(n, k)
-        _verify_layers_fast(CayleyGraph(prepare_graph("top_spin", n=n).generators, dest=initial_state), layer_sizes)
+        _verify_layers_fast(prepare_graph("top_spin", n=n).with_central_state(central_state), layer_sizes)
 
 
 def test_coxeter_cayley_growth():
     for key, layer_sizes in load_dataset("coxeter_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(CayleyGraph(prepare_graph("coxeter", n=n).generators), layer_sizes)
+        _verify_layers_fast(prepare_graph("coxeter", n=n), layer_sizes)
         assert len(layer_sizes) - 1 == n * (n - 1) // 2
 
 
@@ -106,7 +107,7 @@ def test_cyclic_coxeter_cayley_growth():
     for key, layer_sizes in load_dataset("cyclic_coxeter_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(CayleyGraph(prepare_graph("cyclic_coxeter", n=n).generators), layer_sizes)
+        _verify_layers_fast(prepare_graph("cyclic_coxeter", n=n), layer_sizes)
 
 
 def test_pyraminx_cayley_growth():
@@ -124,4 +125,4 @@ def test_hungarian_rings_growth():
         assert n % 2 == 0
         ring_size = (n + 2) // 2
         assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
-        _verify_layers_fast(CayleyGraph(prepare_graph("hungarian_rings", n=n).generators), layer_sizes)
+        _verify_layers_fast(prepare_graph("hungarian_rings", n=n), layer_sizes)

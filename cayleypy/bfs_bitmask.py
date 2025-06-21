@@ -138,7 +138,7 @@ class CayleyGraphChunkedBfs:
     """Class to run the special BFS algorithm."""
 
     def __init__(self, graph: CayleyGraph):
-        n = len(graph.destination_state)
+        n = graph.definition.state_size
         self.graph = graph
         self.chunks = [VertexChunk(n, prefix) for prefix in itertools.permutations(range(n), r=n - R)]
         self.chunk_map = {c.encoded_suffix: c for c in self.chunks}
@@ -151,7 +151,7 @@ class CayleyGraphChunkedBfs:
         self.suffix_mask = (2 ** (4 * (n - R)) - 1) << (4 * R)
 
         # Prepare functions to compute permutations.
-        assert is_permutation(graph.destination_state), "This version of BFS works only for permutations."
+        assert is_permutation(graph.definition.central_state), "This version of BFS works only for permutations."
         perms = graph.generators
         enc = graph.string_encoder
         assert enc is not None
@@ -179,7 +179,7 @@ class CayleyGraphChunkedBfs:
         return sum(c.last_layer_count for c in self.chunks)
 
     def bfs(self, max_diameter=10**6):
-        initial_states = np.array([_encode_perm(self.graph.destination_state.cpu().numpy())], dtype=np.int64)
+        initial_states = np.array([_encode_perm(self.graph.definition.central_state)], dtype=np.int64)
         self.paint_gray(initial_states)
         self.flush_gray_to_black()
         layer_sizes = [self.count_last_layer()]
@@ -215,7 +215,7 @@ def bfs_bitmask(graph: CayleyGraph, max_diameter: int = 10**6) -> list[int]:
     :param max_diameter:  maximal number of BFS iterations.
     :return: Growth function (layer sizes).
     """
-    n = len(graph.destination_state)
+    n = graph.definition.state_size
     assert n > R, f"This algorithm works only for N>{R}."
     if graph.verbose >= 2:
         estimated_memory_gb = (math.factorial(n) * 3 / 8) / (2**30)
