@@ -139,3 +139,4 @@ def generate_datasets():
     _update_dataset("pyraminx_cayley_growth", ["7"], _compute_pyraminx_cayley_growth)
     keys = [str(n) for n in range(6, 14, 2)]
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
+    _update_dataset("puzzles_growth", [], lambda x: [])  # For sort.

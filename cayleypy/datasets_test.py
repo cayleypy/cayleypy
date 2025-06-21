@@ -5,12 +5,12 @@ import math
 from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph
 
 
-def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int]):
+def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int], max_layer_size=1000):
     graph = CayleyGraph(graph_def)
-    if max(layer_sizes) < 100:
+    if max(layer_sizes) < max_layer_size:
         assert layer_sizes == graph.bfs().layer_sizes
     else:
-        first_layers = graph.bfs(max_layer_size_to_explore=100).layer_sizes
+        first_layers = graph.bfs(max_layer_size_to_explore=max_layer_size).layer_sizes
         assert first_layers == layer_sizes[: len(first_layers)]
 
 
@@ -82,7 +82,8 @@ def test_lrx_coset_growth():
         n = len(central_state)
         k = central_state.count("1")
         assert sum(layer_sizes) == math.comb(n, k)
-        _verify_layers_fast(prepare_graph("lrx", n=n).with_central_state(central_state), layer_sizes)
+        graph = prepare_graph("lrx", n=n).with_central_state(central_state)
+        _verify_layers_fast(graph, layer_sizes, max_layer_size=100)
 
 
 # Number of elements in coset graph for TopSpin and binary strings is binomial coefficient, for n>=6.
@@ -92,7 +93,8 @@ def test_top_spin_coset_growth():
         k = central_state.count("1")
         if n >= 6:
             assert sum(layer_sizes) == math.comb(n, k)
-        _verify_layers_fast(prepare_graph("top_spin", n=n).with_central_state(central_state), layer_sizes)
+        graph = prepare_graph("top_spin", n=n).with_central_state(central_state)
+        _verify_layers_fast(graph, layer_sizes, max_layer_size=100)
 
 
 def test_coxeter_cayley_growth():
@@ -130,3 +132,12 @@ def test_hungarian_rings_growth():
         ring_size = (n + 2) // 2
         assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
         _verify_layers_fast(prepare_graph("hungarian_rings", n=n), layer_sizes)
+
+
+def test_puzzles_growth():
+    data = load_dataset("puzzles_growth")
+    _verify_layers_fast(prepare_graph("cube_2/2/2_9gensHTM"), data["cube_222_htm"])
+    _verify_layers_fast(prepare_graph("cube_2/2/2_6gensQTM"), data["cube_222_qtm"])
+    _verify_layers_fast(prepare_graph("cube_3/3/3_18gensHTM"), data["cube_333_htm"])
+    _verify_layers_fast(prepare_graph("cube_3/3/3_12gensQTM"), data["cube_333_qtm"])
+    _verify_layers_fast(prepare_graph("mini_paramorphix"), data["mini_paramorphix"])
