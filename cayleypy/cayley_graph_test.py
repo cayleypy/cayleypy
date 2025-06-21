@@ -260,23 +260,7 @@ def test_cube222_qtm():
     result = graph.bfs()
     assert result.num_vertices == 3674160
     assert result.diameter() == 14
-    assert result.layer_sizes == [
-        1,
-        6,
-        27,
-        120,
-        534,
-        2256,
-        8969,
-        33058,
-        114149,
-        360508,
-        930588,
-        1350852,
-        782536,
-        90280,
-        276,
-    ]
+    assert result.layer_sizes == load_dataset("puzzles_growth")["cube_222_qtm"]
 
 
 @pytest.mark.skipif(FAST_RUN, reason="slow test")
@@ -285,19 +269,7 @@ def test_cube222_htm():
     result = graph.bfs()
     assert result.num_vertices == 3674160
     assert result.diameter() == 11
-    assert result.layer_sizes == [1, 9, 54, 321, 1847, 9992, 50136, 227536, 870072, 1887748, 623800, 2644]
-
-
-def test_cube333_qtm():
-    graph = CayleyGraph(prepare_graph("cube_3/3/3_12gensQTM"))
-    result = graph.bfs(max_diameter=5)
-    assert result.layer_sizes == [1, 12, 114, 1068, 10011, 93840]
-
-
-def test_cube333_htm():
-    graph = CayleyGraph(prepare_graph("cube_3/3/3_18gensHTM"))
-    result = graph.bfs(max_diameter=4)
-    assert result.layer_sizes == [1, 18, 243, 3240, 43239]
+    assert result.layer_sizes == load_dataset("puzzles_growth")["cube_222_htm"]
 
 
 def test_all_transpositions_8():

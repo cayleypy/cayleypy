@@ -99,7 +99,7 @@ class CayleyGraph:
         every edge has and edge in other direction, so the graph can be viewed as undirected.
     The graph is fully defined by list of generators and one selected state called "central state". The graph contains
         all vertices reachable from the central state. This definition is encapsulated in CayleyGraphDef,
-    In the case when destination state is a permutation itself, and generators fully generate S_n, this is a Cayley
+    In the case when the central state is a permutation itself, and generators fully generate S_n, this is a Cayley
         graph for S_n, hence the name. In more general case, elements can have less than n distinct values, and we call
         the set of vertices "coset".
     """
