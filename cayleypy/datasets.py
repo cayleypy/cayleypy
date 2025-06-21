@@ -136,7 +136,6 @@ def generate_datasets():
     keys = [str(n) for n in range(1, 8)]
     _update_dataset("burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth)
     _update_dataset("mini_paramorphix_cayley_growth", ["24"], _compute_mini_paramorphix_cayley_growth)
-    _update_dataset("pyraminx_cayley_growth", ["7"], _compute_pyraminx_cayley_growth)
     keys = [str(n) for n in range(6, 14, 2)]
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
     _update_dataset("puzzles_growth", [], lambda x: [])  # For sort.

@@ -112,19 +112,6 @@ def test_cyclic_coxeter_cayley_growth():
         _verify_layers_fast(prepare_graph("cyclic_coxeter", n=n), layer_sizes)
 
 
-def test_pyraminx_cayley_growth():
-    # fmt: off
-    # pylint: disable=line-too-long
-    # The layers size are the same as here: https://github.com/rokicki/twsearch-results/blob/master/godsnumber/pyraminx-g.log
-    precomputed_layer_sizes = [1, 16, 136, 896, 5456, 32528, 190260, 1070699, 5421594, 21136359, 55716688, 91554722, 85678373, 37687176, 3822520, 13120, 336]
-    # fmt: on
-    # pylint: enable=line-too-long
-    for key, layer_sizes in load_dataset("pyraminx_cayley_growth").items():
-        print(key, layer_sizes)
-        max_diam = int(key)
-        assert layer_sizes == precomputed_layer_sizes[: max_diam + 1]
-
-
 def test_hungarian_rings_growth():
     for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
         n = int(key)
@@ -141,3 +128,4 @@ def test_puzzles_growth():
     _verify_layers_fast(prepare_graph("cube_3/3/3_18gensHTM"), data["cube_333_htm"])
     _verify_layers_fast(prepare_graph("cube_3/3/3_12gensQTM"), data["cube_333_qtm"])
     _verify_layers_fast(prepare_graph("mini_paramorphix"), data["mini_paramorphix"])
+    _verify_layers_fast(prepare_graph("pyraminx"), data["pyraminx"])
