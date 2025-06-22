@@ -121,6 +121,13 @@ def test_hungarian_rings_growth():
         _verify_layers_fast(prepare_graph("hungarian_rings", n=n), layer_sizes)
 
 
+def test_heisenberg_growth():
+    for key, layer_sizes in load_dataset("heisenberg_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == n**3
+        _verify_layers_fast(prepare_graph("heisenberg", n=n), layer_sizes)
+
+
 def test_puzzles_growth():
     data = load_dataset("puzzles_growth")
     _verify_layers_fast(prepare_graph("cube_2/2/2_9gensHTM"), data["cube_222_htm"])
