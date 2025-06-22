@@ -1,6 +1,7 @@
 import gc
 import math
 from dataclasses import dataclass
+from enum import Enum
 from functools import cached_property
 from typing import Callable, Optional, Union
 
@@ -14,11 +15,79 @@ from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted
 
 
+class GeneratorType(Enum):
+    """Type of generators for Cayley graph."""
+
+    # Generators are permutations of size n applied to vectors of n elements.
+    PERMUTATION = 1
+
+    # Generators are n*n integer matrices, applied (by multiplication) to n*m matrices.
+    MATRIX = 2
+
+
+@dataclass(frozen=True)
+class MatrixGenerator:
+    """Cayley graph generator that is square (n*n) integer matrix.
+
+    This matrix applied (by multiplication) to n*m matrices.
+    If `modulo != 0`, multiplication is modulo some pre-defined number `modulo` (2<=modulo<=2^31).
+    If `modulo == 0`, multiplication is signed int64 multiplication with overflow.
+    """
+
+    matrix: np.ndarray
+    modulo: int
+
+    @staticmethod
+    def create(matrix: Union[list, np.ndarray], modulo: int = 0):
+        matrix = np.array(matrix, dtype=np.int64)
+        if modulo > 0:
+            matrix %= modulo
+        return MatrixGenerator(matrix, modulo)
+
+    def __post_init__(self):
+        # Validation.
+        assert self.matrix.shape == (self.n, self.n), "Must be square matrix"
+        assert self.matrix.dtype == np.int64
+        if self.modulo != 0:
+            assert 2 <= self.modulo <= 2**31
+            assert self.matrix.min() >= 0
+            assert self.matrix.max() < self.modulo
+
+    def is_inverse_to(self, other: "MatrixGenerator") -> bool:
+        if self.modulo != other.modulo:
+            return False
+        eye = np.eye(self.n, dtype=np.int64)
+        return np.array_equal(self.apply(other.matrix), eye) and np.array_equal(other.apply(self.matrix), eye)
+
+    @cached_property
+    def n(self):
+        return self.matrix.shape[0]
+
+    def apply(self, state: np.ndarray) -> np.ndarray:
+        """Multiplies (from left) this matrix by a n*m matrix."""
+        ans = self.matrix @ state
+        if self.modulo > 0:
+            ans %= self.modulo
+        return ans
+
+    def apply_batch_torch(self, states: torch.Tensor) -> torch.Tensor:
+        """Multiplies (from left) this matrix by a batch of n*m torch Tensors."""
+        assert len(states.shape) == 3
+        assert states.shape[1] == self.n
+        mx = torch.tensor(self.matrix, dtype=torch.int64, device=states.device)
+        ans = torch.einsum("ij,bjk->bik", mx, states)
+        if self.modulo > 0:
+            ans %= self.modulo
+        return ans
+
+
 @dataclass(frozen=True)
 class CayleyGraphDef:
     """Mathematical definition of a CayleyGraph."""
 
-    generators: list[list[int]]
+    generators_type: GeneratorType
+    generators_permutations: list[list[int]]
+    generators_matrices: list[MatrixGenerator]
     generator_names: list[str]
     central_state: list[int]
 
@@ -28,7 +97,7 @@ class CayleyGraphDef:
         generator_names: Optional[list[str]] = None,
         central_state: Union[list[int], torch.Tensor, np.ndarray, str, None] = None,
     ):
-        """Creates Cayley Graph definition.
+        """Creates Cayley Graph definition (when generators are permutations).
 
         :param generators: List of generating permutations of size n.
         :param generator_names: Names of the generators (optional).
@@ -55,16 +124,65 @@ class CayleyGraphDef:
         if generator_names is None:
             generator_names = [",".join(str(i) for i in g) for g in generators_list]
 
-        # Prepare and validate central state.
+        # Prepare central state.
         if central_state is None:
             central_state = list(range(n))  # Identity permutation.
         else:
-            central_state = [int(x) for x in central_state]
-        assert len(central_state) == n
-        assert min(central_state) >= 0
-        assert max(central_state) < n
+            central_state = CayleyGraphDef.normalize_central_state(central_state)
 
-        return CayleyGraphDef(generators_list, generator_names, central_state)
+        return CayleyGraphDef(GeneratorType.PERMUTATION, generators_list, [], generator_names, central_state)
+
+    @staticmethod
+    def for_matrix_group(
+        *,
+        generators: list[MatrixGenerator],
+        generator_names: Optional[list[str]] = None,
+        central_state: Optional[np.ndarray] = None,
+    ):
+        """Creates Cayley Graph definition (when generators are matrices).
+
+        :param generators: List of generating n*n matrices.
+        :param generator_names: Names of the generators (optional).
+        :param central_state: the central state (n*m matrix). Defaults to the n*n identity matrix.
+        """
+        if generator_names is None:
+            generator_names = ["g" + str(i) for i in range(len(generators))]
+        if central_state is None:
+            # By default, central element is the identity matrix.
+            central_state = np.eye(generators[0].n, dtype=np.int64)
+        else:
+            central_state = np.array(central_state)
+            assert len(central_state.shape) == 2, "Central state must be a matrix."
+            n = generators[0].n
+            assert central_state.shape[0] == n, f"Central state must have shape {n}*m."
+        central_state_list = CayleyGraphDef.normalize_central_state(central_state)
+        return CayleyGraphDef(GeneratorType.MATRIX, [], generators, generator_names, central_state_list)
+
+    def __post_init__(self):
+        # Validation.
+        if self.generators_type == GeneratorType.PERMUTATION:
+            assert len(self.generators_permutations) > 0
+            assert len(self.generators_matrices) == 0
+            n = self.state_size
+            assert all(len(p) == n for p in self.generators_permutations)
+            assert min(self.central_state) >= 0
+            assert max(self.central_state) < n
+        elif self.generators_type == GeneratorType.MATRIX:
+            assert len(self.generators_permutations) == 0
+            assert len(self.generators_matrices) > 0
+            n = self.generators_matrices[0].matrix.shape[0]
+            assert all(g.matrix.shape == (n, n) for g in self.generators_matrices)
+            m = self.state_size // n
+            assert self.state_size == n * m, "State size must be multiple of generator matrix size."
+        else:
+            raise ValueError(f"Unknown generator type: {self.generators_type}")
+
+    @cached_property
+    def generators(self) -> Union[list[list[int]], list[MatrixGenerator]]:
+        if self.generators_type == GeneratorType.PERMUTATION:
+            return self.generators_permutations
+        else:
+            return self.generators_matrices
 
     @cached_property
     def n_generators(self) -> int:
@@ -77,14 +195,41 @@ class CayleyGraphDef:
     @cached_property
     def generators_inverse_closed(self) -> bool:
         """Whether for each generator its inverse is also a generator."""
-        generators_set = set(tuple(perm) for perm in self.generators)
-        for perm in self.generators:
-            if tuple(inverse_permutation(perm)) not in generators_set:
-                return False
-        return True
+        if self.generators_type == GeneratorType.PERMUTATION:
+            generators_set = set(tuple(perm) for perm in self.generators_permutations)
+            return all(tuple(inverse_permutation(p)) in generators_set for p in self.generators_permutations)
+        else:
+            return all(any(g1.is_inverse_to(g2) for g2 in self.generators_matrices) for g1 in self.generators_matrices)
+
+    @cached_property
+    def decoded_state_shape(self) -> tuple[int, ...]:
+        """Shape of state when presented in decoded (human-readable) format."""
+        if self.generators_type == GeneratorType.PERMUTATION:
+            return (self.state_size,)
+        else:
+            n = self.generators_matrices[0].n
+            m = self.state_size // n
+            assert self.state_size == n * m
+            return n, m
+
+    @staticmethod
+    def normalize_central_state(central_state: Union[list[int], torch.Tensor, np.ndarray, str]) -> list[int]:
+        if hasattr(central_state, "reshape"):
+            central_state = central_state.reshape((-1,))  # Flatten.
+        return [int(x) for x in central_state]
 
     def with_central_state(self, central_state) -> "CayleyGraphDef":
-        return CayleyGraphDef.create(self.generators, generator_names=self.generator_names, central_state=central_state)
+        return CayleyGraphDef(
+            self.generators_type,
+            self.generators_permutations,
+            self.generators_matrices,
+            self.generator_names,
+            CayleyGraphDef.normalize_central_state(central_state),
+        )
+
+    def is_permutation_group(self):
+        """Whether generators in this graph are permutations."""
+        return self.generators_type == GeneratorType.PERMUTATION
 
 
 class CayleyGraph:
@@ -144,21 +289,24 @@ class CayleyGraph:
         if verbose > 0:
             print(f"Using device: {self.device}.")
 
-        self.generators = np.array(definition.generators, dtype=np.int64)
-        self.generators_torch = torch.tensor(definition.generators, dtype=torch.int64, device=self.device)
         self.central_state = torch.as_tensor(definition.central_state, device=self.device, dtype=torch.int64)
-
-        # Prepare encoder in case we want to encode states using few bits per element.
-        if bit_encoding_width == "auto":
-            bit_encoding_width = int(math.ceil(math.log2(int(self.central_state.max()) + 1)))
-        self.string_encoder: Optional[StringEncoder] = None
         encoded_state_size: int = self.definition.state_size
-        if bit_encoding_width is not None:
-            self.string_encoder = StringEncoder(code_width=int(bit_encoding_width), n=self.definition.state_size)
-            self.encoded_generators = [
-                self.string_encoder.implement_permutation(perm) for perm in definition.generators
-            ]
-            encoded_state_size = self.string_encoder.encoded_length
+        self.string_encoder: Optional[StringEncoder] = None
+
+        if definition.is_permutation_group():
+            self.permutations_torch = torch.tensor(
+                definition.generators_permutations, dtype=torch.int64, device=self.device
+            )
+
+            # Prepare encoder in case we want to encode states using few bits per element.
+            if bit_encoding_width == "auto":
+                bit_encoding_width = int(math.ceil(math.log2(int(self.central_state.max()) + 1)))
+            if bit_encoding_width is not None:
+                self.string_encoder = StringEncoder(code_width=int(bit_encoding_width), n=self.definition.state_size)
+                self.encoded_generators = [
+                    self.string_encoder.implement_permutation(perm) for perm in definition.generators_permutations
+                ]
+                encoded_state_size = self.string_encoder.encoded_length
 
         self.hasher = StateHasher(encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
 
@@ -183,16 +331,17 @@ class CayleyGraph:
     def encode_states(self, states: Union[torch.Tensor, np.ndarray, list]) -> torch.Tensor:
         """Converts states from human-readable to internal representation."""
         states = torch.as_tensor(states, device=self.device)
-        if len(states.shape) == 1:  # In case when only one state was passed.
-            states = states.reshape(1, -1)
-        assert len(states.shape) == 2
-        assert states.shape[1] == self.definition.state_size
+        states = states.reshape((-1, self.definition.state_size))
         if self.string_encoder is not None:
             return self.string_encoder.encode(states)
         return states
 
     def decode_states(self, states: torch.Tensor) -> torch.Tensor:
         """Converts states from internal to human-readable representation."""
+        if self.definition.generators_type == GeneratorType.MATRIX:
+            n, m = self.definition.decoded_state_shape
+            # Internally states are vectors, but mathematically they are n*m matrices.
+            return states.reshape((-1, n, m))
         if self.string_encoder is not None:
             return self.string_encoder.decode(states)
         return states
@@ -203,16 +352,25 @@ class CayleyGraph:
         neighbors = torch.zeros(
             (states_num * self.definition.n_generators, states.shape[1]), dtype=torch.int64, device=self.device
         )
-        if self.string_encoder is not None:
-            for i in range(self.definition.n_generators):
-                self.encoded_generators[i](states, neighbors[i * states_num : (i + 1) * states_num])
+        if self.definition.is_permutation_group():
+            if self.string_encoder is not None:
+                for i in range(self.definition.n_generators):
+                    self.encoded_generators[i](states, neighbors[i * states_num : (i + 1) * states_num])
+            else:
+                moves = self.permutations_torch
+                neighbors[:, :] = torch.gather(
+                    states.unsqueeze(1).expand(states.size(0), moves.shape[0], states.size(1)),
+                    2,
+                    moves.unsqueeze(0).expand(states.size(0), moves.shape[0], states.size(1)),
+                ).flatten(end_dim=1)
         else:
-            moves = self.generators_torch
-            neighbors[:, :] = torch.gather(
-                states.unsqueeze(1).expand(states.size(0), moves.shape[0], states.size(1)),
-                2,
-                moves.unsqueeze(0).expand(states.size(0), moves.shape[0], states.size(1)),
-            ).flatten(end_dim=1)
+            assert self.definition.generators_type == GeneratorType.MATRIX
+            n, m = self.definition.decoded_state_shape
+            states = states.reshape((states_num, n, m))
+            for i, mx in enumerate(self.definition.generators_matrices):
+                nb = mx.apply_batch_torch(states).reshape((states_num, n * m))
+                neighbors[i * states_num : (i + 1) * states_num] = nb
+
         return neighbors
 
     def bfs(
@@ -297,10 +455,10 @@ class CayleyGraph:
                 layer1_neighbors = self.get_neighbors(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
                 if return_all_edges:
-                    if self.string_encoder is not None:
-                        edges_list_starts += [layer1_hashes] * self.definition.n_generators
-                    else:
+                    if self.string_encoder is None and self.definition.is_permutation_group():
                         edges_list_starts.append(layer1_hashes.repeat_interleave(self.definition.n_generators))
+                    else:
+                        edges_list_starts += [layer1_hashes] * self.definition.n_generators
                     edges_list_ends.append(layer1_neighbors_hashes)
 
                 layer2, layer2_hashes, _ = self.get_unique_states(layer1_neighbors, hashes=layer1_neighbors_hashes)
