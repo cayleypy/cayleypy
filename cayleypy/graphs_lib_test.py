@@ -2,7 +2,7 @@ import numpy as np
 
 from cayleypy import prepare_graph
 from cayleypy.permutation_utils import inverse_permutation, is_permutation
-from cayleypy.graphs_lib import MINI_PARAMORPHIX_ALLOWED_MOVES
+from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES
 
 
 def test_lrx():
@@ -87,11 +87,11 @@ def test_cyclic_coxeter():
     assert np.array_equal(graph.generators, [[1, 0, 2], [0, 2, 1], [2, 1, 0]])
 
 
-def test_mini_paramorphix():
-    graph = prepare_graph("mini_paramorphix")
-    assert graph.n_generators == len(MINI_PARAMORPHIX_ALLOWED_MOVES)
-    assert graph.generator_names == list(MINI_PARAMORPHIX_ALLOWED_MOVES.keys())
-    expected_generators = np.array([MINI_PARAMORPHIX_ALLOWED_MOVES[k] for k in graph.generator_names])
+def test_mini_pyramorphix():
+    graph = prepare_graph("mini_pyramorphix")
+    assert graph.n_generators == len(MINI_PYRAMORPHIX_ALLOWED_MOVES)
+    assert graph.generator_names == list(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
+    expected_generators = np.array([MINI_PYRAMORPHIX_ALLOWED_MOVES[k] for k in graph.generator_names])
     assert np.array_equal(graph.generators, expected_generators)
     for gen in graph.generators:
         assert len(gen) == 24
@@ -102,4 +102,4 @@ def test_mini_paramorphix():
         inverse = inverse_permutation(gen)
         restored = [gen[i] for i in inverse]
         assert restored == list(range(24))
-    assert set(graph.generator_names) == set(MINI_PARAMORPHIX_ALLOWED_MOVES.keys())
+    assert set(graph.generator_names) == set(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
