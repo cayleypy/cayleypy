@@ -19,9 +19,11 @@ class GeneratorType(Enum):
     """Type of generators for Cayley graph."""
 
     # Generators are permutations of size n applied to vectors of n elements.
+    # In this case, the Cayley graph is for group of permutations (S_n).
     PERMUTATION = 1
 
     # Generators are n*n integer matrices, applied (by multiplication) to n*m matrices.
+    # In this case, the Cayley graph is for group of integer square n*n matrices.
     MATRIX = 2
 
 
@@ -30,7 +32,7 @@ class MatrixGenerator:
     """Cayley graph generator that is square (n*n) integer matrix.
 
     This matrix applied (by multiplication) to n*m matrices.
-    If `modulo != 0`, multiplication is modulo some pre-defined number `modulo` (2<=modulo<=2^31).
+    If `modulo != 0`, multiplication is modulo this number (`2<=modulo<=2^31`).
     If `modulo == 0`, multiplication is signed int64 multiplication with overflow.
     """
 
@@ -233,19 +235,27 @@ class CayleyGraphDef:
 
 
 class CayleyGraph:
-    """Represents a Schreier coset graph for the group S_n (group of n-element permutations).
+    """Represents a Schreier coset graph for some group.
 
     In this graph:
-      * Vertices (aka "states") are strings of integers of size n.
-      * Edges are permutations of size n from given set of `generators`.
-      * There is an outgoing edge for every vertex A and every generating permutation P.
-      * On the other end of this edge, there is a vertex P(A).
+      * Vertices (aka "states") are integer vectors or matrices.
+      * There is an outgoing edge for every vertex A and every generator G.
+      * On the other end of this edge, there is a vertex G(A).
+    When `definition.generator_type` is `PERMUTATION`:
+      * The group is the group of permutations S_n.
+      * Generators are permutations of n elements.
+      * States are vectors of integers of size n.
+    When `definition.generator_type` is `MATRIX`:
+      * The group is the group of n*n integer matrices under multiplication (usual or modular)
+      * Technically, it's a group only when all generators are invertible, but we don't require this.
+      * Generators are n*n integer matrices.
+      * States are n*m integers matrices.
     In general case, this graph is directed. However, in the case when set of generators is closed under inversion,
         every edge has and edge in other direction, so the graph can be viewed as undirected.
     The graph is fully defined by list of generators and one selected state called "central state". The graph contains
         all vertices reachable from the central state. This definition is encapsulated in CayleyGraphDef,
     In the case when the central state is a permutation itself, and generators fully generate S_n, this is a Cayley
-        graph for S_n, hence the name. In more general case, elements can have less than n distinct values, and we call
+        graph, hence the name. In more general case, elements can have less than n distinct values, and we call
         the set of vertices "coset".
     """
 
@@ -523,3 +533,8 @@ class CayleyGraph:
         if self.device.type == "cuda":
             torch.cuda.empty_cache()
             gc.collect()
+
+    @property
+    def generators(self):
+        """Generators of this Cayley graph."""
+        return self.definition.generators
