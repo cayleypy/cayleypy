@@ -137,7 +137,7 @@ class CayleyGraphDef:
         *,
         generators: list[MatrixGenerator],
         generator_names: Optional[list[str]] = None,
-        central_state: Optional[np.ndarray] = None,
+        central_state: Union[np.ndarray, list[list[int]], None] = None,
     ):
         """Creates Cayley Graph definition (when generators are matrices).
 

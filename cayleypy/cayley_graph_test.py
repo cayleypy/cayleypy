@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from cayleypy import CayleyGraph, prepare_graph, load_dataset, bfs_numpy
-from cayleypy.cayley_graph import CayleyGraphDef
+from cayleypy.cayley_graph import CayleyGraphDef, MatrixGenerator
 
 FAST_RUN = os.getenv("FAST") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
@@ -314,6 +314,33 @@ def test_hashes_list_len_max_layer_size_to_explore():
     assert not result.bfs_completed
     assert result.num_vertices == len(result.vertices_hashes)
     assert result.num_vertices == len(result.vertex_names)
+
+
+def test_matrix_group():
+    p = 10
+    x = MatrixGenerator.create([[1, 1], [0, 1]], modulo=p)
+    x_inv = MatrixGenerator.create([[1, -1], [0, 1]], modulo=p)
+    graph = CayleyGraph(
+        CayleyGraphDef.for_matrix_group(
+            generators=[x, x_inv],
+            generator_names=["x", "x'"],
+            central_state=[[1, 2], [0, 1]],
+        )
+    )
+    assert not graph.definition.is_permutation_group()
+    assert graph.definition.n_generators == 2
+    assert graph.definition.generators_matrices[0].n == 2
+    bfs_result = graph.bfs()
+    assert bfs_result.layer_sizes == [1, 2, 2, 2, 2, 1]
+    assert np.array_equal(bfs_result.last_layer()[0], [[1, 7], [0, 1]])
+    assert len(bfs_result.all_states) == 10
+
+
+def test_bfs_heisenberg_group():
+    graph = CayleyGraph(prepare_graph("heisenberg"))
+    bfs_result = graph.bfs(max_diameter=15)
+    # See https://oeis.org/A063810
+    assert bfs_result.layer_sizes == [1, 4, 12, 36, 82, 164, 294, 476, 724, 1052, 1464, 1972, 2590, 3324, 4186, 5188]
 
 
 # Below is the benchmark code. To run: `BENCHMARK=1 pytest . -k benchmark`
