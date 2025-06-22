@@ -123,15 +123,15 @@ class BfsResult:
 
     def get_edge_name(self, i1: int, i2: int) -> str:
         """Returns name for generator used to go from vertex i1 to vertex i2."""
+        state_before = self.all_states[i1].cpu().numpy()
+        state_after = self.all_states[i2].cpu().numpy()
         if self.graph.is_permutation_group():
-            state_before = list(map(int, self.all_states[i1]))
-            state_after = list(map(int, self.all_states[i2]))
+            s1 = list(state_before)
+            s2 = list(state_after)
             for i in range(self.graph.n_generators):
-                if apply_permutation(self.graph.generators[i], state_before) == state_after:
+                if apply_permutation(self.graph.generators[i], s1) == s2:
                     return self.graph.generator_names[i]
         else:
-            state_before = self.all_states[i1].cpu().numpy()
-            state_after = self.all_states[i2].cpu().numpy()
             for i, mx in enumerate(self.graph.generators_matrices):
                 if np.array_equal(mx.apply(state_before), state_after):
                     return self.graph.generator_names[i]

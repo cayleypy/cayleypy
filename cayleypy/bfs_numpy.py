@@ -2,7 +2,7 @@
 
 import numpy as np
 
-from .cayley_graph import CayleyGraph, GeneratorType
+from .cayley_graph import CayleyGraph
 from .permutation_utils import inverse_permutation
 
 
