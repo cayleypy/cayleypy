@@ -128,3 +128,5 @@ def test_puzzles_growth():
     _verify_layers_fast(prepare_graph("cube_3/3/3_18gensHTM"), data["cube_333_htm"])
     _verify_layers_fast(prepare_graph("cube_3/3/3_12gensQTM"), data["cube_333_qtm"])
     _verify_layers_fast(prepare_graph("mini_pyramorphix"), data["mini_pyramorphix"])
+    _verify_layers_fast(prepare_graph("starminx"), data["starminx"])
+
