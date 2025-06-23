@@ -2,7 +2,7 @@
 
 import math
 
-from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph
+from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph, matrix_group
 from cayleypy.puzzles import rubik_cube, globe_puzzle
 
 
@@ -126,7 +126,7 @@ def test_heisenberg_growth():
     for key, layer_sizes in load_dataset("heisenberg_growth").items():
         n = int(key)
         assert sum(layer_sizes) == n**3
-        _verify_layers_fast(prepare_graph("heisenberg", n=n), layer_sizes)
+        _verify_layers_fast(matrix_group("heisenberg", modulo=n), layer_sizes)
 
 
 def test_puzzles_growth():
