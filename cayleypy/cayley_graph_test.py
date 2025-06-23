@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from cayleypy import CayleyGraph, prepare_graph, load_dataset, bfs_numpy, matrix_group, MatrixGroups
+from cayleypy import CayleyGraph, prepare_graph, load_dataset, bfs_numpy, MatrixGroups
 from cayleypy.cayley_graph import CayleyGraphDef, MatrixGenerator
 
 FAST_RUN = os.getenv("FAST") == "1"

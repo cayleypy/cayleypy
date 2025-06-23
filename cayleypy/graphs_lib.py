@@ -286,6 +286,7 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
 class MatrixGroups:
     """Pre-defined Cayley graphs for matrix groups."""
 
+    @staticmethod
     def heisenberg(modulo: int = 0) -> CayleyGraphDef:
         """Returns Cayley graph for Heisenberg group.
 
