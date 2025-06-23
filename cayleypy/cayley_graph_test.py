@@ -6,6 +6,7 @@ import torch
 
 from cayleypy import CayleyGraph, prepare_graph, load_dataset, bfs_numpy
 from cayleypy.cayley_graph import CayleyGraphDef
+from cayleypy.graphs_lib import PermutationGroups
 
 FAST_RUN = os.getenv("FAST") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
@@ -145,7 +146,7 @@ def test_bfs_batching_lrx(batch_size: int):
 
 
 def test_bfs_batching_all_transpositions():
-    graph_def = prepare_graph("all_transpositions", n=8)
+    graph_def = PermutationGroups.all_transpositions(8)
     graph = CayleyGraph(graph_def, batch_size=2**10)
     result = graph.bfs()
     assert result.layer_sizes == load_dataset("all_transpositions_cayley_growth")["8"]
@@ -273,7 +274,7 @@ def test_cube222_htm():
 
 
 def test_all_transpositions_8():
-    graph = CayleyGraph(prepare_graph("all_transpositions", n=8))
+    graph = CayleyGraph(PermutationGroups.all_transpositions(8))
     result = graph.bfs()
     assert result.layer_sizes == load_dataset("all_transpositions_cayley_growth")["8"]
 

@@ -2,7 +2,7 @@ import numpy as np
 
 from cayleypy import prepare_graph
 from cayleypy.permutation_utils import inverse_permutation, is_permutation
-from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES
+from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES, PermutationGroups
 
 
 def test_lrx():
@@ -24,11 +24,11 @@ def test_top_spin():
 
 
 def test_all_transpositions():
-    graph = prepare_graph("all_transpositions", n=3)
+    graph = PermutationGroups.all_transpositions(3)
     assert np.array_equal(graph.generators, [[1, 0, 2], [2, 1, 0], [0, 2, 1]])
     assert graph.generator_names == ["(0,1)", "(0,2)", "(1,2)"]
 
-    graph = prepare_graph("all_transpositions", n=20)
+    graph = PermutationGroups.all_transpositions(20)
     assert graph.n_generators == (20 * 19) // 2
 
 
