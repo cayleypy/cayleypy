@@ -7,7 +7,7 @@ import os
 from typing import Any, Callable
 
 from .cayley_graph import CayleyGraph
-from .graphs_lib import prepare_graph
+from .graphs_lib import prepare_graph, PermutationGroups
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -47,13 +47,13 @@ def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str
 # manually.
 def _compute_lrx_coset_growth(central_state: str) -> list[int]:
     n = len(central_state)
-    graph_def = prepare_graph("lrx", n=n).with_central_state(central_state)
+    graph_def = PermutationGroups.lrx(n).with_central_state(central_state)
     return CayleyGraph(graph_def).bfs().layer_sizes
 
 
 def _compute_top_spin_coset_growth(central_state: str) -> list[int]:
     n = len(central_state)
-    graph_def = prepare_graph("top_spin", n=n).with_central_state(central_state)
+    graph_def = PermutationGroups.top_spin(n).with_central_state(central_state)
     return CayleyGraph(graph_def).bfs().layer_sizes
 
 
@@ -90,7 +90,7 @@ def _compute_burnt_pancake_cayley_growth(n: str) -> list[int]:
 
 
 def _compute_full_reversals_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("full_reversals", n=int(n))).bfs().layer_sizes
+    return CayleyGraph(PermutationGroups.full_reversals(int(n))).bfs().layer_sizes
 
 
 def _compute_coxeter_cayley_growth(n: str) -> list[int]:

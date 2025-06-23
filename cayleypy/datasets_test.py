@@ -2,7 +2,7 @@
 
 import math
 
-from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph
+from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph, PermutationGroups
 from cayleypy.puzzles import rubik_cube, globe_puzzle
 
 
@@ -23,7 +23,7 @@ def test_lrx_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         if n >= 4:
             assert len(layer_sizes) - 1 == n * (n - 1) // 2
-        _verify_layers_fast(prepare_graph("lrx", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.lrx(n), layer_sizes)
 
 
 def test_burnt_pancake_cayley_growth():
@@ -43,7 +43,7 @@ def test_top_spin_cayley_growth():
             assert sum(layer_sizes) == math.factorial(n)
         if n % 2 == 1 and n >= 7:
             assert sum(layer_sizes) == math.factorial(n) // 2
-        _verify_layers_fast(prepare_graph("top_spin", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.top_spin(n), layer_sizes)
 
 
 def test_all_transpositions_cayley_growth():
@@ -71,7 +71,7 @@ def test_full_reversals_cayley_growth():
     for key, layer_sizes in load_dataset("full_reversals_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(prepare_graph("full_reversals", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.full_reversals(n), layer_sizes)
         assert len(layer_sizes) == n  # Graph diameter is n-1.
         if n >= 3:
             assert layer_sizes[-1] == 2  # Size of last layer is 2.
@@ -83,7 +83,7 @@ def test_lrx_coset_growth():
         n = len(central_state)
         k = central_state.count("1")
         assert sum(layer_sizes) == math.comb(n, k)
-        graph = prepare_graph("lrx", n=n).with_central_state(central_state)
+        graph = PermutationGroups.lrx(n).with_central_state(central_state)
         _verify_layers_fast(graph, layer_sizes, max_layer_size=100)
 
 
@@ -94,7 +94,7 @@ def test_top_spin_coset_growth():
         k = central_state.count("1")
         if n >= 6:
             assert sum(layer_sizes) == math.comb(n, k)
-        graph = prepare_graph("top_spin", n=n).with_central_state(central_state)
+        graph = PermutationGroups.top_spin(n).with_central_state(central_state)
         _verify_layers_fast(graph, layer_sizes, max_layer_size=100)
 
 
