@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from cayleypy import CayleyGraph, prepare_graph, load_dataset, bfs_numpy, matrix_group
+from cayleypy import CayleyGraph, prepare_graph, load_dataset, bfs_numpy, matrix_group, MatrixGroups
 from cayleypy.cayley_graph import CayleyGraphDef, MatrixGenerator
 
 FAST_RUN = os.getenv("FAST") == "1"
@@ -337,7 +337,7 @@ def test_matrix_group():
 
 
 def test_bfs_heisenberg_group():
-    graph = CayleyGraph(matrix_group("heisenberg"))
+    graph = CayleyGraph(MatrixGroups.heisenberg())
     bfs_result = graph.bfs(max_diameter=15)
     # See https://oeis.org/A063810
     assert bfs_result.layer_sizes == [1, 4, 12, 36, 82, 164, 294, 476, 724, 1052, 1464, 1972, 2590, 3324, 4186, 5188]
