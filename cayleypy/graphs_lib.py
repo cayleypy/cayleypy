@@ -3,6 +3,7 @@
 """Library of pre-defined graphs."""
 
 from itertools import permutations
+from warnings import warn
 
 from cayleypy.cayley_graph import CayleyGraphDef
 from cayleypy.hungarian_rings import hungarian_rings_generators
@@ -313,5 +314,11 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
         generators.extend(inversed)
         central_state = list(range(len(generators[0])))
         return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+    elif name == "lrx":
+        warn("Use PermutationGroups.lrx instead of prepare_graph!", DeprecationWarning, stacklevel=2)
+        return PermutationGroups.lrx(n)
+    elif name == "top_spin":
+        warn("Use PermutationGroups.top_spin instead of prepare_graph!", DeprecationWarning, stacklevel=2)
+        return PermutationGroups.top_spin(n)
     else:
         raise ValueError(f"Unknown generator set: {name}")
