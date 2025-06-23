@@ -102,7 +102,7 @@ def test_coxeter_cayley_growth():
     for key, layer_sizes in load_dataset("coxeter_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(prepare_graph("coxeter", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.coxeter(n), layer_sizes)
         assert len(layer_sizes) - 1 == n * (n - 1) // 2
 
 
@@ -110,7 +110,7 @@ def test_cyclic_coxeter_cayley_growth():
     for key, layer_sizes in load_dataset("cyclic_coxeter_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(prepare_graph("cyclic_coxeter", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.cyclic_coxeter(n), layer_sizes)
 
 
 def test_hungarian_rings_growth():
