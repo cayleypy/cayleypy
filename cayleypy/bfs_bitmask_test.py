@@ -2,7 +2,7 @@ import os
 
 import pytest
 
-from cayleypy import prepare_graph, load_dataset, bfs_bitmask, CayleyGraph, PermutationGroups
+from cayleypy import load_dataset, bfs_bitmask, CayleyGraph, PermutationGroups
 
 FAST_RUN = os.getenv("FAST") == "1"
 

@@ -4,7 +4,6 @@ import csv
 import functools
 import json
 import os
-from importlib.metadata import Prepared
 from typing import Any, Callable
 
 from .cayley_graph import CayleyGraph

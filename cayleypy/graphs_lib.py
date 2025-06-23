@@ -228,7 +228,7 @@ class PermutationGroups:
         return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
 
 
-def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
+def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
     """Returns pre-defined Cayley or Schreier coset graph.
 
     TODO: move everything out and remove this function.
