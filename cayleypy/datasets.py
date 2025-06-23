@@ -4,6 +4,7 @@ import csv
 import functools
 import json
 import os
+from importlib.metadata import Prepared
 from typing import Any, Callable
 
 from .cayley_graph import CayleyGraph
@@ -82,11 +83,11 @@ def _compute_all_transpositions_cayley_growth(n_str: str) -> list[int]:
 
 
 def _compute_pancake_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("pancake", n=int(n))).bfs().layer_sizes
+    return CayleyGraph(PermutationGroups.pancake(int(n))).bfs().layer_sizes
 
 
 def _compute_burnt_pancake_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("burnt_pancake", n=int(n))).bfs().layer_sizes
+    return CayleyGraph(PermutationGroups.burnt_pancake(int(n))).bfs().layer_sizes
 
 
 def _compute_full_reversals_cayley_growth(n: str) -> list[int]:

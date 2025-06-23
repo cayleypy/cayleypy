@@ -21,5 +21,5 @@ def test_bfs_bitmask_lrx_10():
 
 @pytest.mark.skipif(FAST_RUN, reason="slow test")
 def test_bfs_bitmask_pancake_9():
-    graph = CayleyGraph(prepare_graph("pancake", n=9))
+    graph = CayleyGraph(PermutationGroups.pancake(9))
     assert bfs_bitmask(graph) == load_dataset("pancake_cayley_growth")["9"]

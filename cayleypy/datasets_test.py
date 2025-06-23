@@ -32,7 +32,7 @@ def test_burnt_pancake_cayley_growth():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n) * 2**n
         assert len(layer_sizes) - 1 == oeis_a078941[n]
-        _verify_layers_fast(prepare_graph("burnt_pancake", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.burnt_pancake(n), layer_sizes)
 
 
 # TopSpin Cayley graphs contain all permutations for even n>=6, and half of all permutations for odd n>=7.
@@ -64,7 +64,7 @@ def test_pancake_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         assert len(layer_sizes) - 1 == oeis_a058986[n]
         assert layer_sizes[-1] == oeis_a067607[n]
-        _verify_layers_fast(prepare_graph("pancake", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.pancake(n), layer_sizes)
 
 
 def test_full_reversals_cayley_growth():

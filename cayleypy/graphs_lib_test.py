@@ -33,7 +33,7 @@ def test_all_transpositions():
 
 
 def test_pancake():
-    graph = prepare_graph("pancake", n=6)
+    graph = PermutationGroups.pancake(6)
     assert graph.n_generators == 5
     assert graph.generator_names == ["R1", "R2", "R3", "R4", "R5"]
     assert np.array_equal(
@@ -43,7 +43,7 @@ def test_pancake():
 
 
 def test_burnt_pancake():
-    graph = prepare_graph("burnt_pancake", n=6)
+    graph = PermutationGroups.burnt_pancake(6)
     assert graph.n_generators == 6
     assert graph.generator_names == ["R1", "R2", "R3", "R4", "R5", "R6"]
     assert np.array_equal(
@@ -121,7 +121,7 @@ def test_pyraminx():
 
 
 def test_three_cycles():
-    graph = prepare_graph("three_cycles", n=4)
+    graph = PermutationGroups.three_cycles(4)
     assert graph.n_generators == 8
     expected_generators = [
         [1, 2, 0, 3],
@@ -137,7 +137,7 @@ def test_three_cycles():
 
 
 def test_three_cycles_0ij():
-    graph = prepare_graph("three_cycles_0ij", n=4)
+    graph = PermutationGroups.three_cycles_0ij(4)
     assert graph.n_generators == 6
     expected_generators = [[1, 2, 0, 3], [1, 3, 2, 0], [2, 0, 1, 3], [2, 1, 3, 0], [3, 0, 2, 1], [3, 1, 0, 2]]
     assert np.array_equal(graph.generators, expected_generators)
