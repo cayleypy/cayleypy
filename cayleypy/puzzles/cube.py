@@ -1,11 +1,11 @@
+import collections
 from typing import Dict
 
-from cayleypy import CayleyGraphDef
-from cayleypy.permutation_utils import compose_permutations, apply_permutation, inverse_permutation
-import collections
+from cayleypy.cayley_graph import CayleyGraphDef
+from cayleypy.permutation_utils import inverse_permutation
 
 
-def generate_cube_permutations_oneline(n: int) -> Dict[str, list[int]]:
+def generate_cube_permutations_oneline(n: int) -> Dict[str, str]:
     """
     Generates permutations for the basic moves of the n x n x n Rubik's cube.
 
@@ -101,7 +101,7 @@ def generate_cube_permutations_oneline(n: int) -> Dict[str, list[int]]:
         if face_to_rotate:
             face_cycles_cw = rotate_face_cw(face_to_rotate)
             is_ccw = False
-            if (move_type == "f" or move_type == "d") and s == 0:
+            if move_type in ("f", "d") and s == 0:
                 is_ccw = True
             if move_type == "r" and s == n - 1:
                 is_ccw = True
@@ -133,8 +133,23 @@ def full_set_of_perm_cube(cube_size: int) -> Dict[str, list[int]]:
     return new_dict
 
 
-def graph_for_cube(cube_size: int, metric: str) -> CayleyGraphDef:
+def rubik_cube(cube_size: int, metric: str) -> CayleyGraphDef:
+    """Creates Cayley graph for n*n*n Rubik's cube.
+
+    :param: cube_size - Size of the cube.
+    :param: metric - metric, one of:
+      - "QSTM" - Quarter Slice Turn Metric.
+      - TODO: add support for QTM and HTM.
+    """
     if metric == "QSTM":
-        return full_set_of_perm_cube(cube_size)
+        generators = []
+        generator_names = []
+        moves = generate_cube_permutations_oneline(cube_size)
+        for key, value in moves.items():
+            perm = list(map(int, value.split()))
+            generators += [perm, inverse_permutation(perm)]
+            generator_names += [key, key + "_inv"]
+        central_state = [color for color in range(6) for _ in range(cube_size**2)]
+        return CayleyGraphDef.create(generators, generator_names, central_state)
     else:
         raise ValueError(f"Unknown metric: {metric}")
