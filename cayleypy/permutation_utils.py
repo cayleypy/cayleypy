@@ -1,4 +1,5 @@
 """Helper functions."""
+
 from typing import Any, Sequence
 
 
@@ -19,5 +20,28 @@ def inverse_permutation(p: Sequence[int]) -> list[int]:
     return ans
 
 
-def is_permutation(p):
+def is_permutation(p: Any) -> bool:
     return sorted(list(p)) == list(range(len(p)))
+
+
+def transposition(n: int, i1: int, i2: int) -> list[int]:
+    """Returns permutation of n elements that is transposition (swap) of i1 and i2."""
+    assert 0 <= i1 < n
+    assert 0 <= i2 < n
+    assert i1 != i2
+    perm = list(range(n))
+    perm[i1], perm[i2] = i2, i1
+    return perm
+
+
+def permutation_from_cycles(n: int, cycles: list[list[int]], offset: int = 0) -> list[int]:
+    """Returns permutation of size n having given cycles."""
+    perm = list(range(n))
+    cycles_offsetted = [[x - offset for x in y] for y in cycles]
+
+    for cycle in cycles_offsetted:
+        for i in range(len(cycle)):
+            assert 0 <= cycle[i] < n
+            assert perm[cycle[i]] == cycle[i], "Cycles must not intersect."
+            perm[cycle[i]] = cycle[(i + 1) % len(cycle)]
+    return perm

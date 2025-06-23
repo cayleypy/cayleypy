@@ -1,5 +1,5 @@
 import math
-from typing import Callable, Sequence
+from typing import Callable
 
 import numpy as np
 import torch
@@ -38,7 +38,7 @@ class StringEncoder:
         assert s.shape[1] == self.n
         assert torch.min(s) >= 0, "Cannot encode negative values."
         max_value = torch.max(s)
-        assert max_value < 2 ** self.w, f"Width {self.w} is not sufficient to encode value {max_value}."
+        assert max_value < 2**self.w, f"Width {self.w} is not sufficient to encode value {max_value}."
 
         encoded = torch.zeros((s.shape[0], self.encoded_length), dtype=torch.int64, device=s.device)
         w, cl = self.w, CODEWORD_LENGTH
@@ -59,7 +59,7 @@ class StringEncoder:
 
     def prepare_shift_to_mask(self, p: list[int]) -> dict[tuple[int, int, int], int]:
         assert len(p) == self.n
-        shift_to_mask: dict[tuple[int, int, int], int] = dict()
+        shift_to_mask: dict[tuple[int, int, int], int] = {}
         for i in range(self.n):
             for j in range(self.w):
                 start_bit = int(p[i] * self.w + j)
@@ -70,7 +70,7 @@ class StringEncoder:
                 key = (start_cw_id, end_cw_id, shift)
                 if key not in shift_to_mask:
                     shift_to_mask[key] = 0
-                shift_to_mask[key] |= (1 << (start_bit % CODEWORD_LENGTH))
+                shift_to_mask[key] |= 1 << (start_bit % CODEWORD_LENGTH)
         return shift_to_mask
 
     def implement_permutation(self, p: list[int]) -> Callable[[torch.Tensor, torch.Tensor], None]:
@@ -89,7 +89,7 @@ class StringEncoder:
             lines.append(line)
         src = "\n".join(lines)
         l: dict = {}
-        exec(src, {}, l)
+        exec(src, {}, l)  # pylint: disable=exec-used
         return l["f_"]
 
     def implement_permutation_1d(self, p: list[int]) -> Callable[[np.ndarray], np.ndarray]:
@@ -110,23 +110,5 @@ class StringEncoder:
             terms.append(f"({term})")
         src = "f_ = lambda x: " + " | ".join(terms)
         l: dict = {}
-        exec(src, {}, l)
-        return l["f_"]
-
-    def implement_permutation_1d_tf(self, p: list[int]) -> Callable[[np.ndarray], np.ndarray]:
-        """Like function above, but for 1D tensorflow tensors."""
-        import tensorflow as tf
-        assert self.encoded_length == 1
-        shift_to_mask = self.prepare_shift_to_mask(p)
-        terms = []
-        for (_, _, shift), mask in shift_to_mask.items():
-            term = f"x&{mask}"
-            if shift > 0:
-                term = f"tf.bitwise.left_shift({term},{shift})"
-            elif shift < 0:
-                term = f"tf.bitwise.right_shift({term},{-shift})"
-            terms.append(f"({term})")
-        src = "f_ = lambda x: " + " | ".join(terms)
-        l: dict = {}
-        exec(src, {"tf": tf}, l)
+        exec(src, {}, l)  # pylint: disable=exec-used
         return l["f_"]

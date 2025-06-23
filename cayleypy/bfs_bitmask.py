@@ -7,7 +7,7 @@ import numba
 import numpy as np
 
 from .cayley_graph import CayleyGraph
-from .permutation_utils import inverse_permutation, is_permutation
+from .permutation_utils import is_permutation
 
 R = 8  # Chunk prefix size.
 CHUNK_SIZE = math.factorial(R)
@@ -78,16 +78,19 @@ def _materialize_permutations(ans, black, map1):
 def _paint_gray(perms, gray, map2):
     for i in range(len(perms)):
         rank = permutation_to_rank(perms[i], map2)
-        gray[rank // 64] |= (1 << (rank % 64))
+        gray[rank // 64] |= 1 << (rank % 64)
 
 
 def _encode_perm(p):
     return sum(p[i] << (4 * i) for i in range(len(p)))
 
 
-# All possible permutations sharing common suffix of length N-R.
-# We do not store them explicitly, but materialize each time.
 class VertexChunk:
+    """All possible permutations sharing common suffix of length N-R.
+
+    We do not store them explicitly, but materialize each time.
+    """
+
     def __init__(self, n, suffix):
         self.black = np.zeros((CHUNK_SIZE // 64,), dtype=np.uint64)
         self.last_layer = np.zeros((CHUNK_SIZE // 64,), dtype=np.uint64)
@@ -132,8 +135,10 @@ class VertexChunk:
 
 
 class CayleyGraphChunkedBfs:
+    """Class to run the special BFS algorithm."""
+
     def __init__(self, graph: CayleyGraph):
-        n = len(graph.destination_state)
+        n = graph.definition.state_size
         self.graph = graph
         self.chunks = [VertexChunk(n, prefix) for prefix in itertools.permutations(range(n), r=n - R)]
         self.chunk_map = {c.encoded_suffix: c for c in self.chunks}
@@ -146,7 +151,7 @@ class CayleyGraphChunkedBfs:
         self.suffix_mask = (2 ** (4 * (n - R)) - 1) << (4 * R)
 
         # Prepare functions to compute permutations.
-        assert is_permutation(graph.destination_state), "This version of BFS works only for permutations."
+        assert is_permutation(graph.definition.central_state), "This version of BFS works only for permutations."
         perms = graph.generators
         enc = graph.string_encoder
         assert enc is not None
@@ -171,10 +176,10 @@ class CayleyGraphChunkedBfs:
             c.flush_gray_to_black()
 
     def count_last_layer(self):
-        return sum([c.last_layer_count for c in self.chunks])
+        return sum(c.last_layer_count for c in self.chunks)
 
-    def bfs(self, max_diameter=10 ** 6):
-        initial_states = np.array([_encode_perm(self.graph.destination_state)], dtype=np.int64)
+    def bfs(self, max_diameter=10**6):
+        initial_states = np.array([_encode_perm(self.graph.definition.central_state)], dtype=np.int64)
         self.paint_gray(initial_states)
         self.flush_gray_to_black()
         layer_sizes = [self.count_last_layer()]
@@ -201,7 +206,7 @@ class CayleyGraphChunkedBfs:
         return layer_sizes
 
 
-def bfs_bitmask(graph: CayleyGraph, max_diameter: int = 10 ** 6) -> list[int]:
+def bfs_bitmask(graph: CayleyGraph, max_diameter: int = 10**6) -> list[int]:
     """Version of BFS storing all vertices explicitly as bitmasks, using 3 bits of memory per state.
 
     See https://www.kaggle.com/code/fedimser/memory-efficient-bfs-on-caley-graphs-3bits-per-vx
@@ -210,9 +215,9 @@ def bfs_bitmask(graph: CayleyGraph, max_diameter: int = 10 ** 6) -> list[int]:
     :param max_diameter:  maximal number of BFS iterations.
     :return: Growth function (layer sizes).
     """
-    n = len(graph.destination_state)
+    n = graph.definition.state_size
     assert n > R, f"This algorithm works only for N>{R}."
     if graph.verbose >= 2:
-        estimated_memory_gb = (math.factorial(n) * 3 / 8) / (2 ** 30)
+        estimated_memory_gb = (math.factorial(n) * 3 / 8) / (2**30)
         print(f"Estimated memory usage: {estimated_memory_gb:.02f}GB.")
     return CayleyGraphChunkedBfs(graph).bfs(max_diameter=max_diameter)
