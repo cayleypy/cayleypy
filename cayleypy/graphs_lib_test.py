@@ -2,7 +2,7 @@ import numpy as np
 
 from cayleypy import prepare_graph
 from cayleypy.permutation_utils import inverse_permutation, is_permutation
-from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES
+from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES
 
 
 def test_lrx():
@@ -103,3 +103,41 @@ def test_mini_pyramorphix():
         restored = [gen[i] for i in inverse]
         assert restored == list(range(24))
     assert set(graph.generator_names) == set(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
+
+
+def test_pyraminx():
+    perm_set_length = 36
+    graph = prepare_graph("pyraminx")
+    assert graph.n_generators == len(PYRAMINX_MOVES) * 2  # inverse generators are not listed in PYRAMINX_MOVES
+
+    graph_gens = dict(zip(graph.generator_names, graph.generators))
+    gen_names = list(PYRAMINX_MOVES.keys())
+    gen_names += [x + "_inv" for x in PYRAMINX_MOVES]
+
+    for gen_name, gen in PYRAMINX_MOVES.items():
+        assert np.all(graph_gens[gen_name] == gen)
+        assert np.all(graph_gens[gen_name + "_inv"] == inverse_permutation(gen))
+        assert len(gen) == perm_set_length
+
+
+def test_three_cycles():
+    graph = prepare_graph("three_cycles", n=4)
+    assert graph.n_generators == 8
+    expected_generators = [
+        [1, 2, 0, 3],
+        [1, 3, 2, 0],
+        [2, 0, 1, 3],
+        [2, 1, 3, 0],
+        [3, 0, 2, 1],
+        [3, 1, 0, 2],
+        [0, 2, 3, 1],
+        [0, 3, 1, 2],
+    ]
+    assert np.array_equal(graph.generators, expected_generators)
+
+
+def test_three_cycles_0ij():
+    graph = prepare_graph("three_cycles_0ij", n=4)
+    assert graph.n_generators == 6
+    expected_generators = [[1, 2, 0, 3], [1, 3, 2, 0], [2, 0, 1, 3], [2, 1, 3, 0], [3, 0, 2, 1], [3, 1, 0, 2]]
+    assert np.array_equal(graph.generators, expected_generators)
