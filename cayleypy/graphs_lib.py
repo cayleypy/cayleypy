@@ -9,6 +9,7 @@ from cayleypy.permutation_utils import (
     transposition,
     permutation_from_cycles as pfc,
     inverse_permutation,
+    permutation_from_cycles,
 )
 
 CUBE222_MOVES = {
@@ -175,9 +176,7 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
         generator_names = []
         for a, b, c in permutations(range(n), 3):
             if a < b and a < c:
-                vector = list(range(n))
-                vector[a], vector[b], vector[c] = b, c, a
-                generators.append(vector)
+                generators.append(permutation_from_cycles(n, [[a, b, c]]))
                 generator_names.append(f"({a} {b} {c})")
         return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
     elif name == "three_cycles_0ij":
@@ -187,9 +186,7 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
             for j in range(1, n):
                 if j == i:
                     continue
-                vector = list(range(n))
-                vector[0], vector[i], vector[j] = i, j, 0
-                generators.append(vector)
+                generators.append(permutation_from_cycles(n, [[0, i, j]]))
                 generator_names.append(f"({0} {i} {j})")
         return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
     elif name == "cube_2/2/2_6gensQTM":

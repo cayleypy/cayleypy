@@ -1,139 +1,143 @@
-"""Sanity checks for datasets."""
+import numpy as np
 
-import math
-
-from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph
-from cayleypy.puzzles import rubik_cube, globe_puzzle
-
-
-def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int], max_layer_size=1000):
-    graph = CayleyGraph(graph_def)
-    if max(layer_sizes) < max_layer_size:
-        assert layer_sizes == graph.bfs().layer_sizes
-    else:
-        first_layers = graph.bfs(max_layer_size_to_explore=max_layer_size).layer_sizes
-        assert first_layers == layer_sizes[: len(first_layers)]
+from cayleypy import prepare_graph
+from cayleypy.permutation_utils import inverse_permutation, is_permutation
+from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES
 
 
-# LRX Cayley graphs contain all permutations.
-# It's conjectured that for n>=4, diameter of LRX Cayley graph is n(n-1)/2. See https://oeis.org/A186783.
-def test_lrx_cayley_growth():
-    for key, layer_sizes in load_dataset("lrx_cayley_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == math.factorial(n)
-        if n >= 4:
-            assert len(layer_sizes) - 1 == n * (n - 1) // 2
-        _verify_layers_fast(prepare_graph("lrx", n=n), layer_sizes)
+def test_lrx():
+    graph = prepare_graph("lrx", n=4)
+    assert np.array_equal(graph.generators, [[1, 2, 3, 0], [3, 0, 1, 2], [1, 0, 2, 3]])
+    assert graph.generator_names == ["L", "R", "X"]
+
+    graph = prepare_graph("lrx", n=5, k=3)
+    assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 1, 2, 0, 4]])
+    assert graph.generator_names == ["L", "R", "X"]
 
 
-def test_burnt_pancake_cayley_growth():
-    oeis_a078941 = [None, 1, 4, 6, 8, 10, 12, 14, 15, 17, 18, 19, 21]
-    for key, layer_sizes in load_dataset("burnt_pancake_cayley_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == math.factorial(n) * 2**n
-        assert len(layer_sizes) - 1 == oeis_a078941[n]
-        _verify_layers_fast(prepare_graph("burnt_pancake", n=n), layer_sizes)
+def test_top_spin():
+    graph = prepare_graph("top_spin", n=5)
+    assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 2, 1, 0, 4]])
+
+    graph = prepare_graph("top_spin", n=5, k=3)
+    assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [2, 1, 0, 3, 4]])
 
 
-# TopSpin Cayley graphs contain all permutations for even n>=6, and half of all permutations for odd n>=7.
-def test_top_spin_cayley_growth():
-    for key, layer_sizes in load_dataset("top_spin_cayley_growth").items():
-        n = int(key)
-        if n % 2 == 0 and n >= 6:
-            assert sum(layer_sizes) == math.factorial(n)
-        if n % 2 == 1 and n >= 7:
-            assert sum(layer_sizes) == math.factorial(n) // 2
-        _verify_layers_fast(prepare_graph("top_spin", n=n), layer_sizes)
+def test_all_transpositions():
+    graph = prepare_graph("all_transpositions", n=3)
+    assert np.array_equal(graph.generators, [[1, 0, 2], [2, 1, 0], [0, 2, 1]])
+    assert graph.generator_names == ["(0,1)", "(0,2)", "(1,2)"]
+
+    graph = prepare_graph("all_transpositions", n=20)
+    assert graph.n_generators == (20 * 19) // 2
 
 
-def test_all_transpositions_cayley_growth():
-    for key, layer_sizes in load_dataset("all_transpositions_cayley_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == math.factorial(n)
-        assert len(layer_sizes) == n  # Graph diameter is n-1.
-        assert layer_sizes[-1] == math.factorial(n - 1)  # Size of last layer is (n-1)!.
+def test_pancake():
+    graph = prepare_graph("pancake", n=6)
+    assert graph.n_generators == 5
+    assert graph.generator_names == ["R1", "R2", "R3", "R4", "R5"]
+    assert np.array_equal(
+        graph.generators,
+        [[1, 0, 2, 3, 4, 5], [2, 1, 0, 3, 4, 5], [3, 2, 1, 0, 4, 5], [4, 3, 2, 1, 0, 5], [5, 4, 3, 2, 1, 0]],
+    )
 
 
-def test_pancake_cayley_growth():
-    # See https://oeis.org/A058986
-    oeis_a058986 = [None, 0, 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 22]
-    # See https://oeis.org/A067607
-    oeis_a067607 = [None, 1, 1, 1, 3, 20, 2, 35, 455, 5804, 73232, 6, 167, 2001, 24974, 339220, 4646117, 65758725]
-    for key, layer_sizes in load_dataset("pancake_cayley_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == math.factorial(n)
-        assert len(layer_sizes) - 1 == oeis_a058986[n]
-        assert layer_sizes[-1] == oeis_a067607[n]
-        _verify_layers_fast(prepare_graph("pancake", n=n), layer_sizes)
+def test_burnt_pancake():
+    graph = prepare_graph("burnt_pancake", n=6)
+    assert graph.n_generators == 6
+    assert graph.generator_names == ["R1", "R2", "R3", "R4", "R5", "R6"]
+    assert np.array_equal(
+        graph.generators,
+        [
+            [6, 1, 2, 3, 4, 5, 0, 7, 8, 9, 10, 11],
+            [7, 6, 2, 3, 4, 5, 1, 0, 8, 9, 10, 11],
+            [8, 7, 6, 3, 4, 5, 2, 1, 0, 9, 10, 11],
+            [9, 8, 7, 6, 4, 5, 3, 2, 1, 0, 10, 11],
+            [10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 11],
+            [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+        ],
+    )
 
 
-def test_full_reversals_cayley_growth():
-    for key, layer_sizes in load_dataset("full_reversals_cayley_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(prepare_graph("full_reversals", n=n), layer_sizes)
-        assert len(layer_sizes) == n  # Graph diameter is n-1.
-        if n >= 3:
-            assert layer_sizes[-1] == 2  # Size of last layer is 2.
+def test_full_reversals():
+    graph = prepare_graph("full_reversals", n=4)
+    assert graph.n_generators == 6
+    assert graph.generator_names == ["R[0..1]", "R[0..2]", "R[0..3]", "R[1..2]", "R[1..3]", "R[2..3]"]
+    assert np.array_equal(
+        graph.generators, [[1, 0, 2, 3], [2, 1, 0, 3], [3, 2, 1, 0], [0, 2, 1, 3], [0, 3, 2, 1], [0, 1, 3, 2]]
+    )
 
 
-# Number of elements in coset graph for LRX and binary strings is binomial coefficient.
-def test_lrx_coset_growth():
-    for central_state, layer_sizes in load_dataset("lrx_coset_growth").items():
-        n = len(central_state)
-        k = central_state.count("1")
-        assert sum(layer_sizes) == math.comb(n, k)
-        graph = prepare_graph("lrx", n=n).with_central_state(central_state)
-        _verify_layers_fast(graph, layer_sizes, max_layer_size=100)
+def test_cube333():
+    graph = prepare_graph("cube_3/3/3_12gensQTM")
+    assert graph.n_generators == 12
+
+    graph = prepare_graph("cube_3/3/3_18gensHTM")
+    assert graph.n_generators == 18
 
 
-# Number of elements in coset graph for TopSpin and binary strings is binomial coefficient, for n>=6.
-def test_top_spin_coset_growth():
-    for central_state, layer_sizes in load_dataset("top_spin_coset_growth").items():
-        n = len(central_state)
-        k = central_state.count("1")
-        if n >= 6:
-            assert sum(layer_sizes) == math.comb(n, k)
-        graph = prepare_graph("top_spin", n=n).with_central_state(central_state)
-        _verify_layers_fast(graph, layer_sizes, max_layer_size=100)
+def test_cyclic_coxeter():
+    graph = prepare_graph("cyclic_coxeter", n=4)
+    assert graph.n_generators == 4
+    assert graph.generator_names == ["(0,1)", "(1,2)", "(2,3)", "(0,3)"]
+    assert np.array_equal(graph.generators, [[1, 0, 2, 3], [0, 2, 1, 3], [0, 1, 3, 2], [3, 1, 2, 0]])
+
+    graph = prepare_graph("cyclic_coxeter", n=3)
+    assert graph.n_generators == 3
+    assert np.array_equal(graph.generators, [[1, 0, 2], [0, 2, 1], [2, 1, 0]])
 
 
-def test_coxeter_cayley_growth():
-    for key, layer_sizes in load_dataset("coxeter_cayley_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(prepare_graph("coxeter", n=n), layer_sizes)
-        assert len(layer_sizes) - 1 == n * (n - 1) // 2
+def test_mini_pyramorphix():
+    graph = prepare_graph("mini_pyramorphix")
+    assert graph.n_generators == len(MINI_PYRAMORPHIX_ALLOWED_MOVES)
+    assert graph.generator_names == list(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
+    expected_generators = np.array([MINI_PYRAMORPHIX_ALLOWED_MOVES[k] for k in graph.generator_names])
+    assert np.array_equal(graph.generators, expected_generators)
+    for gen in graph.generators:
+        assert len(gen) == 24
+        assert is_permutation(gen)
+    identity = list(range(24))
+    assert any(gen != identity for gen in graph.generators)
+    for gen in graph.generators:
+        inverse = inverse_permutation(gen)
+        restored = [gen[i] for i in inverse]
+        assert restored == list(range(24))
+    assert set(graph.generator_names) == set(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
 
 
-def test_cyclic_coxeter_cayley_growth():
-    for key, layer_sizes in load_dataset("cyclic_coxeter_cayley_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(prepare_graph("cyclic_coxeter", n=n), layer_sizes)
+def test_pyraminx():
+    perm_set_length = 36
+    graph = prepare_graph("pyraminx")
+    assert graph.n_generators == len(PYRAMINX_MOVES) * 2  # inverse generators are not listed in PYRAMINX_MOVES
+
+    graph_gens = dict(zip(graph.generator_names, graph.generators))
+    gen_names = list(PYRAMINX_MOVES.keys())
+    gen_names += [x + "_inv" for x in PYRAMINX_MOVES]
+
+    for gen_name, gen in PYRAMINX_MOVES.items():
+        assert np.all(graph_gens[gen_name] == gen)
+        assert np.all(graph_gens[gen_name + "_inv"] == inverse_permutation(gen))
+        assert len(gen) == perm_set_length
 
 
-def test_hungarian_rings_growth():
-    for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
-        n = int(key)
-        assert n % 2 == 0
-        ring_size = (n + 2) // 2
-        assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
-        _verify_layers_fast(prepare_graph("hungarian_rings", n=n), layer_sizes)
+def test_three_cycles():
+    graph = prepare_graph("three_cycles", n=4)
+    assert graph.n_generators == 8
+    expected_generators = [
+        [1, 2, 0, 3],
+        [1, 3, 2, 0],
+        [2, 0, 1, 3],
+        [2, 1, 3, 0],
+        [3, 0, 2, 1],
+        [3, 1, 0, 2],
+        [0, 2, 3, 1],
+        [0, 3, 1, 2],
+    ]
+    assert np.array_equal(graph.generators, expected_generators)
 
 
-def test_puzzles_growth():
-    data = load_dataset("puzzles_growth")
-    _verify_layers_fast(prepare_graph("cube_2/2/2_9gensHTM"), data["cube_222_htm"])
-    _verify_layers_fast(prepare_graph("cube_2/2/2_6gensQTM"), data["cube_222_qtm"])
-    _verify_layers_fast(prepare_graph("cube_3/3/3_18gensHTM"), data["cube_333_htm"])
-    _verify_layers_fast(prepare_graph("cube_3/3/3_12gensQTM"), data["cube_333_qtm"])
-    _verify_layers_fast(rubik_cube(2, metric="QSTM"), data["cube_222_qstm"])
-    _verify_layers_fast(prepare_graph("mini_pyramorphix"), data["mini_pyramorphix"])
-    _verify_layers_fast(prepare_graph("pyraminx"), data["pyraminx"])
-
-
-def test_globes_growth():
-    for key, layer_sizes in load_dataset("globes_growth").items():
-        a, b = map(int, key.split(","))
-        _verify_layers_fast(globe_puzzle(a, b), layer_sizes)
+def test_three_cycles_0ij():
+    graph = prepare_graph("three_cycles_0ij", n=4)
+    assert graph.n_generators == 6
+    expected_generators = [[1, 2, 0, 3], [1, 3, 2, 0], [2, 0, 1, 3], [2, 1, 3, 0], [3, 0, 2, 1], [3, 1, 0, 2]]
+    assert np.array_equal(graph.generators, expected_generators)
