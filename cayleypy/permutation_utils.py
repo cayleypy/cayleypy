@@ -34,10 +34,12 @@ def transposition(n: int, i1: int, i2: int) -> list[int]:
     return perm
 
 
-def permutation_from_cycles(n: int, cycles: list[list[int]]) -> list[int]:
+def permutation_from_cycles(n: int, cycles: list[list[int]], offset: int = 0) -> list[int]:
     """Returns permutation of size n having given cycles."""
     perm = list(range(n))
-    for cycle in cycles:
+    cycles_offsetted = [[x - offset for x in y] for y in cycles]
+
+    for cycle in cycles_offsetted:
         for i in range(len(cycle)):
             assert 0 <= cycle[i] < n
             assert perm[cycle[i]] == cycle[i], "Cycles must not intersect."

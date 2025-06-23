@@ -3,6 +3,7 @@
 import math
 
 from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph
+from cayleypy.puzzles import rubik_cube, globe_puzzle
 
 
 def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int], max_layer_size=1000):
@@ -134,4 +135,13 @@ def test_puzzles_growth():
     _verify_layers_fast(prepare_graph("cube_2/2/2_6gensQTM"), data["cube_222_qtm"])
     _verify_layers_fast(prepare_graph("cube_3/3/3_18gensHTM"), data["cube_333_htm"])
     _verify_layers_fast(prepare_graph("cube_3/3/3_12gensQTM"), data["cube_333_qtm"])
+    _verify_layers_fast(rubik_cube(2, metric="QSTM"), data["cube_222_qstm"])
     _verify_layers_fast(prepare_graph("mini_pyramorphix"), data["mini_pyramorphix"])
+    _verify_layers_fast(prepare_graph("pyraminx"), data["pyraminx"])
+    _verify_layers_fast(prepare_graph("starminx"), data["starminx"])
+
+
+def test_globes_growth():
+    for key, layer_sizes in load_dataset("globes_growth").items():
+        a, b = map(int, key.split(","))
+        _verify_layers_fast(globe_puzzle(a, b), layer_sizes)
