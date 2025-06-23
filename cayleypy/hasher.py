@@ -6,7 +6,8 @@ import torch
 
 class StateHasher:
     """Helper class to hash states by multiplying them by random vector."""
-    def __init__(self, state_size: int, random_seed: Optional[int], device: torch.device, chunk_size=2 ** 18):
+
+    def __init__(self, state_size: int, random_seed: Optional[int], device: torch.device, chunk_size=2**18):
         self.state_size = state_size
         self.chunk_size = chunk_size
 
@@ -19,14 +20,14 @@ class StateHasher:
         self.is_identity = False
         if random_seed is not None:
             torch.manual_seed(random_seed)
-        max_int = int((2 ** 62))
+        max_int = int((2**62))
         self.vec_hasher = torch.randint(-max_int, max_int + 1, size=(state_size, 1), device=device, dtype=torch.int64)
 
         try:
             trial_states = torch.zeros((2, state_size), device=device, dtype=torch.int64)
             _ = self._make_hashes_cpu_and_modern_gpu(trial_states)
             self.make_hashes = self._make_hashes_cpu_and_modern_gpu
-        except RuntimeError as e:
+        except RuntimeError:
             self.vec_hasher = self.vec_hasher.reshape((state_size,))
             self.make_hashes = self._make_hashes_older_gpu
 

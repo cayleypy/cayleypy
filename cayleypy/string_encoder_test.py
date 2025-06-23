@@ -11,7 +11,7 @@ from .string_encoder import StringEncoder
 @pytest.mark.parametrize("code_width,n", [(1, 2), (1, 5), (2, 30), (10, 100)])
 def test_encode_decode(code_width, n):
     num_states = 5
-    s = torch.randint(0, 2 ** code_width, (num_states, n))
+    s = torch.randint(0, 2**code_width, (num_states, n))
     enc = StringEncoder(code_width=code_width, n=n)
     s_encoded = enc.encode(s)
     assert s_encoded.shape == (num_states, int(math.ceil(code_width * n / 63)))
@@ -21,7 +21,7 @@ def test_encode_decode(code_width, n):
 @pytest.mark.parametrize("code_width,n", [(1, 2), (1, 5), (2, 30), (10, 100)])
 def test_permutation(code_width: int, n: int):
     num_states = 5
-    s = torch.randint(0, 2 ** code_width, (num_states, n), dtype=torch.int64)
+    s = torch.randint(0, 2**code_width, (num_states, n), dtype=torch.int64)
     perm = [int(x) for x in np.random.permutation(n)]
     expected = torch.tensor([apply_permutation(perm, row) for row in s.numpy()], dtype=torch.int64)
     enc = StringEncoder(code_width=code_width, n=n)
@@ -36,7 +36,7 @@ def test_permutation(code_width: int, n: int):
 @pytest.mark.parametrize("code_width,n", [(1, 2), (1, 5), (2, 30)])
 def test_permutation_1d(code_width: int, n: int):
     num_states = 5
-    s = torch.randint(0, 2 ** code_width, (num_states, n), dtype=torch.int64)
+    s = torch.randint(0, 2**code_width, (num_states, n), dtype=torch.int64)
     perm = [int(x) for x in np.random.permutation(n)]
     expected = torch.tensor([apply_permutation(perm, row) for row in s.numpy()], dtype=torch.int64)
     enc = StringEncoder(code_width=code_width, n=n)
