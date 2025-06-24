@@ -1,39 +1,39 @@
 import numpy as np
 
 from cayleypy import prepare_graph
+from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES, PermutationGroups
 from cayleypy.permutation_utils import inverse_permutation, is_permutation
-from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES
 
 
 def test_lrx():
-    graph = prepare_graph("lrx", n=4)
+    graph = PermutationGroups.lrx(4)
     assert np.array_equal(graph.generators, [[1, 2, 3, 0], [3, 0, 1, 2], [1, 0, 2, 3]])
     assert graph.generator_names == ["L", "R", "X"]
 
-    graph = prepare_graph("lrx", n=5, k=3)
+    graph = PermutationGroups.lrx(5, k=3)
     assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 1, 2, 0, 4]])
     assert graph.generator_names == ["L", "R", "X"]
 
 
 def test_top_spin():
-    graph = prepare_graph("top_spin", n=5)
+    graph = PermutationGroups.top_spin(5)
     assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 2, 1, 0, 4]])
 
-    graph = prepare_graph("top_spin", n=5, k=3)
+    graph = PermutationGroups.top_spin(5, k=3)
     assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [2, 1, 0, 3, 4]])
 
 
 def test_all_transpositions():
-    graph = prepare_graph("all_transpositions", n=3)
+    graph = PermutationGroups.all_transpositions(3)
     assert np.array_equal(graph.generators, [[1, 0, 2], [2, 1, 0], [0, 2, 1]])
     assert graph.generator_names == ["(0,1)", "(0,2)", "(1,2)"]
 
-    graph = prepare_graph("all_transpositions", n=20)
+    graph = PermutationGroups.all_transpositions(20)
     assert graph.n_generators == (20 * 19) // 2
 
 
 def test_pancake():
-    graph = prepare_graph("pancake", n=6)
+    graph = PermutationGroups.pancake(6)
     assert graph.n_generators == 5
     assert graph.generator_names == ["R1", "R2", "R3", "R4", "R5"]
     assert np.array_equal(
@@ -43,7 +43,7 @@ def test_pancake():
 
 
 def test_burnt_pancake():
-    graph = prepare_graph("burnt_pancake", n=6)
+    graph = PermutationGroups.burnt_pancake(6)
     assert graph.n_generators == 6
     assert graph.generator_names == ["R1", "R2", "R3", "R4", "R5", "R6"]
     assert np.array_equal(
@@ -60,7 +60,7 @@ def test_burnt_pancake():
 
 
 def test_full_reversals():
-    graph = prepare_graph("full_reversals", n=4)
+    graph = graph = PermutationGroups.full_reversals(4)
     assert graph.n_generators == 6
     assert graph.generator_names == ["R[0..1]", "R[0..2]", "R[0..3]", "R[1..2]", "R[1..3]", "R[2..3]"]
     assert np.array_equal(
@@ -77,12 +77,12 @@ def test_cube333():
 
 
 def test_cyclic_coxeter():
-    graph = prepare_graph("cyclic_coxeter", n=4)
+    graph = PermutationGroups.cyclic_coxeter(4)
     assert graph.n_generators == 4
     assert graph.generator_names == ["(0,1)", "(1,2)", "(2,3)", "(0,3)"]
     assert np.array_equal(graph.generators, [[1, 0, 2, 3], [0, 2, 1, 3], [0, 1, 3, 2], [3, 1, 2, 0]])
 
-    graph = prepare_graph("cyclic_coxeter", n=3)
+    graph = PermutationGroups.cyclic_coxeter(3)
     assert graph.n_generators == 3
     assert np.array_equal(graph.generators, [[1, 0, 2], [0, 2, 1], [2, 1, 0]])
 
@@ -121,7 +121,7 @@ def test_pyraminx():
 
 
 def test_three_cycles():
-    graph = prepare_graph("three_cycles", n=4)
+    graph = PermutationGroups.three_cycles(4)
     assert graph.n_generators == 8
     expected_generators = [
         [1, 2, 0, 3],
@@ -137,7 +137,7 @@ def test_three_cycles():
 
 
 def test_three_cycles_0ij():
-    graph = prepare_graph("three_cycles_0ij", n=4)
+    graph = PermutationGroups.three_cycles_0ij(4)
     assert graph.n_generators == 6
     expected_generators = [[1, 2, 0, 3], [1, 3, 2, 0], [2, 0, 1, 3], [2, 1, 3, 0], [3, 0, 2, 1], [3, 1, 0, 2]]
     assert np.array_equal(graph.generators, expected_generators)

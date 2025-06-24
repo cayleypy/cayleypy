@@ -7,7 +7,7 @@ import os
 from typing import Any, Callable
 
 from .cayley_graph import CayleyGraph
-from .graphs_lib import prepare_graph
+from .graphs_lib import prepare_graph, PermutationGroups
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -47,13 +47,13 @@ def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str
 # manually.
 def _compute_lrx_coset_growth(central_state: str) -> list[int]:
     n = len(central_state)
-    graph_def = prepare_graph("lrx", n=n).with_central_state(central_state)
+    graph_def = PermutationGroups.lrx(n).with_central_state(central_state)
     return CayleyGraph(graph_def).bfs().layer_sizes
 
 
 def _compute_top_spin_coset_growth(central_state: str) -> list[int]:
     n = len(central_state)
-    graph_def = prepare_graph("top_spin", n=n).with_central_state(central_state)
+    graph_def = PermutationGroups.top_spin(n).with_central_state(central_state)
     return CayleyGraph(graph_def).bfs().layer_sizes
 
 
@@ -82,19 +82,19 @@ def _compute_all_transpositions_cayley_growth(n_str: str) -> list[int]:
 
 
 def _compute_pancake_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("pancake", n=int(n))).bfs().layer_sizes
+    return CayleyGraph(PermutationGroups.pancake(int(n))).bfs().layer_sizes
 
 
 def _compute_burnt_pancake_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("burnt_pancake", n=int(n))).bfs().layer_sizes
+    return CayleyGraph(PermutationGroups.burnt_pancake(int(n))).bfs().layer_sizes
 
 
 def _compute_full_reversals_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("full_reversals", n=int(n))).bfs().layer_sizes
+    return CayleyGraph(PermutationGroups.full_reversals(int(n))).bfs().layer_sizes
 
 
 def _compute_coxeter_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("coxeter", n=int(n))).bfs().layer_sizes
+    return CayleyGraph(PermutationGroups.coxeter(int(n))).bfs().layer_sizes
 
 
 def _compute_mini_pyramorphix_cayley_growth(_: str) -> list[int]:
@@ -106,7 +106,7 @@ def _compute_pyraminx_cayley_growth(max_diam: str) -> list[int]:
 
 
 def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("cyclic_coxeter", n=int(n))).bfs().layer_sizes
+    return CayleyGraph(PermutationGroups.cyclic_coxeter(int(n))).bfs().layer_sizes
 
 
 def _compute_hungarian_rings_growth(n: str) -> list[int]:

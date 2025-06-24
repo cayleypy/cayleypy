@@ -2,7 +2,7 @@
 
 import math
 
-from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph, MatrixGroups
+from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph, PermutationGroups, MatrixGroups
 from cayleypy.puzzles import rubik_cube, globe_puzzle
 
 
@@ -23,7 +23,7 @@ def test_lrx_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         if n >= 4:
             assert len(layer_sizes) - 1 == n * (n - 1) // 2
-        _verify_layers_fast(prepare_graph("lrx", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.lrx(n), layer_sizes)
 
 
 def test_burnt_pancake_cayley_growth():
@@ -32,7 +32,7 @@ def test_burnt_pancake_cayley_growth():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n) * 2**n
         assert len(layer_sizes) - 1 == oeis_a078941[n]
-        _verify_layers_fast(prepare_graph("burnt_pancake", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.burnt_pancake(n), layer_sizes)
 
 
 # TopSpin Cayley graphs contain all permutations for even n>=6, and half of all permutations for odd n>=7.
@@ -43,7 +43,7 @@ def test_top_spin_cayley_growth():
             assert sum(layer_sizes) == math.factorial(n)
         if n % 2 == 1 and n >= 7:
             assert sum(layer_sizes) == math.factorial(n) // 2
-        _verify_layers_fast(prepare_graph("top_spin", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.top_spin(n), layer_sizes)
 
 
 def test_all_transpositions_cayley_growth():
@@ -64,14 +64,14 @@ def test_pancake_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         assert len(layer_sizes) - 1 == oeis_a058986[n]
         assert layer_sizes[-1] == oeis_a067607[n]
-        _verify_layers_fast(prepare_graph("pancake", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.pancake(n), layer_sizes)
 
 
 def test_full_reversals_cayley_growth():
     for key, layer_sizes in load_dataset("full_reversals_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(prepare_graph("full_reversals", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.full_reversals(n), layer_sizes)
         assert len(layer_sizes) == n  # Graph diameter is n-1.
         if n >= 3:
             assert layer_sizes[-1] == 2  # Size of last layer is 2.
@@ -83,7 +83,7 @@ def test_lrx_coset_growth():
         n = len(central_state)
         k = central_state.count("1")
         assert sum(layer_sizes) == math.comb(n, k)
-        graph = prepare_graph("lrx", n=n).with_central_state(central_state)
+        graph = PermutationGroups.lrx(n).with_central_state(central_state)
         _verify_layers_fast(graph, layer_sizes, max_layer_size=100)
 
 
@@ -94,7 +94,7 @@ def test_top_spin_coset_growth():
         k = central_state.count("1")
         if n >= 6:
             assert sum(layer_sizes) == math.comb(n, k)
-        graph = prepare_graph("top_spin", n=n).with_central_state(central_state)
+        graph = PermutationGroups.top_spin(n).with_central_state(central_state)
         _verify_layers_fast(graph, layer_sizes, max_layer_size=100)
 
 
@@ -102,7 +102,7 @@ def test_coxeter_cayley_growth():
     for key, layer_sizes in load_dataset("coxeter_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(prepare_graph("coxeter", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.coxeter(n), layer_sizes)
         assert len(layer_sizes) - 1 == n * (n - 1) // 2
 
 
@@ -110,7 +110,7 @@ def test_cyclic_coxeter_cayley_growth():
     for key, layer_sizes in load_dataset("cyclic_coxeter_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
-        _verify_layers_fast(prepare_graph("cyclic_coxeter", n=n), layer_sizes)
+        _verify_layers_fast(PermutationGroups.cyclic_coxeter(n), layer_sizes)
 
 
 def test_hungarian_rings_growth():
