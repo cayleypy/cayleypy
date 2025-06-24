@@ -332,6 +332,5 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
     elif name == "pancake":
         warn("Use PermutationGroups.pancake instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.pancake(n)
-
     else:
         raise ValueError(f"Unknown generator set: {name}")
