@@ -320,5 +320,18 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
     elif name == "top_spin":
         warn("Use PermutationGroups.top_spin instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.top_spin(n)
+    elif name == "all_transpositions":
+        warn("Use PermutationGroups.all_transpositions instead of prepare_graph!", DeprecationWarning, stacklevel=2)
+        return PermutationGroups.all_transpositions(n)
+    elif name == "full_reversals":
+        warn("Use PermutationGroups.full_reversals instead of prepare_graph!", DeprecationWarning, stacklevel=2)
+        return PermutationGroups.full_reversals(n)
+    elif name == "coxeter":
+        warn("Use PermutationGroups.coxeter instead of prepare_graph!", DeprecationWarning, stacklevel=2)
+        return PermutationGroups.coxeter(n)
+    elif name == "pancake":
+        warn("Use PermutationGroups.pancake instead of prepare_graph!", DeprecationWarning, stacklevel=2)
+        return PermutationGroups.pancake(n)
+
     else:
         raise ValueError(f"Unknown generator set: {name}")
