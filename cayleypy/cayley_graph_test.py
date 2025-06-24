@@ -4,6 +4,7 @@ import numpy as np
 import pytest
 import torch
 
+from cayleypy.bfs_numpy import bfs_numpy
 from cayleypy.cayley_graph import CayleyGraph, MatrixGenerator, CayleyGraphDef
 from cayleypy.datasets import load_dataset
 from cayleypy.graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
