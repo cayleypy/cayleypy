@@ -4,8 +4,8 @@ import numpy as np
 import pytest
 import torch
 
-from cayleypy.cayley_graph import CayleyGraph, MatrixGenerator
-from cayleypy.cayley_graph import CayleyGraphDef
+from cayleypy.cayley_graph import CayleyGraph, MatrixGenerator, CayleyGraphDef
+from cayleypy.datasets import load_dataset
 from cayleypy.graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 
 FAST_RUN = os.getenv("FAST") == "1"

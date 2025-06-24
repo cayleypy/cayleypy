@@ -216,7 +216,7 @@ class PermutationGroups:
             if a < b and a < c:
                 generators.append(pfc(n, [[a, b, c]]))
                 generator_names.append(f"({a} {b} {c})")
-        return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
     @staticmethod
     def three_cycles_0ij(n: int) -> CayleyGraphDef:
@@ -226,7 +226,7 @@ class PermutationGroups:
         for i, j in permutations(range(1, n), 2):
             generators.append(pfc(n, [[0, i, j]]))
             generator_names.append(f"({0} {i} {j})")
-        return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
 
 def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
