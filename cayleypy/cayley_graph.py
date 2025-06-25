@@ -77,7 +77,8 @@ class MatrixGenerator:
         assert len(states.shape) == 3
         assert states.shape[1] == self.n
         mx = torch.tensor(self.matrix, dtype=torch.int64, device=states.device)
-        ans = torch.einsum("ij,bjk->bik", mx, states)
+        mx = mx.unsqueeze(0).unsqueeze(-1)
+        ans = (mx * states.unsqueeze(1)).sum(dim=2)
         if self.modulo > 0:
             ans %= self.modulo
         return ans
