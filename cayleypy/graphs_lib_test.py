@@ -42,6 +42,78 @@ def test_pancake():
     )
 
 
+def test_cubic_pancake():
+    graph = PermutationGroups.cubic_pancake(n=15, subset=1)
+    assert graph.n_generators == 3
+    assert graph.generator_names == ["R15", "R14", "R2"]
+    assert np.array_equal(
+        graph.generators,
+        [[14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0], 
+         [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 14], 
+         [1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]],
+    )
+
+    graph = PermutationGroups.cubic_pancake(n=15, subset=2)
+    assert graph.n_generators == 3
+    assert graph.generator_names == ["R15", "R14", "R3"]
+    assert np.array_equal(
+        graph.generators,
+        [[14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+         [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 14],
+         [2, 1, 0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]],
+    )
+
+    graph = PermutationGroups.cubic_pancake(n=15, subset=3)
+    assert graph.n_generators == 3
+    assert graph.generator_names == ["R15", "R14", "R13"]
+    assert np.array_equal(
+        graph.generators,
+        [[14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+         [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 14],
+         [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 13, 14]],
+    )
+
+    graph = PermutationGroups.cubic_pancake(n=15, subset=4)
+    assert graph.n_generators == 3
+    assert graph.generator_names == ["R15", "R14", "R12"]
+    assert np.array_equal(
+        graph.generators,
+        [[14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+         [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 14],
+         [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 12, 13, 14]],
+    )
+
+    graph = PermutationGroups.cubic_pancake(n=15, subset=5)
+    assert graph.n_generators == 3
+    assert graph.generator_names == ["R15", "R13", "R2"]
+    assert np.array_equal(
+        graph.generators,
+        [[14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+         [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 13, 14],
+         [1, 0, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]],
+    )
+
+    graph = PermutationGroups.cubic_pancake(n=15, subset=6)
+    assert graph.n_generators == 3
+    assert graph.generator_names == ["R15", "R13", "R3"]
+    assert np.array_equal(
+        graph.generators,
+        [[14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+         [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 13, 14],
+         [2, 1, 0, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]],
+    )
+    
+    graph = PermutationGroups.cubic_pancake(n=15, subset=7)
+    assert graph.n_generators == 3
+    assert graph.generator_names == ["R15", "R13", "R12"]
+    assert np.array_equal(
+        graph.generators,
+        [[14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
+         [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 13, 14],
+         [11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 12, 13, 14]],
+    )
+
+
 def test_burnt_pancake():
     graph = PermutationGroups.burnt_pancake(6)
     assert graph.n_generators == 6
