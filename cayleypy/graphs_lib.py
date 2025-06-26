@@ -6,7 +6,7 @@ from itertools import permutations
 from warnings import warn
 
 from cayleypy.cayley_graph import CayleyGraphDef
-from cayleypy.hungarian_rings import hungarian_rings_generators
+from cayleypy.puzzles.hungarian_rings import hungarian_rings_generators
 from cayleypy.permutation_utils import (
     compose_permutations,
     transposition,

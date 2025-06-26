@@ -3,8 +3,8 @@ import os
 
 import pytest
 
+from cayleypy.permutation_utils import compose_permutations
 from .hungarian_rings import hungarian_rings_permutations, _circular_shift, _create_right_ring, _get_intersections
-from .permutation_utils import compose_permutations
 
 FAST_RUN = os.getenv("FAST") == "1"
 
