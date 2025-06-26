@@ -48,6 +48,35 @@ def _create_coxeter_generators(n: int) -> list[list[int]]:
     return gens
 
 
+def _cubic_pancake_cayley_graph(n: int, subset: int) -> CayleyGraph:    
+    def pancake_generator(k: int, n: int):
+        return list(range(k-1, -1, -1))+list(range(k, n, 1))
+    generators = []
+    generator_names = []
+    if subset == 1:
+        generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(2, n)]
+        generator_names = [f'R{n}', f'R{n-1}', 'R2']
+    elif subset == 2:
+        generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(3, n)]
+        generator_names = [f'R{n}', f'R{n-1}', 'R3']
+    elif subset == 3:
+        generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(n-2, n)]
+        generator_names = [f'R{n}', f'R{n-1}', f'R{n-2}']
+    elif subset == 4:
+        generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(n-3, n)]
+        generator_names = [f'R{n}', f'R{n-1}', f'R{n-3}']
+    elif subset == 5:
+        generators = [pancake_generator(n, n), pancake_generator(n-2, n), pancake_generator(2, n)]
+        generator_names = [f'R{n}', f'R{n-2}', 'R2']
+    elif subset == 6:
+        generators = [pancake_generator(n, n), pancake_generator(n-2, n), pancake_generator(3, n)]
+        generator_names = [f'R{n}', f'R{n-2}', 'R3']
+    elif subset == 7:
+        generators = [pancake_generator(n, n), pancake_generator(n-2, n), pancake_generator(n-3, n)]
+        generator_names = [f'R{n}', f'R{n-2}', f'R{n-3}']
+    return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
+
+
 def prepare_graph(name, n=0, **kwargs) -> CayleyGraph:
     """Returns pre-defined Cayley or Schreier coset graph.
 
@@ -106,33 +135,7 @@ def prepare_graph(name, n=0, **kwargs) -> CayleyGraph:
         assert 'subset' in kwargs, "For cubic_pancake must specify parameter 'subset'."
         subset = kwargs['subset']
         assert subset in [1, 2, 3, 4, 5, 6, 7], "subset parameter must be one of {1,2,3,4,5,6,7}"
-
-        def pancake_generator(k: int, n: int):
-            return list(range(k-1, -1, -1))+list(range(k, n, 1))
-        generators = []
-        generator_names = []
-        if subset == 1:
-            generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(2, n)]
-            generator_names = [f'R{n}', f'R{n-1}', 'R2']
-        elif subset == 2:
-            generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(3, n)]
-            generator_names = [f'R{n}', f'R{n-1}', 'R3']
-        elif subset == 3:
-            generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(n-2, n)]
-            generator_names = [f'R{n}', f'R{n-1}', f'R{n-2}']
-        elif subset == 4:
-            generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(n-3, n)]
-            generator_names = [f'R{n}', f'R{n-1}', f'R{n-3}']
-        elif subset == 5:
-            generators = [pancake_generator(n, n), pancake_generator(n-2, n), pancake_generator(2, n)]
-            generator_names = [f'R{n}', f'R{n-2}', 'R2']
-        elif subset == 6:
-            generators = [pancake_generator(n, n), pancake_generator(n-2, n), pancake_generator(3, n)]
-            generator_names = [f'R{n}', f'R{n-2}', 'R3']
-        elif subset == 7:
-            generators = [pancake_generator(n, n), pancake_generator(n-2, n), pancake_generator(n-3, n)]
-            generator_names = [f'R{n}', f'R{n-2}', f'R{n-3}']
-        return CayleyGraph(generators, dest=list(range(n)), generator_names=generator_names)
+        return _cubic_pancake_cayley_graph(n, subset)
     elif name == "full_reversals":
         assert n >= 2
         generators = []
