@@ -377,9 +377,3 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
         return PermutationGroups.pancake(n)
     else:
         raise ValueError(f"Unknown generator set: {name}")
-
-
-#================================================================================================
-
-
-
