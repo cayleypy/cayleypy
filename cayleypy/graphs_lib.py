@@ -286,7 +286,7 @@ class PermutationGroups:
                     break
             if not has_fixed_point:
                 generators.append(list(perm))
-                generator_names.append(f'D{idx}')
+                generator_names.append(f"D{idx}")
         return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
 
 
@@ -393,7 +393,7 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
     elif name == "pancake":
         warn("Use PermutationGroups.pancake instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.pancake(n)
-    elif name =='dearrangements':
+    elif name == 'dearrangements':
         warn("Use PermutationGroups.dearrangements instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.dearrangements(n)
     else:
