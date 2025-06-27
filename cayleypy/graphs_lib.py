@@ -200,33 +200,35 @@ class PermutationGroups:
           subset=7 => {Rn, R(n-2), R(n-3)}
         where Ri is reverse of elements 0,1..i.
         """
+
         def pancake_generator(k: int, n: int):
-            return list(range(k-1, -1, -1))+list(range(k, n, 1))
+            return list(range(k - 1, -1, -1)) + list(range(k, n, 1))
+
         assert n >= 2
         assert subset in [1, 2, 3, 4, 5, 6, 7], "subset parameter must be one of {1,2,3,4,5,6,7}"
         generators = []
         generator_names = []
         if subset == 1:
-            generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(2, n)]
-            generator_names = [f'R{n}', f'R{n-1}', 'R2']
+            generators = [pancake_generator(n, n), pancake_generator(n - 1, n), pancake_generator(2, n)]
+            generator_names = [f"R{n}", f"R{n-1}", "R2"]
         elif subset == 2:
-            generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(3, n)]
-            generator_names = [f'R{n}', f'R{n-1}', 'R3']
+            generators = [pancake_generator(n, n), pancake_generator(n - 1, n), pancake_generator(3, n)]
+            generator_names = [f"R{n}", f"R{n-1}", "R3"]
         elif subset == 3:
-            generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(n-2, n)]
-            generator_names = [f'R{n}', f'R{n-1}', f'R{n-2}']
+            generators = [pancake_generator(n, n), pancake_generator(n - 1, n), pancake_generator(n - 2, n)]
+            generator_names = [f"R{n}", f"R{n-1}", f"R{n-2}"]
         elif subset == 4:
-            generators = [pancake_generator(n, n), pancake_generator(n-1, n), pancake_generator(n-3, n)]
-            generator_names = [f'R{n}', f'R{n-1}', f'R{n-3}']
+            generators = [pancake_generator(n, n), pancake_generator(n - 1, n), pancake_generator(n - 3, n)]
+            generator_names = [f"R{n}", f"R{n-1}", f"R{n-3}"]
         elif subset == 5:
-            generators = [pancake_generator(n, n), pancake_generator(n-2, n), pancake_generator(2, n)]
-            generator_names = [f'R{n}', f'R{n-2}', 'R2']
+            generators = [pancake_generator(n, n), pancake_generator(n - 2, n), pancake_generator(2, n)]
+            generator_names = [f"R{n}", f"R{n-2}", "R2"]
         elif subset == 6:
-            generators = [pancake_generator(n, n), pancake_generator(n-2, n), pancake_generator(3, n)]
-            generator_names = [f'R{n}', f'R{n-2}', 'R3']
+            generators = [pancake_generator(n, n), pancake_generator(n - 2, n), pancake_generator(3, n)]
+            generator_names = [f"R{n}", f"R{n-2}", "R3"]
         elif subset == 7:
-            generators = [pancake_generator(n, n), pancake_generator(n-2, n), pancake_generator(n-3, n)]
-            generator_names = [f'R{n}', f'R{n-2}', f'R{n-3}']
+            generators = [pancake_generator(n, n), pancake_generator(n - 2, n), pancake_generator(n - 3, n)]
+            generator_names = [f"R{n}", f"R{n-2}", f"R{n-3}"]
         return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
 
     @staticmethod
