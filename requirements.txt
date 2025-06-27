@@ -2,3 +2,4 @@ numba
 numpy
 scipy
 torch
+h5py

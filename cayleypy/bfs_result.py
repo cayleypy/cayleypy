@@ -1,4 +1,3 @@
-import typing
 from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional
@@ -6,11 +5,9 @@ from typing import Optional
 import numpy as np
 import torch
 from scipy.sparse import coo_array
-
+import h5py
 from cayleypy.permutation_utils import apply_permutation
-
-if typing.TYPE_CHECKING:
-    from cayleypy.cayley_graph import CayleyGraphDef
+from .cayley_graph_def import CayleyGraphDef
 
 
 @dataclass(frozen=True)
@@ -51,6 +48,59 @@ class BfsResult:
     def last_layer(self) -> np.ndarray:
         """Returns last layer, formatted as set of strings."""
         return self.get_layer(self.diameter())
+
+    def save(self, path: str):
+        assert path.endswith(".h5"), "Please use '.h5' exntention for BfsResult saving"
+
+        with h5py.File(path, "w") as f:
+            f["bfs_completed"] = self.bfs_completed
+            f["layer_sizes"] = self.layer_sizes
+            for name, layer in self.layers.items():
+                f[f"layer__{name}"] = layer
+
+            if hasattr(self, "vertices_hashes") and self.vertices_hashes is not None:
+                f["vertices_hashes"] = self.vertices_hashes
+            else:
+                f["vertices_hashes"] = torch.empty([])
+
+            if hasattr(self, "edges_list_hashes") and self.edges_list_hashes is not None:
+                f["edges_list_hashes"] = self.edges_list_hashes
+            else:
+                f["edges_list_hashes"] = torch.empty([])
+
+            f["graph__generators"] = self.graph.generators
+            f["graph__generator_names"] = self.graph.generator_names
+            f["graph__central_state"] = self.graph.central_state
+
+    @staticmethod
+    def load(path: str):
+        with h5py.File(path, "r") as f:
+
+            layer_sizes = f["layer_sizes"][()].tolist()
+
+            if f["vertices_hashes"].shape == tuple():
+                vertices_hashes = None
+            else:
+                vertices_hashes = f["vertices_hashes"][()]
+
+            if f["edges_list_hashes"].shape == tuple():
+                edges_list_hashes = None
+            else:
+                edges_list_hashes = f["edges_list_hashes"][()]
+
+            loaded_result = BfsResult(
+                bfs_completed=bool(f["bfs_completed"]),
+                layer_sizes=layer_sizes,
+                layers={x: f[f"layer__{str(x)}"][()] for x in range(len(layer_sizes))},
+                edges_list_hashes=edges_list_hashes,
+                vertices_hashes=vertices_hashes,
+                graph=CayleyGraphDef(
+                    generators=f["graph__generators"][()].tolist(),
+                    generator_names=f["graph__generator_names"][()].tolist(),
+                    central_state=f["graph__central_state"][()].tolist(),
+                ),
+            )
+        return loaded_result
 
     @cached_property
     def num_vertices(self) -> int:
