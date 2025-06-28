@@ -1,5 +1,5 @@
 CayleyPy
-=======
+========
 
 CayleyPy is a scientific library for studying Cayley graphs and Schreier coset graphs.
 The main page of the project is here_.

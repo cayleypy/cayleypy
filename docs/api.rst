@@ -1,5 +1,5 @@
 CayleyPy API Reference
-=============
+======================
 
 
 Core classes
