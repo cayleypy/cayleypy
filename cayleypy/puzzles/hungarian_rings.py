@@ -58,8 +58,8 @@ def hungarian_rings_permutations(
 
     if left_size <= left_index or right_size <= right_index:
         raise ValueError(
-            f"Ring size is too small. left_size:{left_size} right_size:{right_size} "
-            + f"left_index:{left_index} right_index:{right_index}"
+            f"Ring size is too small. left_size:{left_size} left_index:{left_index} "
+            + f"right_size:{right_size} right_index:{right_index}"
         )
 
     intersections = _get_intersections(left_index=left_index, right_index=right_index)
@@ -85,21 +85,68 @@ def hungarian_rings_permutations(
     return left_rotation, right_rotation
 
 
-def hungarian_rings_generators(ring_size: int) -> tuple[list[list[int]], list[str]]:
+def get_santa_parameters_from_n(n: int) -> tuple[int, int, int, int]:
     """
-    Generators are similar to those used in the santa_2023 competition.
+    Parameters are similar to those used in the santa_2023 competition.
     The rings are the same size and intersect at one third(one fourth in santa). Indexes are shifted by 1.
+    Returns:
+        left_size: left ring size
+        left_index: index of the second intersection on the left ring
+        right_size: right ring size
+        right_index: index of the second intersection on the right ring
     """
-    if ring_size <= 3:
-        raise ValueError(f"ring_size must be greater than 3. ring_size:{ring_size}")
-
-    left_index = ring_size // 3  # the rings intersect with one third
+    right_size = (n + 2) // 2
+    assert right_size >= 4
+    left_size = (n + 2) - right_size
+    left_index = right_size // 3  # the rings intersect with one third
     right_index = left_index + 1
+    return left_size, left_index, right_size, right_index
+
+
+def get_group(n: int):
+    """
+    Returns all non-repeating parameter variants for current n
+    """
+    result = []
+    full_size_one_intersection = n + 1
+    for left_size in range(2, full_size_one_intersection//2 + 1):
+        right_size = full_size_one_intersection- left_size
+        result.append((left_size, 0, right_size, 0))
+    full_size_two_intersections = n + 2
+    for left_size in range(2, full_size_two_intersections//2 + 1):
+        right_size = full_size_two_intersections - left_size
+        result.extend(get_pair_variants(left_size, right_size))
+    return result
+
+
+
+def get_pair_variants(left_size, right_size):
+    """
+    non-repeating index variants for two intersections
+    """
+    result = []
+    for left_index in range(1, left_size // 2 + 1):
+        for right_index in range(1, right_size // 2 + 1):
+            parameters = (left_size, left_index, right_size, right_index)
+            clone = (right_size, right_index, left_size, left_index)
+            if parameters not in result and clone not in result:
+                result.append(parameters)
+    return result
+
+
+def hungarian_rings_generators(left_size: int, left_index: int,
+                               right_size: int, right_index: int) -> tuple[list[list[int]], list[str]]:
+    """
+    Generators for undirected graph. Rotate rings in both directions by 1 step.
+    """
+    if left_size <= 1 or right_size <= 1:
+        raise ValueError(f"Ring size must be greater than 1. left_size:{left_size} right_size:{right_size}")
+
     forth_l, forth_r = hungarian_rings_permutations(
-        left_size=ring_size, left_index=left_index, right_size=ring_size, right_index=right_index
+        left_size=left_size, left_index=left_index, right_size=right_size, right_index=right_index
     )
     back_l, back_r = hungarian_rings_permutations(
-        left_size=ring_size, left_index=left_index, right_size=ring_size, right_index=right_index, step=-1
+        left_size=left_size, left_index=left_index, right_size=right_size, right_index=right_index, step=-1
     )
     generators = [forth_l, forth_r, back_l, back_r]
     generator_names = ["L", "R", "-L", "-R"]

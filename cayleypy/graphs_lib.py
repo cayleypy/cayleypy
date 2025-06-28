@@ -6,7 +6,7 @@ from itertools import permutations
 from warnings import warn
 
 from cayleypy.cayley_graph import CayleyGraphDef
-from cayleypy.puzzles.hungarian_rings import hungarian_rings_generators
+from cayleypy.puzzles.hungarian_rings import hungarian_rings_generators, get_santa_parameters_from_n
 from cayleypy.permutation_utils import (
     compose_permutations,
     transposition,
@@ -228,6 +228,12 @@ class PermutationGroups:
             generator_names.append(f"({0} {i} {j})")
         return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
 
+    @staticmethod
+    def hungarian_rings(left_size: int, left_index: int, right_size: int, right_index: int):
+        generators, generator_names = hungarian_rings_generators(left_size, left_index, right_size, right_index)
+        n = len(generators[0])
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+
 
 def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
     """Returns pre-defined Cayley or Schreier coset graph.
@@ -300,11 +306,9 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
         central_state = list(range(len(generators[0])))
         return CayleyGraphDef(generators, central_state=central_state, generator_names=generator_names)
     elif name == "hungarian_rings":
-        assert n % 2 == 0
-        ring_size = (n + 2) // 2
-        assert ring_size >= 4
-        generators, generator_names = hungarian_rings_generators(ring_size=ring_size)
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        warn("Use PermutationGroups.hungarian_rings instead of prepare_graph!", DeprecationWarning, stacklevel=2)
+        hr_params = get_santa_parameters_from_n(n)
+        return PermutationGroups.hungarian_rings(*hr_params)
     elif name == "starminx":
         generator_names = list(STARMINX_MOVES.keys())
         generators = [STARMINX_MOVES[k] for k in generator_names]

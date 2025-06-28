@@ -4,6 +4,7 @@ import math
 
 from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph, PermutationGroups
 from cayleypy.puzzles import rubik_cube, globe_puzzle
+from cayleypy.puzzles.hungarian_rings import get_santa_parameters_from_n, hungarian_rings_generators
 
 
 def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int], max_layer_size=1000):
@@ -115,11 +116,22 @@ def test_cyclic_coxeter_cayley_growth():
 
 def test_hungarian_rings_growth():
     for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
-        n = int(key)
-        assert n % 2 == 0
-        ring_size = (n + 2) // 2
-        assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
-        _verify_layers_fast(prepare_graph("hungarian_rings", n=n), layer_sizes)
+        parameters = map(int, key.split(","))
+        (left_size, left_index, right_size, right_index) = parameters
+        n = left_size + right_size - (2 if left_index > 0 and right_index > 0 else 1)
+        if n > 12:
+            continue
+
+        santa_params = get_santa_parameters_from_n(n)
+        if parameters == santa_params:
+            assert n % 2 == 0
+            ring_size = (n + 2) // 2
+            assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
+            _verify_layers_fast(prepare_graph("hungarian_rings", n=n), layer_sizes)
+
+        generators, generator_names = hungarian_rings_generators(*parameters)
+        graph = CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        _verify_layers_fast(graph, layer_sizes)
 
 
 def test_puzzles_growth():

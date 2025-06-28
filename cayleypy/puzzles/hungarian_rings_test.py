@@ -4,7 +4,8 @@ import os
 import pytest
 
 from cayleypy.permutation_utils import compose_permutations
-from .hungarian_rings import hungarian_rings_permutations, _circular_shift, _create_right_ring, _get_intersections
+from .hungarian_rings import hungarian_rings_permutations, _circular_shift, _create_right_ring, _get_intersections, \
+    get_santa_parameters_from_n, get_group, get_pair_variants
 
 FAST_RUN = os.getenv("FAST") == "1"
 
@@ -79,11 +80,7 @@ wreath_moves = [
     (6, 2, 6, 3, 1, [1, 2, 3, 4, 5, 0, 6, 7, 8, 9], [6, 1, 8, 3, 4, 5, 7, 2, 9, 0]),
     (7, 2, 7, 3, 1, [1, 2, 3, 4, 5, 6, 0, 7, 8, 9, 10, 11], [7, 1, 10, 3, 4, 5, 6, 8, 9, 2, 11, 0]),
     (
-        12,
-        3,
-        12,
-        4,
-        1,
+        12, 3, 12, 4, 1,
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
         [12, 1, 2, 19, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 3, 20, 21, 0],
     ),
@@ -143,8 +140,10 @@ def test_hr_permutations_compensation(left_size: int, left_index: int, right_siz
 
 @pytest.mark.skipif(FAST_RUN, reason="slow test")
 def test_hr_permutations_compensation_bf():
-    parameters = [range(2, 6), range(1, 5), range(2, 6), range(1, 5), range(-7, 8)]
-    for left_size, left_index, right_size, right_index, step in list(itertools.product(*parameters)):
+    two_inter_params = [range(2, 6), range(1, 5), range(2, 6), range(1, 5), range(-7, 8)]
+    one_inter_params = [range(2, 6), [0], range(2, 6), [0], range(-7, 8)]
+    parameters = list(itertools.product(*one_inter_params)) + list(itertools.product(*two_inter_params))
+    for left_size, left_index, right_size, right_index, step in parameters:
         if left_index >= left_size or right_index >= right_size:
             continue
         l_permutations, r_permutations = hungarian_rings_permutations(
@@ -160,3 +159,56 @@ def test_hr_permutations_compensation_bf():
         assert len(l_permutations) == len(r_permutations) == full_size
         assert compose_permutations(l_permutations, l_counter_perm) == list(range(full_size))
         assert compose_permutations(r_permutations, r_counter_perm) == list(range(full_size))
+
+
+@pytest.mark.parametrize("n, parameters", [
+    (10, (6, 2, 6, 3)),
+    (12, (7, 2, 7, 3)),
+])
+def test_get_santa_parameters_from_n(n: int, parameters):
+    assert get_santa_parameters_from_n(n) == parameters
+
+pairs_data = {
+    (2, 4) : [
+        (2, 1, 4, 1),
+        (2, 1, 4, 2),
+    ],
+    (2, 5) : [
+        (2, 1, 5, 1),
+        (2, 1, 5, 2),
+    ],
+    (2, 6) : [
+        (2, 1, 6, 1),
+        (2, 1, 6, 2),
+        (2, 1, 6, 3),
+    ],
+    (3, 4) : [
+        (3, 1, 4, 1),
+        (3, 1, 4, 2),
+    ],
+    (3, 5) : [
+        (3, 1, 5, 1),
+        (3, 1, 5, 2),
+    ],
+    (4, 4) : [
+        (4, 1, 4, 1),
+        (4, 1, 4, 2),
+        (4, 2, 4, 2),
+    ]
+}
+
+groups_data = [
+    (4, [(2, 0, 3, 0)] + pairs_data[(2, 4)] + [(3, 1, 3, 1)]),
+    (5, [(2, 0, 4, 0), (3, 0, 3, 0)] + pairs_data[(2, 5)] + pairs_data[(3, 4)]),
+    (6, [(2, 0, 5, 0), (3, 0, 4, 0)] + pairs_data[(2, 6)] + pairs_data[(3, 5)] + pairs_data[(4, 4)])
+]
+
+
+@pytest.mark.parametrize("pair, variants", pairs_data.items())
+def test_get_pair_variants(pair: tuple[int, int], variants: list):
+    assert get_pair_variants(*pair) == variants
+
+
+@pytest.mark.parametrize("n, group", groups_data)
+def test_get_group(n: int, group: list):
+    assert get_group(n) == group
