@@ -1,6 +1,6 @@
 from dataclasses import dataclass, replace
 from functools import cached_property
-from typing import Optional, Any
+from typing import Optional, Union, Any
 import numpy as np
 import torch
 from scipy.sparse import coo_array
@@ -148,7 +148,7 @@ class BfsResult:
     def has_edges_list_hashes(self):
         return hasattr(self, "edges_list_hashes") and self.edges_list_hashes is not None
 
-    def to_device(self, device: str | torch.device):
+    def to_device(self, device: Union[str, torch.device]):
 
         if isinstance(device, str):
             device = torch.device(device)
