@@ -274,16 +274,13 @@ class PermutationGroups:
         return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
 
     @staticmethod
-    def dearrangements(n: int) -> CayleyGraphDef:
-        """Cayley graph for permutations without static points, called dearrangements."""
+    def derangements(n: int) -> CayleyGraphDef:
+        """Cayley graph for permutations without static points, called derangements."""
+        assert n >= 2
         generators = []
         generator_names = []
         for idx, perm in enumerate(permutations(range(n))):
-            has_fixed_point = False
-            for i in range(n):
-                if perm[i] == i:
-                    has_fixed_point = True
-                    break
+            has_fixed_point = any(perm[i] == i for i in range(n))
             if not has_fixed_point:
                 generators.append(list(perm))
                 generator_names.append(f"D{idx}")
@@ -393,8 +390,5 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
     elif name == "pancake":
         warn("Use PermutationGroups.pancake instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.pancake(n)
-    elif name == "dearrangements":
-        warn("Use PermutationGroups.dearrangements instead of prepare_graph!", DeprecationWarning, stacklevel=2)
-        return PermutationGroups.dearrangements(n)
     else:
         raise ValueError(f"Unknown generator set: {name}")

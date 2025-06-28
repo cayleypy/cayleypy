@@ -227,3 +227,10 @@ def test_three_cycles_0ij():
     assert graph.n_generators == 6
     expected_generators = [[1, 2, 0, 3], [1, 3, 2, 0], [2, 0, 1, 3], [2, 1, 3, 0], [3, 0, 2, 1], [3, 1, 0, 2]]
     assert np.array_equal(graph.generators, expected_generators)
+
+
+def test_derangements():
+    assert PermutationGroups.derangements(2).generators == [[1, 0]]
+    assert PermutationGroups.derangements(3).generators == [[1, 2, 0], [2, 0, 1]]
+    assert len(PermutationGroups.derangements(4).generators) == 9
+    assert len(PermutationGroups.derangements(5).generators) == 44
