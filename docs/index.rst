@@ -12,6 +12,7 @@ Classes representing different kinds of graphical models.
 
     cayleypy.CayleyGraphDef
     cayleypy.CayleyGraph
+    cayleypy.BfsResult
 
 
 
@@ -24,3 +25,4 @@ Blah blah
     :toctree: generated/
 
     cayleypy.PermutationGroups
+    cayleypy.puzzles

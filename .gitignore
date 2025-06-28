@@ -4,3 +4,7 @@ __pycache__/
 *.ipynb
 .coverage
 htmlcov/
+
+# Sphinx
+docs/_build
+docs/generated

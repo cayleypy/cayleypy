@@ -198,7 +198,7 @@ class PermutationGroups:
           subset=5 => {Rn, R(n-2), R2}
           subset=6 => {Rn, R(n-2), R3}
           subset=7 => {Rn, R(n-2), R(n-3)}
-        where Ri is reverse of elements 0,1..i.
+          where Ri is reverse of elements 0,1..i.
         """
 
         def pancake_generator(k: int, n: int):

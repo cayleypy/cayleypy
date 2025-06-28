@@ -20,13 +20,16 @@ class CayleyGraph:
       * Edges are permutations of size n from given set of `generators`.
       * There is an outgoing edge for every vertex A and every generating permutation P.
       * On the other end of this edge, there is a vertex P(A).
+
     In general case, this graph is directed. However, in the case when set of generators is closed under inversion,
-        every edge has and edge in other direction, so the graph can be viewed as undirected.
+    every edge has and edge in other direction, so the graph can be viewed as undirected.
+
     The graph is fully defined by list of generators and one selected state called "central state". The graph contains
-        all vertices reachable from the central state. This definition is encapsulated in CayleyGraphDef,
+    all vertices reachable from the central state. This definition is encapsulated in CayleyGraphDef,
+
     In the case when the central state is a permutation itself, and generators fully generate S_n, this is a Cayley
-        graph for S_n, hence the name. In more general case, elements can have less than n distinct values, and we call
-        the set of vertices "coset".
+    graph for S_n, hence the name. In more general case, elements can have less than n distinct values, and we call
+    the set of vertices "coset".
     """
 
     def __init__(
@@ -172,8 +175,8 @@ class CayleyGraph:
         :param max_diameter: maximal number of BFS iterations.
         :param return_all_edges: whether to return list of all edges (uses more memory).
         :param return_all_hashes: whether to return hashes for all vertices (uses more memory).
-        :param keep_alive_func - function to call on every iteration.
-        :return: BfsResult object with requested BFS results.
+        :param keep_alive_func: function to call on every iteration.
+        :return: :class:`cayleypy.BfsResult` object with requested BFS results.
         """
         # This version of BFS is correct only for undirected graph.
         assert self.definition.generators_inverse_closed, "BFS is supported only when generators are inverse-closed."
