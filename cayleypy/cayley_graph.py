@@ -193,7 +193,8 @@ class CayleyGraph:
         :param max_diameter: maximal number of BFS iterations.
         :param return_all_edges: whether to return list of all edges (uses more memory).
         :param return_all_hashes: whether to return hashes for all vertices (uses more memory).
-        :param keep_alive_func - function to call on every iteration.
+        :param keep_alive_func: function to call on every iteration.
+
         :return: BfsResult object with requested BFS results.
         """
         # This version of BFS is correct only for undirected graph.

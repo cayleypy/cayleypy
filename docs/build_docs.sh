@@ -1,4 +1,4 @@
-# Generates local copy of InferLO documentation.
+# Generates local copy of CayleyPy documentation.
 # Inspired by https://github.com/InferLO/inferlo/blob/master/tools/build_docs.sh
 
 set -e

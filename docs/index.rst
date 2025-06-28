@@ -1,28 +1,13 @@
-API Reference
-=============
+CayleyPy
+=======
 
+CayleyPy is a scientific library for studying Cayley graphs and Schreier coset graphs.
+The main page of the project is here_.
+This site contains auto-generated documentation (API reference) for the library.
 
-Core
-''''''''''''''''
+.. _here: https://github.com/cayleypy/cayleypy
 
-Classes representing different kinds of graphical models.
+.. toctree::
+   :maxdepth: 1
 
-.. autosummary::
-    :toctree: generated/
-
-    cayleypy.CayleyGraphDef
-    cayleypy.CayleyGraph
-    cayleypy.BfsResult
-
-
-
-Graph library
-'''''''''''''''''
-
-Blah blah
-
-.. autosummary::
-    :toctree: generated/
-
-    cayleypy.PermutationGroups
-    cayleypy.puzzles
+   api

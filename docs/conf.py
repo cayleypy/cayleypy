@@ -1,19 +1,17 @@
 # Configuration file for the Sphinx documentation builder.
-#
-# This file only contains a selection of the most common options. For a full
-# list see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html
 
-# -- Path setup --------------------------------------------------------------
-
-# If extensions (or modules to document with autodoc) are in another directory,
-# add these directories to sys.path here. If the directory is relative to the
-# documentation root, use os.path.abspath to make it absolute, like shown here.
-#
+import inspect
 import os
 import sys
 
 from sphinx_markdown_parser.parser import MarkdownParser
+
+# -- Path setup --------------------------------------------------------------
+# If extensions (or modules to document with autodoc) are in another directory,
+# add these directories to sys.path here. If the directory is relative to the
+# documentation root, use os.path.abspath to make it absolute, like shown here.
+#
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
@@ -27,12 +25,7 @@ def setup(app):
 
 # -- Project information -----------------------------------------------------
 
-project = "InferLO"
-copyright = "2020, InferLO developers"
-author = "InferLO developers"
-
-# The full version, including alpha/beta/rc tags
-release = "0.1.0"
+project = "CayleyPy"
 
 # -- General configuration ---------------------------------------------------
 
@@ -59,10 +52,6 @@ templates_path = ["_templates"]
 # This pattern also affects html_static_path and html_extra_path.
 exclude_patterns = [
     "_build",
-    "Thumbs.db",
-    ".DS_Store",
-    "**.ipynb_checkpoints",
-    "generated/inferlo.rst",  # No need in page for root __init__.py.
 ]
 
 # -- Options for HTML output -------------------------------------------------
@@ -108,10 +97,7 @@ def autodoc_process_signature(app, what, name, obj, options, signature, return_a
         return None, None
 
 
-import inspect
-import cayleypy
-
-
+# Add "source" links pointing to source on GitHub.
 def linkcode_resolve(domain, info):
     if domain != "py" or not info["module"]:
         return None
@@ -125,6 +111,5 @@ def linkcode_resolve(domain, info):
     except Exception:
         return None
 
-    fn = os.path.relpath(fn, start=os.path.dirname(cayleypy.__file__))
-
-    return f"https://github.com/cayleypy/cayleypy/blob/main/{fn}#L{lineno}-L{lineno + len(source) - 1}"
+    fn = os.path.relpath(fn, start=os.getcwd())
+    return f"https://github.com/cayleypy/cayleypy/blob/main/cayleypy/{fn}#L{lineno}-L{lineno + len(source) - 1}"
