@@ -117,7 +117,7 @@ class BfsResult:
                 layers={x: f[f"layer__{str(x)}"][()] for x in range(len(layer_sizes))},
                 edges_list_hashes=edges_list_hashes,
                 vertices_hashes=vertices_hashes,
-                graph=CayleyGraphDef(
+                graph=CayleyGraphDef.create(
                     generators=f["graph__generators"][()].tolist(),
                     generator_names=[x.decode("utf-8") for x in f["graph__generator_names"][()]],
                     central_state=f["graph__central_state"][()].tolist(),

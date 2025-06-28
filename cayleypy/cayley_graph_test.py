@@ -4,10 +4,11 @@ import numpy as np
 import pytest
 import torch
 
-from cayleypy.bfs_numpy import bfs_numpy
-from cayleypy.cayley_graph import CayleyGraph, MatrixGenerator, CayleyGraphDef
-from cayleypy.datasets import load_dataset
-from cayleypy.graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
+from .bfs_numpy import bfs_numpy
+from .cayley_graph import CayleyGraph
+from .cayley_graph_def import MatrixGenerator, CayleyGraphDef
+from .datasets import load_dataset
+from .graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 
 FAST_RUN = os.getenv("FAST") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"

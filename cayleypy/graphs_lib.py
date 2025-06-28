@@ -5,9 +5,9 @@
 from itertools import permutations
 from warnings import warn
 
-from cayleypy.cayley_graph import CayleyGraphDef, MatrixGenerator
-from cayleypy.hungarian_rings import hungarian_rings_generators
-from cayleypy.permutation_utils import (
+from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
+from .hungarian_rings import hungarian_rings_generators
+from .permutation_utils import (
     compose_permutations,
     transposition,
     permutation_from_cycles as pfc,
@@ -229,7 +229,7 @@ class PermutationGroups:
         elif subset == 7:
             generators = [pancake_generator(n, n), pancake_generator(n - 2, n), pancake_generator(n - 3, n)]
             generator_names = [f"R{n}", f"R{n-2}", f"R{n-3}"]
-        return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
     @staticmethod
     def burnt_pancake(n: int) -> CayleyGraphDef:
@@ -284,7 +284,7 @@ class PermutationGroups:
             if not has_fixed_point:
                 generators.append(list(perm))
                 generator_names.append(f"D{idx}")
-        return CayleyGraphDef(generators, central_state=list(range(n)), generator_names=generator_names)
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
 
 def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:

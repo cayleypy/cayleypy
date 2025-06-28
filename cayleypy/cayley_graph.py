@@ -6,7 +6,7 @@ import numpy as np
 import torch
 
 from .bfs_result import BfsResult
-from .cayley_graph_def import CayleyGraphDef
+from .cayley_graph_def import CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
 from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted
