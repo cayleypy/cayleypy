@@ -1,3 +1,57 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools"]
+
+[project]
+# https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
+name = "cayleypy"
+version = "0.1.0"
+description = "Cayley graphs processing using GPU and pytorch"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "CayleyPy Foundation" }]
+
+# https://pypi.org/classifiers/
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+
+# https://peps.python.org/pep-0508/
+dependencies = [
+    "h5py",
+    "numba",
+    "numpy",
+    "scipy",
+    "torch",
+]
+
+# Development dependencies
+# pip install -e .[lint,test,dev]
+[project.optional-dependencies]
+lint = [
+    "black",
+    "mypy==1.15.0",
+    "pylint"
+]
+test = [
+    "pytest",
+    "pytest-benchmark",
+]
+dev = [
+    "coverage",
+    "setuptools"
+]
+
+[project.urls]
+"Homepage" = "https://github.com/cayleypy/cayleypy"
+"Documentation" = "https://cayleypy.github.io/cayleypy/"
+
+[tool.setuptools.package-data]
+"my_package" = ["data/*.csv"]
+
 [[tool.mypy.overrides]]
 module = ["networkx.*"]
 ignore_missing_imports = true

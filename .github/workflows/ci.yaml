@@ -30,9 +30,7 @@ jobs:
           python-version: '3.12'
           architecture: 'x64'
       - name: Install requirements
-        run: |
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+        run: pip install .[lint]
       - name: Lint
         run: ./lint.sh
   pytest-ubuntu:
@@ -48,9 +46,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: 'x64'
       - name: Install requirements
-        run: |
-          pip install -r requirements.txt
-          pip install pytest
+        run: pip install .[test]
       - name: Run tests
         run: pytest
   pytest-windows:
@@ -63,9 +59,7 @@ jobs:
           python-version: '3.12'
           architecture: 'x64'
       - name: Install requirements
-        run: |
-          pip install -r requirements.txt
-          pip install pytest
+        run: pip install .[test]
       - name: Run tests
         run: pytest
   pytest-macos:
@@ -78,8 +72,6 @@ jobs:
           python-version: '3.12'
           architecture: 'x64'
       - name: Install requirements
-        run: |
-          pip install -r requirements.txt
-          pip install pytest
+        run: pip install .[test]
       - name: Run tests
         run: pytest

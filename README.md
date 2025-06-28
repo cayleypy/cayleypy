@@ -51,8 +51,7 @@ To start development, run:
 ```
 git clone https://github.com/cayleypy/cayleypy.git
 cd cayleypy
-pip install -r requirements.txt
-pip install -r requirements-dev.txt
+pip install .[lint,test,dev]
 ```
 
 To run only quick tests:
