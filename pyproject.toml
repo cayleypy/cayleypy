@@ -25,12 +25,14 @@ dependencies = [
     "numba",
     "numpy",
     "scipy",
-    "torch",
 ]
 
 # Development dependencies
-# pip install -e .[lint,test,dev]
+# pip install .[torch,lint,test,dev]
 [project.optional-dependencies]
+torch = [
+    "torch"
+]
 lint = [
     "black",
     "mypy==1.15.0",
