@@ -2,8 +2,11 @@
 
 import math
 
-from cayleypy import load_dataset, CayleyGraph, CayleyGraphDef, prepare_graph, PermutationGroups
-from cayleypy.puzzles import rubik_cube, globe_puzzle
+from .cayley_graph import CayleyGraph
+from .cayley_graph_def import CayleyGraphDef
+from .datasets import load_dataset
+from .graphs_lib import prepare_graph, PermutationGroups, MatrixGroups
+from .puzzles import rubik_cube, globe_puzzle
 
 
 def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int], max_layer_size=1000):
@@ -120,6 +123,13 @@ def test_hungarian_rings_growth():
         ring_size = (n + 2) // 2
         assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
         _verify_layers_fast(prepare_graph("hungarian_rings", n=n), layer_sizes)
+
+
+def test_heisenberg_growth():
+    for key, layer_sizes in load_dataset("heisenberg_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == n**3
+        _verify_layers_fast(MatrixGroups.heisenberg(n), layer_sizes)
 
 
 def test_puzzles_growth():
