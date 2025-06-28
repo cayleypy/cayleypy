@@ -1,16 +1,12 @@
-import typing
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from functools import cached_property
-from typing import Optional
-
+from typing import Optional, Union, Any
 import numpy as np
 import torch
 from scipy.sparse import coo_array
-
+import h5py
 from cayleypy.permutation_utils import apply_permutation
-
-if typing.TYPE_CHECKING:
-    from cayleypy.cayley_graph import CayleyGraphDef
+from .cayley_graph_def import CayleyGraphDef
 
 
 @dataclass(frozen=True)
@@ -36,6 +32,100 @@ class BfsResult:
     # Definition of the CayleyGraph on which BFS was run. Needed if we want to restore edge names.
     graph: "CayleyGraphDef"
 
+    def __eq__(self, other: Any) -> bool:
+
+        if not isinstance(other, BfsResult):
+            return False
+
+        if self.bfs_completed != other.bfs_completed:
+            return False
+        if self.layer_sizes != other.layer_sizes:
+            return False
+        if set(self.layers) != set(other.layers):
+            return False
+        for k in self.layers:
+            if not torch.all(self.layers[k] == other.layers[k]):
+                return False
+
+        if not self.has_vertices_hashes():
+            if other.has_vertices_hashes():
+                return False
+        else:
+            if self.vertices_hashes.shape != other.vertices_hashes.shape:  # type: ignore
+                return False
+            if not torch.all(self.vertices_hashes == other.vertices_hashes):  # type: ignore
+                return False
+
+        if not self.has_edges_list_hashes():
+            if other.has_edges_list_hashes():
+                return False
+        else:
+            if self.edges_list_hashes.shape != other.edges_list_hashes.shape:  # type: ignore
+                return False
+            if not torch.all(self.edges_list_hashes == other.edges_list_hashes):  # type: ignore
+                return False
+
+        if self.graph != other.graph:
+            return False
+        return True
+
+    def save(self, path: str):
+        path = str(path)
+        assert path.endswith(".h5"), "Please use '.h5' extention for BfsResult saving"
+
+        with h5py.File(path, "w") as f:
+            f["bfs_completed"] = self.bfs_completed
+            f["layer_sizes"] = self.layer_sizes
+            for name, layer in self.layers.items():
+                f[f"layer__{name}"] = layer.detach().cpu()
+
+            if self.has_vertices_hashes():
+                f["vertices_hashes"] = self.vertices_hashes.detach().cpu()  # type: ignore
+            else:
+                f["vertices_hashes"] = torch.empty([])
+
+            if self.has_edges_list_hashes():
+                f["edges_list_hashes"] = self.edges_list_hashes.detach().cpu()  # type: ignore
+            else:
+                f["edges_list_hashes"] = torch.empty([])
+
+            f["graph__generators"] = self.graph.generators
+            f["graph__generator_names"] = self.graph.generator_names
+            f["graph__central_state"] = self.graph.central_state
+
+    @staticmethod
+    def load(path: str):
+        path = str(path)
+        # pylint: disable=no-member
+        with h5py.File(path, "r") as f:
+
+            layer_sizes = f["layer_sizes"][()].tolist()
+
+            if f["vertices_hashes"].shape == tuple():
+                vertices_hashes = None
+            else:
+                vertices_hashes = f["vertices_hashes"][()]
+
+            if f["edges_list_hashes"].shape == tuple():
+                edges_list_hashes = None
+            else:
+                edges_list_hashes = f["edges_list_hashes"][()]
+
+            loaded_result = BfsResult(
+                bfs_completed=bool(f["bfs_completed"][()]),
+                layer_sizes=layer_sizes,
+                layers={x: f[f"layer__{str(x)}"][()] for x in range(len(layer_sizes))},
+                edges_list_hashes=edges_list_hashes,
+                vertices_hashes=vertices_hashes,
+                graph=CayleyGraphDef(
+                    generators=f["graph__generators"][()].tolist(),
+                    generator_names=[x.decode("utf-8") for x in f["graph__generator_names"][()]],
+                    central_state=f["graph__central_state"][()].tolist(),
+                ),
+            )
+        # pylint: enable=no-member
+        return loaded_result
+
     def diameter(self):
         """Maximal distance from any start vertex to any other vertex."""
         return len(self.layer_sizes) - 1
@@ -51,6 +141,24 @@ class BfsResult:
     def last_layer(self) -> np.ndarray:
         """Returns last layer, formatted as set of strings."""
         return self.get_layer(self.diameter())
+
+    def has_vertices_hashes(self):
+        return hasattr(self, "vertices_hashes") and self.vertices_hashes is not None
+
+    def has_edges_list_hashes(self):
+        return hasattr(self, "edges_list_hashes") and self.edges_list_hashes is not None
+
+    def to_device(self, device: Union[str, torch.device]):
+
+        if isinstance(device, str):
+            device = torch.device(device)
+        # in dataclass one has to use replace() instead of regular assignment
+        return replace(
+            self,
+            layers={k: v.to(device) for k, v in self.layers.items()},
+            vertices_hashes=self.vertices_hashes.to(device) if self.has_vertices_hashes() else None,  # type: ignore
+            edges_list_hashes=self.edges_list_hashes.to(device) if self.has_edges_list_hashes() else None,  # type: ignore # pylint: disable=line-too-long
+        )
 
     @cached_property
     def num_vertices(self) -> int:
