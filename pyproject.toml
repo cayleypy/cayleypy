@@ -31,6 +31,9 @@ dependencies = [
 # pip install .[torch,lint,test,dev]
 [project.optional-dependencies]
 torch = [
+    # torch is required, but it is optional here because if it's in dependencies,
+    # Kaggle would spend several minutes installing some dependencies, even though
+    # it has torch installed.
     "torch"
 ]
 lint = [
