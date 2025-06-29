@@ -25,5 +25,6 @@ jobs:
         uses: peaceiris/actions-gh-pages@v3
         with:
           publish_dir: ./docs/_build/html
+          external_repository: cayleypy/cayleypy-docs
           publish_branch: gh-pages
           deploy_key: ${{ secrets.DOCS_DEPLOY_KEY }}
