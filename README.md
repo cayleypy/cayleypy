@@ -56,7 +56,7 @@ To start development, run:
 ```
 git clone https://github.com/cayleypy/cayleypy.git
 cd cayleypy
-pip install .[torch,lint,test,dev]
+pip install -e .[torch,lint,test,dev,docs]
 ```
 
 To run only quick tests:
@@ -76,6 +76,12 @@ To check coverage, run:
 
 ```
 coverage run -m pytest && coverage html
+```
+
+To rebuild documentation locally, run:
+
+```
+./docs/build_docs.sh 
 ```
 
 ### Formatting

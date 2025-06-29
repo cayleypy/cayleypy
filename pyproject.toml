@@ -28,7 +28,7 @@ dependencies = [
 ]
 
 # Development dependencies
-# pip install .[torch,lint,test,dev]
+# pip install .[torch,lint,test,dev,docs]
 [project.optional-dependencies]
 torch = [
     # torch is required, but it is optional here because if it's in dependencies,
@@ -48,7 +48,13 @@ test = [
 dev = [
     "coverage",
     "networkx",
-    "setuptools"
+    "setuptools",
+]
+docs = [
+    # Libraries needed to build documentation.
+    "sphinx",
+    "sphinx_rtd_theme",
+    "sphinx_markdown_parser",
 ]
 
 [project.urls]
