@@ -152,7 +152,7 @@ class CayleyGraphChunkedBfs:
 
         # Prepare functions to compute permutations.
         assert is_permutation(graph.definition.central_state), "This version of BFS works only for permutations."
-        perms = graph.generators
+        perms = graph.definition.generators_permutations
         enc = graph.string_encoder
         assert enc is not None
         perm_funcs = [enc.implement_permutation_1d(p) for p in perms]
@@ -215,6 +215,7 @@ def bfs_bitmask(graph: CayleyGraph, max_diameter: int = 10**6) -> list[int]:
     :param max_diameter:  maximal number of BFS iterations.
     :return: Growth function (layer sizes).
     """
+    assert graph.definition.is_permutation_group(), "Only works for permutations."
     n = graph.definition.state_size
     assert n > R, f"This algorithm works only for N>{R}."
     if graph.verbose >= 2:

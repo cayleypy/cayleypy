@@ -6,26 +6,34 @@ import numpy as np
 import torch
 
 from .bfs_result import BfsResult
+from .cayley_graph_def import CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
 from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted
-from .cayley_graph_def import CayleyGraphDef
 
 
 class CayleyGraph:
-    """Represents a Schreier coset graph for the group S_n (group of n-element permutations).
+    """Represents a Schreier coset graph for some group.
 
     In this graph:
-      * Vertices (aka "states") are strings of integers of size n.
-      * Edges are permutations of size n from given set of `generators`.
-      * There is an outgoing edge for every vertex A and every generating permutation P.
-      * On the other end of this edge, there is a vertex P(A).
+      * Vertices (aka "states") are integer vectors or matrices.
+      * There is an outgoing edge for every vertex A and every generator G.
+      * On the other end of this edge, there is a vertex G(A).
+    When `definition.generator_type` is `PERMUTATION`:
+      * The group is the group of permutations S_n.
+      * Generators are permutations of n elements.
+      * States are vectors of integers of size n.
+    When `definition.generator_type` is `MATRIX`:
+      * The group is the group of n*n integer matrices under multiplication (usual or modular)
+      * Technically, it's a group only when all generators are invertible, but we don't require this.
+      * Generators are n*n integer matrices.
+      * States are n*m integers matrices.
     In general case, this graph is directed. However, in the case when set of generators is closed under inversion,
         every edge has and edge in other direction, so the graph can be viewed as undirected.
     The graph is fully defined by list of generators and one selected state called "central state". The graph contains
         all vertices reachable from the central state. This definition is encapsulated in CayleyGraphDef,
     In the case when the central state is a permutation itself, and generators fully generate S_n, this is a Cayley
-        graph for S_n, hence the name. In more general case, elements can have less than n distinct values, and we call
+        graph, hence the name. In more general case, elements can have less than n distinct values, and we call
         the set of vertices "coset".
     """
 
@@ -69,21 +77,24 @@ class CayleyGraph:
         if verbose > 0:
             print(f"Using device: {self.device}.")
 
-        self.generators = np.array(definition.generators, dtype=np.int64)
-        self.generators_torch = torch.tensor(definition.generators, dtype=torch.int64, device=self.device)
         self.central_state = torch.as_tensor(definition.central_state, device=self.device, dtype=torch.int64)
-
-        # Prepare encoder in case we want to encode states using few bits per element.
-        if bit_encoding_width == "auto":
-            bit_encoding_width = int(math.ceil(math.log2(int(self.central_state.max()) + 1)))
-        self.string_encoder: Optional[StringEncoder] = None
         encoded_state_size: int = self.definition.state_size
-        if bit_encoding_width is not None:
-            self.string_encoder = StringEncoder(code_width=int(bit_encoding_width), n=self.definition.state_size)
-            self.encoded_generators = [
-                self.string_encoder.implement_permutation(perm) for perm in definition.generators
-            ]
-            encoded_state_size = self.string_encoder.encoded_length
+        self.string_encoder: Optional[StringEncoder] = None
+
+        if definition.is_permutation_group():
+            self.permutations_torch = torch.tensor(
+                definition.generators_permutations, dtype=torch.int64, device=self.device
+            )
+
+            # Prepare encoder in case we want to encode states using few bits per element.
+            if bit_encoding_width == "auto":
+                bit_encoding_width = int(math.ceil(math.log2(int(self.central_state.max()) + 1)))
+            if bit_encoding_width is not None:
+                self.string_encoder = StringEncoder(code_width=int(bit_encoding_width), n=self.definition.state_size)
+                self.encoded_generators = [
+                    self.string_encoder.implement_permutation(perm) for perm in definition.generators_permutations
+                ]
+                encoded_state_size = self.string_encoder.encoded_length
 
         self.hasher = StateHasher(encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
 
@@ -108,16 +119,17 @@ class CayleyGraph:
     def encode_states(self, states: Union[torch.Tensor, np.ndarray, list]) -> torch.Tensor:
         """Converts states from human-readable to internal representation."""
         states = torch.as_tensor(states, device=self.device)
-        if len(states.shape) == 1:  # In case when only one state was passed.
-            states = states.reshape(1, -1)
-        assert len(states.shape) == 2
-        assert states.shape[1] == self.definition.state_size
+        states = states.reshape((-1, self.definition.state_size))
         if self.string_encoder is not None:
             return self.string_encoder.encode(states)
         return states
 
     def decode_states(self, states: torch.Tensor) -> torch.Tensor:
         """Converts states from internal to human-readable representation."""
+        if self.definition.generators_type == GeneratorType.MATRIX:
+            n, m = self.definition.decoded_state_shape
+            # Internally states are vectors, but mathematically they are n*m matrices.
+            return states.reshape((-1, n, m))
         if self.string_encoder is not None:
             return self.string_encoder.decode(states)
         return states
@@ -128,16 +140,25 @@ class CayleyGraph:
         neighbors = torch.zeros(
             (states_num * self.definition.n_generators, states.shape[1]), dtype=torch.int64, device=self.device
         )
-        if self.string_encoder is not None:
-            for i in range(self.definition.n_generators):
-                self.encoded_generators[i](states, neighbors[i * states_num : (i + 1) * states_num])
+        if self.definition.is_permutation_group():
+            if self.string_encoder is not None:
+                for i in range(self.definition.n_generators):
+                    self.encoded_generators[i](states, neighbors[i * states_num : (i + 1) * states_num])
+            else:
+                moves = self.permutations_torch
+                neighbors[:, :] = torch.gather(
+                    states.unsqueeze(1).expand(states.size(0), moves.shape[0], states.size(1)),
+                    2,
+                    moves.unsqueeze(0).expand(states.size(0), moves.shape[0], states.size(1)),
+                ).flatten(end_dim=1)
         else:
-            moves = self.generators_torch
-            neighbors[:, :] = torch.gather(
-                states.unsqueeze(1).expand(states.size(0), moves.shape[0], states.size(1)),
-                2,
-                moves.unsqueeze(0).expand(states.size(0), moves.shape[0], states.size(1)),
-            ).flatten(end_dim=1)
+            assert self.definition.generators_type == GeneratorType.MATRIX
+            n, m = self.definition.decoded_state_shape
+            states = states.reshape((states_num, n, m))
+            for i, mx in enumerate(self.definition.generators_matrices):
+                nb = mx.apply_batch_torch(states).reshape((states_num, n * m))
+                neighbors[i * states_num : (i + 1) * states_num] = nb
+
         return neighbors
 
     def bfs(
@@ -172,7 +193,8 @@ class CayleyGraph:
         :param max_diameter: maximal number of BFS iterations.
         :param return_all_edges: whether to return list of all edges (uses more memory).
         :param return_all_hashes: whether to return hashes for all vertices (uses more memory).
-        :param keep_alive_func - function to call on every iteration.
+        :param keep_alive_func: function to call on every iteration.
+
         :return: BfsResult object with requested BFS results.
         """
         # This version of BFS is correct only for undirected graph.
@@ -222,10 +244,10 @@ class CayleyGraph:
                 layer1_neighbors = self.get_neighbors(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
                 if return_all_edges:
-                    if self.string_encoder is not None:
-                        edges_list_starts += [layer1_hashes] * self.definition.n_generators
-                    else:
+                    if self.string_encoder is None and self.definition.is_permutation_group():
                         edges_list_starts.append(layer1_hashes.repeat_interleave(self.definition.n_generators))
+                    else:
+                        edges_list_starts += [layer1_hashes] * self.definition.n_generators
                     edges_list_ends.append(layer1_neighbors_hashes)
 
                 layer2, layer2_hashes, _ = self.get_unique_states(layer1_neighbors, hashes=layer1_neighbors_hashes)
@@ -290,3 +312,8 @@ class CayleyGraph:
         if self.device.type == "cuda":
             torch.cuda.empty_cache()
             gc.collect()
+
+    @property
+    def generators(self):
+        """Generators of this Cayley graph."""
+        return self.definition.generators

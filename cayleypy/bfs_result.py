@@ -117,7 +117,7 @@ class BfsResult:
                 layers={x: f[f"layer__{str(x)}"][()] for x in range(len(layer_sizes))},
                 edges_list_hashes=edges_list_hashes,
                 vertices_hashes=vertices_hashes,
-                graph=CayleyGraphDef(
+                graph=CayleyGraphDef.create(
                     generators=f["graph__generators"][()].tolist(),
                     generator_names=[x.decode("utf-8") for x in f["graph__generator_names"][()]],
                     central_state=f["graph__central_state"][()].tolist(),
@@ -205,16 +205,23 @@ class BfsResult:
         col = self.edges_list[:, 1]
         return coo_array((data, (row, col)), shape=(self.num_vertices, self.num_vertices))
 
+    @staticmethod
+    def vertex_name(state: np.ndarray) -> str:
+        if len(state.shape) == 1:
+            delimiter = "" if state.max() <= 9 else ","
+            return delimiter.join(str(int(x)) for x in state)
+        else:
+            return str(state)
+
     @cached_property
     def vertex_names(self) -> list[str]:
         """Returns names for vertices in the graph."""
         ans = []
-        delimiter = "" if max(self.graph.central_state) <= 9 else ","
         for layer_id in range(len(self.layers)):
             if layer_id not in self.layers:
                 raise ValueError("To get explicit graph, run bfs with max_layer_size_to_store=None.")
             for state in self.get_layer(layer_id):
-                ans.append(delimiter.join(str(int(x)) for x in state))
+                ans.append(BfsResult.vertex_name(state))
         return ans
 
     @cached_property
@@ -224,12 +231,19 @@ class BfsResult:
 
     def get_edge_name(self, i1: int, i2: int) -> str:
         """Returns name for generator used to go from vertex i1 to vertex i2."""
-        state_before = list(map(int, self.all_states[i1]))
-        state_after = list(map(int, self.all_states[i2]))
-        for i in range(self.graph.n_generators):
-            if apply_permutation(self.graph.generators[i], state_before) == state_after:
-                return self.graph.generator_names[i]
-        assert False, "Edge not found."
+        state_before = self.all_states[i1].cpu().numpy()
+        state_after = self.all_states[i2].cpu().numpy()
+        if self.graph.is_permutation_group():
+            s1 = list(state_before)
+            s2 = list(state_after)
+            for i in range(self.graph.n_generators):
+                if apply_permutation(self.graph.generators[i], s1) == s2:
+                    return self.graph.generator_names[i]
+        else:
+            for i, mx in enumerate(self.graph.generators_matrices):
+                if np.array_equal(mx.apply(state_before), state_after):
+                    return self.graph.generator_names[i]
+        assert False, f"Edge ({i1},{i2}) not found."
 
     def to_networkx_graph(self, directed=False, with_labels=True):
         """Returns explicit graph as networkx.Graph or networkx.DiGraph."""

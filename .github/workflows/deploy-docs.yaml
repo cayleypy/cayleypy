@@ -1,0 +1,30 @@
+name: Deploy docs
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy-docs:
+    name: Deploy documentation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: 'x64'
+      - name: Install requirements
+        run: |
+          sudo apt-get install pandoc
+          pip install -r requirements.txt
+          pip install sphinx sphinx_rtd_theme sphinx_markdown_parser
+      - name: Build the docs
+        run: docs/build_docs.sh
+      - name: Push documentation to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          publish_dir: ./docs/_build/html
+          external_repository: cayleypy/cayleypy-docs
+          publish_branch: gh-pages
+          deploy_key: ${{ secrets.DOCS_DEPLOY_KEY }}
