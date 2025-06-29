@@ -17,8 +17,7 @@ jobs:
       - name: Install requirements
         run: |
           sudo apt-get install pandoc
-          pip install -r requirements.txt
-          pip install sphinx sphinx_rtd_theme sphinx_markdown_parser
+          pip install .[torch,docs]
       - name: Build the docs
         run: docs/build_docs.sh
       - name: Push documentation to GitHub Pages

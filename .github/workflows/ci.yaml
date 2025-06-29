@@ -87,6 +87,6 @@ jobs:
       - name: Install requirements
         run: |
           sudo apt-get install pandoc
-          pip install .[docs]
+          pip install .[torch,docs]
       - name: Build the docs
         run: docs/build_docs.sh
