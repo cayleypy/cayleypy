@@ -334,6 +334,13 @@ def test_bfs_heisenberg_group():
     assert bfs_result.layer_sizes == [1, 4, 12, 36, 82, 164, 294, 476, 724, 1052, 1464, 1972, 2590, 3324, 4186, 5188]
 
 
+def test_incomplete_bfs_symmetric_adjacency_matrix():
+    graph = CayleyGraph(prepare_graph("pyraminx"), device="cpu")
+    bfs_result = graph.bfs(return_all_edges=True, return_all_hashes=True, max_diameter=2)
+    mx = bfs_result.adjacency_matrix()
+    assert np.array_equal(mx, mx.T)
+
+
 # Below is the benchmark code. To run: `BENCHMARK=1 pytest . -k benchmark`
 @pytest.mark.skipif(not BENCHMARK_RUN, reason="benchmark")
 @pytest.mark.parametrize("benchmark_mode", ["baseline", "bit_encoded", "bfs_numpy"])

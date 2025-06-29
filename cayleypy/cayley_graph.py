@@ -252,7 +252,7 @@ class CayleyGraph:
                     if self.string_encoder is None and self.definition.is_permutation_group():
                         edges_list_starts.append(layer1_hashes.repeat_interleave(self.definition.n_generators))
                     else:
-                        edges_list_starts += [layer1_hashes] * self.definition.n_generators
+                        edges_list_starts += [layer1_hashes.repeat(self.definition.n_generators)]
                     edges_list_ends.append(layer1_neighbors_hashes)
 
                 layer2, layer2_hashes, _ = self.get_unique_states(layer1_neighbors, hashes=layer1_neighbors_hashes)
@@ -289,6 +289,12 @@ class CayleyGraph:
 
         edges_list_hashes: Optional[torch.Tensor] = None
         if return_all_edges:
+            if not full_graph_explored:
+                # Add copy of edges between last 2 layers, but in opposite direction.
+                # This is done so adjacency matrix is symmetric.
+                v1, v2 = edges_list_starts[-1], edges_list_ends[-1]
+                edges_list_starts.append(v2)
+                edges_list_ends.append(v1)
             edges_list_hashes = torch.vstack([torch.hstack(edges_list_starts), torch.hstack(edges_list_ends)]).T
         vertices_hashes: Optional[torch.Tensor] = None
         if return_all_hashes:
