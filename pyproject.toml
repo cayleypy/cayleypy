@@ -53,7 +53,7 @@ dev = [
 
 [project.urls]
 "Homepage" = "https://github.com/cayleypy/cayleypy"
-"Documentation" = "https://cayleypy.github.io/cayleypy/"
+"Documentation" = "https://cayleypy.github.io/cayleypy-docs/api.html"
 
 [tool.setuptools]
 include-package-data = true

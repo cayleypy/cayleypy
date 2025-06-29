@@ -44,6 +44,11 @@ Mathematical applications:
 See this demo [Kaggle notebook](https://www.kaggle.com/code/fedimser/cayleypy-demo) for examples
 on how this library can be used.
 
+## Documentation
+
+Documentation (API reference) for the latest version of the library is available
+[here](https://cayleypy.github.io/cayleypy-docs/api.html).
+
 ## Development
 
 To start development, run:
