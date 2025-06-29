@@ -29,6 +29,16 @@ def test_lrx_cayley_growth():
         _verify_layers_fast(PermutationGroups.lrx(n), layer_sizes)
 
 
+def test_lx_cayley_growth():
+    # See https://oeis.org/A039745
+    oeis_a039745 = [None, 0, 1, 2, 6, 11, 18, 25, 35, 45, 58, 71, 87, 103]
+    for key, layer_sizes in load_dataset("lx_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        assert len(layer_sizes) - 1 == oeis_a039745[n]
+        _verify_layers_fast(PermutationGroups.lx(n), layer_sizes)
+
+
 def test_burnt_pancake_cayley_growth():
     oeis_a078941 = [None, 1, 4, 6, 8, 10, 12, 14, 15, 17, 18, 19, 21]
     for key, layer_sizes in load_dataset("burnt_pancake_cayley_growth").items():

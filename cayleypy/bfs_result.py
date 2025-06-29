@@ -250,6 +250,9 @@ class BfsResult:
         # Import networkx here so we don't need to depend on this library in requirements.
         import networkx  # pylint: disable=import-outside-toplevel
 
+        if not self.graph.generators_inverse_closed:
+            assert directed, "Generators are not inverse closed, you must call to_networkx_graph(directed=True)."
+
         vertex_names = self.vertex_names
         ans = networkx.DiGraph() if directed else networkx.Graph()
         for name in vertex_names:

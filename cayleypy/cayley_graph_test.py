@@ -212,8 +212,7 @@ def test_edges_list_n4():
 def test_generators_not_inverse_closed():
     graph = CayleyGraphDef.create([[1, 2, 3, 0]])
     assert not graph.generators_inverse_closed
-    with pytest.raises(AssertionError):
-        CayleyGraph(graph).bfs()
+    assert CayleyGraph(graph).bfs().layer_sizes == [1, 1, 1, 1]
 
 
 # Tests below compare growth function for small graphs with stored pre-computed results.

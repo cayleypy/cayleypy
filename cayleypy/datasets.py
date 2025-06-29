@@ -61,6 +61,10 @@ def _compute_lrx_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(prepare_graph("lrx", n=int(n))).bfs().layer_sizes
 
 
+def _compute_lx_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.lx(int(n))).bfs().layer_sizes
+
+
 def _compute_top_spin_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(prepare_graph("top_spin", n=int(n))).bfs().layer_sizes
 
@@ -128,6 +132,7 @@ def generate_datasets():
     _update_dataset("top_spin_coset_growth", keys, _compute_top_spin_coset_growth)
     keys = [str(n) for n in range(3, 12)]
     _update_dataset("lrx_cayley_growth", keys, _compute_lrx_cayley_growth)
+    _update_dataset("lx_cayley_growth", keys, _compute_lx_cayley_growth)
     keys = [str(n) for n in range(4, 12)]
     _update_dataset("top_spin_cayley_growth", keys, _compute_top_spin_cayley_growth)
     keys = [str(n) for n in range(2, 31)]
@@ -142,6 +147,5 @@ def generate_datasets():
     _update_dataset("mini_pyramorphix_cayley_growth", ["24"], _compute_mini_pyramorphix_cayley_growth)
     keys = [str(n) for n in range(6, 14, 2)]
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
-    _update_dataset("puzzles_growth", [], lambda x: [])  # For sort.
     keys = [str(n) for n in range(2, 51)]
     _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)

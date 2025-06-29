@@ -157,6 +157,7 @@ class CayleyGraphDef:
 
     def __post_init__(self):
         # Validation.
+        assert len(self.generator_names) == len(self.generators), "Wrong number of generator names."
         if self.generators_type == GeneratorType.PERMUTATION:
             assert len(self.generators_permutations) > 0
             assert len(self.generators_matrices) == 0

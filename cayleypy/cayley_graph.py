@@ -175,7 +175,6 @@ class CayleyGraph:
         max_diameter: int = 1000000,
         return_all_edges: bool = False,
         return_all_hashes: bool = False,
-        keep_alive_func: Callable[[], None] = lambda: None,
     ) -> BfsResult:
         """Runs bread-first search (BFS) algorithm from given `start_states`.
 
@@ -198,15 +197,10 @@ class CayleyGraph:
         :param max_diameter: maximal number of BFS iterations.
         :param return_all_edges: whether to return list of all edges (uses more memory).
         :param return_all_hashes: whether to return hashes for all vertices (uses more memory).
-        :param keep_alive_func: function to call on every iteration.
 
         :return: BfsResult object with requested BFS results.
         """
-        # This version of BFS is correct only for undirected graph.
-        assert self.definition.generators_inverse_closed, "BFS is supported only when generators are inverse-closed."
-
         start_states = self.encode_states(start_states or self.central_state)
-        layer0_hashes = torch.empty((0,), dtype=torch.int64, device=self.device)
         layer1, layer1_hashes, _ = self.get_unique_states(start_states)
         layer_sizes = [len(layer1)]
         layers = {0: self.decode_states(layer1)}
@@ -223,6 +217,17 @@ class CayleyGraph:
             self.string_encoder is not None and self.string_encoder.encoded_length == 1 and not return_all_edges
         )
 
+        # Stores hashes of previous layers, so BFS does not visit already visited states again.
+        # If generators are inverse closed, only 2 last layers are stored here.
+        seen_states_hashes = [layer1_hashes]
+
+        # Returns mask where 0s are at positions in `current_layer_hashes` that were seen previously.
+        def remove_seen_states(current_layer_hashes: torch.Tensor) -> torch.Tensor:
+            ans = ~isin_via_searchsorted(current_layer_hashes, seen_states_hashes[-1])
+            for h in seen_states_hashes[:-1]:
+                ans &= ~isin_via_searchsorted(current_layer_hashes, h)
+            return ans
+
         # BFS iteration: layer2 := neighbors(layer1)-layer0-layer1.
         for i in range(1, max_diameter + 1):
             if do_batching and len(layer1) > self.batch_size:
@@ -231,9 +236,7 @@ class CayleyGraph:
                 for layer1_batch in layer1.tensor_split(num_batches, dim=0):
                     layer2_batch = self.get_neighbors(layer1_batch).reshape((-1,))
                     layer2_batch = torch.unique(layer2_batch, sorted=True)
-                    mask = ~isin_via_searchsorted(layer2_batch, layer1_hashes)
-                    if i > 1:
-                        mask &= ~isin_via_searchsorted(layer2_batch, layer0_hashes)
+                    mask = remove_seen_states(layer2_batch)
                     for other_batch in layer2_batches:
                         mask &= ~isin_via_searchsorted(layer2_batch, other_batch)
                     layer2_batch = layer2_batch[mask]
@@ -256,9 +259,7 @@ class CayleyGraph:
                     edges_list_ends.append(layer1_neighbors_hashes)
 
                 layer2, layer2_hashes, _ = self.get_unique_states(layer1_neighbors, hashes=layer1_neighbors_hashes)
-                mask = ~isin_via_searchsorted(layer2_hashes, layer1_hashes)
-                if i > 1:
-                    mask &= ~isin_via_searchsorted(layer2_hashes, layer0_hashes)
+                mask = remove_seen_states(layer2_hashes)
                 layer2 = layer2[mask]
                 layer2_hashes = self.hasher.make_hashes(layer2) if self.hasher.is_identity else layer2_hashes[mask]
 
@@ -276,10 +277,13 @@ class CayleyGraph:
                 layers[i] = self.decode_states(layer2)
 
             layer1 = layer2
-            layer0_hashes, layer1_hashes = layer1_hashes, layer2_hashes
+            layer1_hashes = layer2_hashes
+            seen_states_hashes.append(layer2_hashes)
+            if self.definition.generators_inverse_closed:
+                # Only keep hashes for last 2 layers.
+                seen_states_hashes = seen_states_hashes[-2:]
             if len(layer2) >= max_layer_size_to_explore:
                 break
-            keep_alive_func()
 
         if return_all_hashes and not full_graph_explored:
             all_layers_hashes.append(layer1_hashes)
