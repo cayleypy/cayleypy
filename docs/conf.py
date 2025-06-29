@@ -26,6 +26,7 @@ def setup(app):
 # -- Project information -----------------------------------------------------
 
 project = "CayleyPy"
+copyright = "2025, CayleyPy Foundation"
 
 # -- General configuration ---------------------------------------------------
 
