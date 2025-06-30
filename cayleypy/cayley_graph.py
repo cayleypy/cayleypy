@@ -139,31 +139,32 @@ class CayleyGraph:
             return self.string_encoder.decode(states)
         return states
 
+    def _apply_generator_batched(self, i: int, src: torch.Tensor, dst: torch.Tensor):
+        """Applies i-th generator to encoded states in `src`, writes output to `dst`."""
+
+        states_num = src.shape[0]
+        if self.definition.is_permutation_group():
+            if self.string_encoder is not None:
+                self.encoded_generators[i](src, dst)
+            else:
+                move = self.permutations_torch[i].reshape((1, -1)).expand(states_num, -1)
+                dst[:, :] = torch.gather(src, 1, move)
+        else:
+            assert self.definition.is_matrix_group()
+            n, m = self.definition.decoded_state_shape
+            mx = self.definition.generators_matrices[i]
+            src = src.reshape((states_num, n, m))
+            dst[:, :] = mx.apply_batch_torch(src).reshape((states_num, n * m))
+
     def get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates all neighbors of `states` (in internal representation)."""
         states_num = states.shape[0]
         neighbors = torch.zeros(
             (states_num * self.definition.n_generators, states.shape[1]), dtype=torch.int64, device=self.device
         )
-        if self.definition.is_permutation_group():
-            if self.string_encoder is not None:
-                for i in range(self.definition.n_generators):
-                    self.encoded_generators[i](states, neighbors[i * states_num : (i + 1) * states_num])
-            else:
-                moves = self.permutations_torch
-                neighbors[:, :] = torch.gather(
-                    states.unsqueeze(1).expand(states.size(0), moves.shape[0], states.size(1)),
-                    2,
-                    moves.unsqueeze(0).expand(states.size(0), moves.shape[0], states.size(1)),
-                ).flatten(end_dim=1)
-        else:
-            assert self.definition.generators_type == GeneratorType.MATRIX
-            n, m = self.definition.decoded_state_shape
-            states = states.reshape((states_num, n, m))
-            for i, mx in enumerate(self.definition.generators_matrices):
-                nb = mx.apply_batch_torch(states).reshape((states_num, n * m))
-                neighbors[i * states_num : (i + 1) * states_num] = nb
-
+        for i in range(self.definition.n_generators):
+            dst = neighbors[i * states_num : (i + 1) * states_num, :]
+            self._apply_generator_batched(i, states, dst)
         return neighbors
 
     def bfs(
@@ -252,10 +253,7 @@ class CayleyGraph:
                 layer1_neighbors = self.get_neighbors(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
                 if return_all_edges:
-                    if self.string_encoder is None and self.definition.is_permutation_group():
-                        edges_list_starts.append(layer1_hashes.repeat_interleave(self.definition.n_generators))
-                    else:
-                        edges_list_starts += [layer1_hashes.repeat(self.definition.n_generators)]
+                    edges_list_starts += [layer1_hashes.repeat(self.definition.n_generators)]
                     edges_list_ends.append(layer1_neighbors_hashes)
 
                 layer2, layer2_hashes, _ = self.get_unique_states(layer1_neighbors, hashes=layer1_neighbors_hashes)
@@ -314,6 +312,53 @@ class CayleyGraph:
             edges_list_hashes=edges_list_hashes,
             graph=self.definition,
         )
+
+    def random_walks(
+        self,
+        *,
+        rw_num=10,
+        rw_length=10,
+        start_state: Union[None, torch.Tensor, np.ndarray, list] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Generates random walks on this graph.
+
+        Random walk is a path in this graph starting from `start_state`, where on each step the next edge is chosen
+        randomly with equal probability.
+
+        :param rw_num: Number of random walks to generate.
+        :param rw_length: Length of each random walk.
+        :param start_state: State from which to start random walk. Defaults to the central state.
+        :return: Pair of tensors `x, y`.
+                 Tensor `x` has shape `(rw_num*rw_length,state_size)` and contains states.
+                 Tensor `y` has shape `(rw_num*rw_length)` and contains distances to states in `x`.
+                 Here distance means number of random walk steps to get to that state.
+                 i-th random walk can be extracted as: `[x[i+j*rw_num] for j in range(rw_len)]`.
+        """
+        # Allocate memory.
+        x_shape = (rw_num * rw_length, self.definition.state_size)
+        x = torch.zeros(x_shape, device=self.device, dtype=torch.int64)
+        y = torch.zeros(rw_num * rw_length, device=self.device, dtype=torch.int32)
+
+        # First state in each walk is the start state.
+        start_state = self.encode_states(start_state or self.central_state).reshape((-1,))
+        x[:rw_num, :] = start_state
+        y[:rw_num] = 0
+
+        # Main loop.
+        for i_step in range(1, rw_length):
+            y[i_step * rw_num : (i_step + 1) * rw_num] = i_step
+            gen_idx = torch.randint(0, self.definition.n_generators, (rw_num,), device=self.device)
+            src = x[(i_step - 1) * rw_num : i_step * rw_num, :]
+            dst = x[i_step * rw_num : (i_step + 1) * rw_num, :]
+            for j in range(self.definition.n_generators):
+                # Go to next state for walks where we chose to use j-th generator on this step.
+                mask = gen_idx == j
+                prev_states = src[mask, :]
+                next_states = torch.zeros_like(prev_states)
+                self._apply_generator_batched(j, prev_states, next_states)
+                dst[mask, :] = next_states
+
+        return self.decode_states(x), y
 
     def to_networkx_graph(self):
         return self.bfs(

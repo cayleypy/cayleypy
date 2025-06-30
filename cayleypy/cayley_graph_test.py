@@ -169,18 +169,10 @@ def test_get_neighbors(bit_encoding_width):
     graph = CayleyGraph(graph_def, bit_encoding_width=bit_encoding_width)
     states = graph.encode_states(torch.tensor([[10, 11, 12, 13, 14], [15, 16, 17, 18, 19]], dtype=torch.int64))
     result = graph.decode_states(graph.get_neighbors(states))
-    if bit_encoding_width == 5:
-        # When using StringEncoder, we go over the generators in outer loop, and over the states in inner loop.
-        assert torch.equal(
-            result.cpu(),
-            torch.tensor([[11, 10, 12, 13, 14], [16, 15, 17, 18, 19], [10, 11, 12, 14, 13], [15, 16, 17, 19, 18]]),
-        )
-    else:
-        # When operating on ints directly, it's the other way around.
-        assert torch.equal(
-            result.cpu(),
-            torch.tensor([[11, 10, 12, 13, 14], [10, 11, 12, 14, 13], [16, 15, 17, 18, 19], [15, 16, 17, 19, 18]]),
-        )
+    assert torch.equal(
+        result.cpu(),
+        torch.tensor([[11, 10, 12, 13, 14], [16, 15, 17, 18, 19], [10, 11, 12, 14, 13], [15, 16, 17, 19, 18]]),
+    )
 
 
 def test_edges_list_n2():
@@ -195,8 +187,10 @@ def test_edges_list_n3():
     assert result.named_undirected_edges() == {("001", "001"), ("001", "010"), ("001", "100"), ("010", "100")}
 
 
-def test_edges_list_n4():
-    graph = CayleyGraph(PermutationGroups.top_spin(4).with_central_state("0011"))
+@pytest.mark.parametrize("bit_encoding_width", [None, 5])
+def test_edges_list_n4(bit_encoding_width):
+    graph_def = PermutationGroups.top_spin(4).with_central_state("0011")
+    graph = CayleyGraph(graph_def, bit_encoding_width=bit_encoding_width)
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
     assert result.named_undirected_edges() == {
         ("0011", "0110"),
@@ -338,6 +332,39 @@ def test_incomplete_bfs_symmetric_adjacency_matrix():
     bfs_result = graph.bfs(return_all_edges=True, return_all_hashes=True, max_diameter=2)
     mx = bfs_result.adjacency_matrix()
     assert np.array_equal(mx, mx.T)
+
+
+def _state_to_str(state: torch.Tensor):
+    return "".join(str(int(x)) for x in state)
+
+
+def test_random_walks_single_walk():
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    x, y = graph.random_walks(rw_num=1, rw_length=5)
+    assert x.shape == (5, 5)
+    assert y.shape == (5,)
+    assert _state_to_str(x[0]) == "01234"
+    assert _state_to_str(x[1]) in ["12340", "40123", "10234"]
+    assert np.array_equal(y.cpu().numpy(), [0, 1, 2, 3, 4])
+
+
+def test_random_walks_matrix_group():
+    graph = CayleyGraph(MatrixGroups.heisenberg())
+    x, y = graph.random_walks(rw_num=20, rw_length=10)
+    assert x.shape == (200, 3, 3)
+    assert y.shape == (200,)
+    assert np.array_equal(y, [i for i in range(10) for _ in range(20)])
+
+
+def test_random_walks_start_state():
+    graph = CayleyGraph(PermutationGroups.lx(5))
+    x, y = graph.random_walks(rw_num=10, rw_length=5, start_state=[1, 0, 0, 0, 0])
+    assert x.shape == (50, 5)
+    assert y.shape == (50,)
+    for i in range(10):
+        assert _state_to_str(x[i]) == "10000"
+    for i in range(10, 20):
+        assert _state_to_str(x[i]) in ["01000", "00001"]
 
 
 # Below is the benchmark code. To run: `BENCHMARK=1 pytest . -k benchmark`

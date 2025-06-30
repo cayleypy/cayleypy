@@ -228,3 +228,7 @@ class CayleyGraphDef:
     def is_permutation_group(self):
         """Whether generators in this graph are permutations."""
         return self.generators_type == GeneratorType.PERMUTATION
+
+    def is_matrix_group(self):
+        """Whether generators in this graph are matrices."""
+        return self.generators_type == GeneratorType.MATRIX
