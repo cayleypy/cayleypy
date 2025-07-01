@@ -15,10 +15,8 @@ Core classes
     cayleypy.CayleyGraph
     cayleypy.BfsResult
 
-
-
-Graph library
-'''''''''''''''''
+Graphs library
+''''''''''''''
 
 .. autosummary::
     :toctree: generated/
@@ -26,8 +24,17 @@ Graph library
     cayleypy.PermutationGroups
     cayleypy.MatrixGroups
 
-Algorithms
-'''''''''''''''''
+Beam search
+'''''''''''
+
+.. autosummary::
+    :toctree: generated/
+
+    cayleypy.BeamSearchResult
+    cayleypy.Predictor
+
+Special BFS algorithms
+''''''''''''''''''''''
 .. autosummary::
     :toctree: generated/
 

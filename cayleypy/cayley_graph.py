@@ -5,9 +5,11 @@ from typing import Optional, Union
 import numpy as np
 import torch
 
+from .beam_search_result import BeamSearchResult
 from .bfs_result import BfsResult
 from .cayley_graph_def import CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
+from .predictor import Predictor
 from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted
 
@@ -102,6 +104,7 @@ class CayleyGraph:
                 encoded_state_size = self.string_encoder.encoded_length
 
         self.hasher = StateHasher(encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
+        self.central_state_hash = self.hasher.make_hashes(self.encode_states(self.central_state))
 
     def get_unique_states(
         self, states: torch.Tensor, hashes: Optional[torch.Tensor] = None
@@ -359,6 +362,45 @@ class CayleyGraph:
                 dst[mask, :] = next_states
 
         return self.decode_states(x), y
+
+    def beam_search(
+        self,
+        *,
+        start_state: Union[torch.Tensor, np.ndarray, list],
+        predictor: Predictor,
+        beam_width=1000,
+        max_iterations=10**6,
+        return_path=False,
+    ) -> BeamSearchResult:
+        """Tries to find a path from `start_state` to central state using Beam Search algorithm.
+
+        :param start_state: State from which to star search.
+        :param predictor: A heuristic that estimates scores for states (lower score= closer to center).
+        :param beam_width: Width of the beam (how many "best" states we consider at each step".
+        :param max_iterations: Maximum number of iterations before giving up.
+        :param return_path: Whether to return parth (consumes much more memory if True).
+        """
+        start_states = self.encode_states(start_state)
+        layer1, layer1_hashes, _ = self.get_unique_states(start_states)
+
+        for i in range(max_iterations):
+            if bool(isin_via_searchsorted(self.central_state_hash, layer1_hashes)):
+                # Found path.
+                BeamSearchResult(True, i, None, self.definition)
+            # Create states on the next layer.
+            layer2, layer2_hashes, _ = self.get_unique_states(self.get_neighbors(layer1))
+
+            if len(layer2) >= beam_width:
+                # Pick `beam_width` states with lowest scores.
+                scores = predictor(self.decode_states(layer2))
+                idx = torch.argsort(scores)[:beam_width]
+                layer2 = layer2[idx, :]
+                layer2_hashes = layer2_hashes[idx, :]
+
+            layer1 = layer2
+            layer1_hashes = layer2_hashes
+
+        return BeamSearchResult(False, 0, None, self.definition)
 
     def to_networkx_graph(self):
         return self.bfs(
