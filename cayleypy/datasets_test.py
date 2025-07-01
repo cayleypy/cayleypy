@@ -90,6 +90,13 @@ def test_full_reversals_cayley_growth():
             assert layer_sizes[-1] == 2  # Size of last layer is 2.
 
 
+def test_signed_reversals_cayley_growth():
+    for key, layer_sizes in load_dataset("signed_reversals_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n) * 2**n
+        _verify_layers_fast(PermutationGroups.signed_reversals(n), layer_sizes)
+
+
 # Number of elements in coset graph for LRX and binary strings is binomial coefficient.
 def test_lrx_coset_growth():
     for central_state, layer_sizes in load_dataset("lrx_coset_growth").items():

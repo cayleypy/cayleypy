@@ -155,6 +155,17 @@ def test_full_reversals():
     )
 
 
+def test_signed_reversals():
+    graph = graph = PermutationGroups.signed_reversals(3)
+    assert graph.n_generators == 6
+    assert graph.generator_names == ["R[0..0]", "R[0..1]", "R[0..2]", "R[1..1]", "R[1..2]", "R[2..2]"]
+    assert np.array_equal(
+        graph.generators, [[3, 1, 2, 0, 4, 5], [4, 3, 2, 1, 0, 5],
+                           [5, 4, 3, 2, 1, 0], [0, 4, 2, 3, 1, 5],
+                           [0, 5, 4, 3, 2, 1], [0, 1, 5, 3, 4, 2]]
+    )
+
+
 def test_cube333():
     graph = prepare_graph("cube_3/3/3_12gensQTM")
     assert graph.n_generators == 12
