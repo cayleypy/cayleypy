@@ -11,7 +11,7 @@ from .cayley_graph_def import MatrixGenerator, CayleyGraphDef
 from .datasets import load_dataset
 from .graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 
-FAST_RUN = not os.getenv("RUN_SLOW_TESTS") == "1"
+RUN_SLOW_TESTS = not os.getenv("RUN_SLOW_TESTS") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
 
 
@@ -240,7 +240,7 @@ def test_lrx_coset_growth():
 
 # Skipped by default.
 # To run slow tests like this, do `RUN_SLOW_TESTS=1 pytest`
-@pytest.mark.skipif(FAST_RUN, reason="slow test")
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_cube222_qtm():
     graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
     result = graph.bfs()
@@ -249,7 +249,7 @@ def test_cube222_qtm():
     assert result.layer_sizes == load_dataset("puzzles_growth")["cube_222_qtm"]
 
 
-@pytest.mark.skipif(FAST_RUN, reason="slow test")
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_cube222_htm():
     graph = CayleyGraph(prepare_graph("cube_2/2/2_9gensHTM"))
     result = graph.bfs()
@@ -410,7 +410,7 @@ def test_beam_search_lrx_n9_random():
     _validate_beam_search_result(graph, start_state, bs_result)
 
 
-@pytest.mark.skipif(FAST_RUN, reason="slow test")
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_beam_search_cube222():
     graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
     start_state = _scramble(graph, 100)
