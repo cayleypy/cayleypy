@@ -11,7 +11,7 @@ from .cayley_graph_def import MatrixGenerator, CayleyGraphDef
 from .datasets import load_dataset
 from .graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 
-RUN_SLOW_TESTS = not os.getenv("RUN_SLOW_TESTS") == "1"
+RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
 
 
