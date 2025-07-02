@@ -22,9 +22,9 @@ class Predictor(ABC):
         return self.estimate_distance_to_central_state(states)
 
     @staticmethod
-    def const() -> "ConstZeroPredictor":
+    def const() -> "ConstPredictor":
         """Always returns 0."""
-        return ConstZeroPredictor()
+        return ConstPredictor()
 
     @staticmethod
     def hamming(graph: "CayleyGraph") -> "HammingPredictor":
@@ -32,7 +32,7 @@ class Predictor(ABC):
         return HammingPredictor(graph)
 
 
-class ConstZeroPredictor(Predictor):
+class ConstPredictor(Predictor):
     """Always returns 0."""
 
     def estimate_distance_to_central_state(self, states: torch.Tensor) -> torch.Tensor:

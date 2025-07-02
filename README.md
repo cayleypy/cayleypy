@@ -59,10 +59,10 @@ cd cayleypy
 pip install -e .[torch,lint,test,dev,docs]
 ```
 
-To run only quick tests:
+To run all tests, including some slow running tests:
 
 ```
-FAST=1 pytest
+RUN_SLOW_TESTS=1 pytest
 ```
 
 Before commiting, run these checks:
