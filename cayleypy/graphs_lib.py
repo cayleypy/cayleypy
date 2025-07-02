@@ -450,10 +450,8 @@ class MatrixGroups:
         :return: requested graph as `CayleyGraphDef`.
         """
         x = MatrixGenerator.create([[1, 1, 0], [0, 1, 0], [0, 0, 1]], modulo=modulo)
-        x_inv = MatrixGenerator.create([[1, -1, 0], [0, 1, 0], [0, 0, 1]], modulo=modulo)
         y = MatrixGenerator.create([[1, 0, 0], [0, 1, 1], [0, 0, 1]], modulo=modulo)
-        y_inv = MatrixGenerator.create([[1, 0, 0], [0, 1, -1], [0, 0, 1]], modulo=modulo)
         return CayleyGraphDef.for_matrix_group(
-            generators=[x, x_inv, y, y_inv],
+            generators=[x, x.inv, y, y.inv],
             generator_names=["x", "x'", "y", "y'"],
         )
