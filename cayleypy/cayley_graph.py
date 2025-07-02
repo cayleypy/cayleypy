@@ -449,7 +449,7 @@ class CayleyGraph:
             candidates_hashes = self.hasher.make_hashes(self.encode_states(candidates))
             mask = torch.isin(candidates_hashes, hashes[i])
             assert torch.any(mask), "Not found any neighbor on previous layer."
-            gen_id = mask.nonzero()[0].item()
+            gen_id = int(mask.nonzero()[0].item())
             path.append(gen_id)
             cur_state = candidates[gen_id : gen_id + 1, :]
         return path[::-1]

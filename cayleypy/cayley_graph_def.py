@@ -223,8 +223,10 @@ class CayleyGraphDef:
             return n, m
 
     @staticmethod
-    def normalize_central_state(central_state: Union[list[int], torch.Tensor, np.ndarray, str]) -> list[int]:
-        if type(central_state) is list:
+    def normalize_central_state(
+        central_state: Union[list[int], list[list[int]], torch.Tensor, np.ndarray, str],
+    ) -> list[int]:
+        if isinstance(central_state, list):
             central_state = np.array(central_state)
         if hasattr(central_state, "reshape"):
             central_state = central_state.reshape((-1,))  # Flatten.
