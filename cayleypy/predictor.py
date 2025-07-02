@@ -12,7 +12,7 @@ class Predictor(ABC):
 
     @abstractmethod
     def estimate_distance_to_central_state(self, states: torch.Tensor) -> torch.Tensor:
-        """For each state in `states` returns
+        """For each state in `states` returns estimated distance to central state.
 
         :param states: int64 tensor of shape (n, state_size) with states for which we want to estimate distance.
         :return: 1D tensor of length `n` with estimated distances (of any numeric type).
