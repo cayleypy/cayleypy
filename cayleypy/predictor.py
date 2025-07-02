@@ -22,7 +22,7 @@ class Predictor(ABC):
         return self.estimate_distance_to_central_state(states)
 
     @staticmethod
-    def const_zero() -> "ConstZeroPredictor":
+    def const() -> "ConstZeroPredictor":
         """Always returns 0."""
         return ConstZeroPredictor()
 

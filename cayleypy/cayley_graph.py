@@ -85,7 +85,7 @@ class CayleyGraph:
             print(f"Using device: {self.device}.")
 
         self.central_state = torch.as_tensor(definition.central_state, device=self.device, dtype=torch.int64)
-        encoded_state_size: int = self.definition.state_size
+        self.encoded_state_size: int = self.definition.state_size
         self.string_encoder: Optional[StringEncoder] = None
 
         if definition.is_permutation_group():
@@ -101,9 +101,9 @@ class CayleyGraph:
                 self.encoded_generators = [
                     self.string_encoder.implement_permutation(perm) for perm in definition.generators_permutations
                 ]
-                encoded_state_size = self.string_encoder.encoded_length
+                self.encoded_state_size = self.string_encoder.encoded_length
 
-        self.hasher = StateHasher(encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
+        self.hasher = StateHasher(self.encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
         self.central_state_hash = self.hasher.make_hashes(self.encode_states(self.central_state))
 
     def get_unique_states(
@@ -356,7 +356,7 @@ class CayleyGraph:
                  i-th random walk can be extracted as: `[x[i+j*rw_num] for j in range(rw_len)]`.
         """
         # Allocate memory.
-        x_shape = (rw_num * rw_length, self.definition.state_size)
+        x_shape = (rw_num * rw_length, self.encoded_state_size)
         x = torch.zeros(x_shape, device=self.device, dtype=torch.int64)
         y = torch.zeros(rw_num * rw_length, device=self.device, dtype=torch.int32)
 
