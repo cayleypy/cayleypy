@@ -339,6 +339,34 @@ def test_incomplete_bfs_symmetric_adjacency_matrix():
     mx = bfs_result.adjacency_matrix()
     assert np.array_equal(mx, mx.T)
 
+def test_rapaport_m2_growth():
+    """Test growth function for Rapaport M2 generators group"""
+    # Test for n=3
+    graph_def = PermutationGroups.rapaport_m2(3)
+    graph = CayleyGraph(
+        generators=graph_def.generators,
+        central_state=graph_def.central_state
+    )
+    result = graph.bfs()
+    assert result.layer_sizes == [1, 2, 2, 1]
+    assert result.diameter() == 3
+    assert result.num_vertices == 6  
+    
+    # Test for n=4
+    graph_def = PermutationGroups.rapaport_m2(4)
+    graph = CayleyGraph(
+        generators=graph_def.generators,
+        central_state=graph_def.central_state
+    )
+    result = graph.bfs()
+    
+    # Basic checks for S_4
+    assert result.num_vertices == 24  
+    assert result.diameter() == 4  
+    
+    # Verify layer sizes
+    assert result.layer_sizes == [1, 3, 5, 8, 6, 1]
+
 
 # Below is the benchmark code. To run: `BENCHMARK=1 pytest . -k benchmark`
 @pytest.mark.skipif(not BENCHMARK_RUN, reason="benchmark")
