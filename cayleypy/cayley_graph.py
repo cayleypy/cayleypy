@@ -387,7 +387,7 @@ class CayleyGraph:
         start_state: Union[torch.Tensor, np.ndarray, list],
         predictor: Predictor,
         beam_width=1000,
-        max_iterations=10**6,
+        max_iterations=1000,
         return_path=False,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using Beam Search algorithm.
