@@ -301,29 +301,28 @@ class PermutationGroups:
                 generators.append(list(perm))
                 generator_names.append(f"D{idx}")
         return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+
     @staticmethod
     def rapaport_m2(n: int) -> CayleyGraphDef:
         """Cayley graph for S_n with M2 generators"""
         # Generator 1: Transposition (0,1)
         g1 = list(range(n))
         g1[0], g1[1] = g1[1], g1[0]
-        
+
         # Generator 2: Product of transpositions (0,1)(2,3)...
         g2 = list(range(n))
-        for i in range(0, n-1, 2):
-            g2[i], g2[i+1] = g2[i+1], g2[i]
-        
+        for i in range(0, n - 1, 2):
+            g2[i], g2[i + 1] = g2[i + 1], g2[i]
+
         # Generator 3: Product of transpositions (1,2)(3,4)...
         g3 = list(range(n))
-        for i in range(1, n-1, 2):
-            g3[i], g3[i+1] = g3[i+1], g3[i]
-        
+        for i in range(1, n - 1, 2):
+            g3[i], g3[i + 1] = g3[i + 1], g3[i]
+
         generators = [g1, g2, g3]
         generator_names = ["(0,1)", "EvenDisjTrans", "OddDisjTrans"]
-        
-        return CayleyGraphDef.create(generators, 
-                                central_state=list(range(n)), 
-                                generator_names=generator_names)
+
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
 
 def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
