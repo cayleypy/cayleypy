@@ -12,6 +12,18 @@ class BeamSearchResult:
     path: Optional[list[int]]  # Path from start state to central state (edges are generator indexes), if requested.
     graph: CayleyGraphDef  # Definition of graph on which beam search was run.
 
-    def get_path_as_string(self):
+    def __post_init__(self):
+        if self.path is not None:
+            assert len(self.path) == self.path_length
+
+    def get_path_as_string(self, delimiter="∘"):
         assert self.path is not None
-        return ",".join(self.graph.generator_names[i] for i in self.path)
+        return delimiter.join(self.graph.generator_names[i] for i in self.path)
+
+    def __repr__(self):
+        if not self.path_found:
+            return "PathNotFound"
+        ans = f"Length={self.path_length}"
+        if self.path is not None and self.path_length > 0:
+            ans += ", Path=" + self.get_path_as_string()
+        return ans

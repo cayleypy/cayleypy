@@ -207,6 +207,7 @@ class CayleyGraphDef:
             generators_set = set(tuple(perm) for perm in self.generators_permutations)
             return all(tuple(inverse_permutation(p)) in generators_set for p in self.generators_permutations)
         else:
+            assert self.generators_type == GeneratorType.MATRIX
             return all(any(g1.is_inverse_to(g2) for g2 in self.generators_matrices) for g1 in self.generators_matrices)
 
     @cached_property
@@ -223,6 +224,8 @@ class CayleyGraphDef:
 
     @staticmethod
     def normalize_central_state(central_state: Union[list[int], torch.Tensor, np.ndarray, str]) -> list[int]:
+        if type(central_state) is list:
+            central_state = np.array(central_state)
         if hasattr(central_state, "reshape"):
             central_state = central_state.reshape((-1,))  # Flatten.
         return [int(x) for x in central_state]

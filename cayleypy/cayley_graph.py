@@ -144,7 +144,6 @@ class CayleyGraph:
 
     def _apply_generator_batched(self, i: int, src: torch.Tensor, dst: torch.Tensor):
         """Applies i-th generator to encoded states in `src`, writes output to `dst`."""
-
         states_num = src.shape[0]
         if self.definition.is_permutation_group():
             if self.string_encoder is not None:
@@ -159,6 +158,21 @@ class CayleyGraph:
             src = src.reshape((states_num, n, m))
             dst[:, :] = mx.apply_batch_torch(src).reshape((states_num, n * m))
 
+    def apply_path(self, states: torch.Tensor, generator_ids: list[int]) -> torch.Tensor:
+        """Applies multiple generators to given state(s) in order.
+
+        :param states: one or more states (as torch.Tensor) to which to apply the states.
+        :param generator_ids: Indexes of generators to apply.
+        :return: States after applying specified generators in order.
+        """
+        states = self.encode_states(states)
+        for gen_id in generator_ids:
+            assert 0 <= gen_id < self.definition.n_generators
+            new_states = torch.zeros_like(states)
+            self._apply_generator_batched(gen_id, states, new_states)
+            states = new_states
+        return self.decode_states(states)
+
     def get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates all neighbors of `states` (in internal representation)."""
         states_num = states.shape[0]
@@ -169,6 +183,10 @@ class CayleyGraph:
             dst = neighbors[i * states_num : (i + 1) * states_num, :]
             self._apply_generator_batched(i, states, dst)
         return neighbors
+
+    def get_neighbors_decoded(self, states: torch.Tensor) -> torch.Tensor:
+        """Calculates neighbors in decoded (external) representation."""
+        return self.decode_states(self.get_neighbors(self.encode_states(states)))
 
     def bfs(
         self,
@@ -379,28 +397,62 @@ class CayleyGraph:
         :param beam_width: Width of the beam (how many "best" states we consider at each step".
         :param max_iterations: Maximum number of iterations before giving up.
         :param return_path: Whether to return parth (consumes much more memory if True).
+        :return: BeamSearchResult containing found path length and 9optionally) the path itself.
         """
         start_states = self.encode_states(start_state)
         layer1, layer1_hashes, _ = self.get_unique_states(start_states)
+        all_layers_hashes = [layer1_hashes]
 
         for i in range(max_iterations):
             if bool(isin_via_searchsorted(self.central_state_hash, layer1_hashes)):
-                # Found path.
-                BeamSearchResult(True, i, None, self.definition)
+                # Path found.
+                path = None
+                if return_path:
+                    path = self._restore_beam_search_path(all_layers_hashes)
+                return BeamSearchResult(True, i, path, self.definition)
+
             # Create states on the next layer.
             layer2, layer2_hashes, _ = self.get_unique_states(self.get_neighbors(layer1))
 
+            # Pick `beam_width` states with lowest scores.
             if len(layer2) >= beam_width:
-                # Pick `beam_width` states with lowest scores.
                 scores = predictor(self.decode_states(layer2))
                 idx = torch.argsort(scores)[:beam_width]
                 layer2 = layer2[idx, :]
-                layer2_hashes = layer2_hashes[idx, :]
+                layer2_hashes = layer2_hashes[idx]
+                if self.verbose >= 2:
+                    best_score = scores[idx[0]]
+                    print(f"Iteration {i}, best score {best_score}.")
 
             layer1 = layer2
             layer1_hashes = layer2_hashes
+            if return_path:
+                all_layers_hashes.append(layer1_hashes)
 
+        # Path not found.
         return BeamSearchResult(False, 0, None, self.definition)
+
+    def _restore_beam_search_path(self, hashes: list[torch.Tensor]) -> list[int]:
+        """Restores path found by the Beam Search algorithm."""
+        inv_graph = CayleyGraph(self.definition.with_inverted_generators())
+        assert bool(isin_via_searchsorted(self.central_state_hash, hashes[-1]))
+        assert len(hashes[0]) == 1
+        path = []  # type: list[int]
+        cur_state = self.decode_states(self.encode_states(self.central_state))
+
+        for i in range(len(hashes) - 2, -1, -1):
+            # Find hash in hashes[i] from which we could go to cur_state.
+            # Corresponding state will be new_cur_state.
+            # The generator index in inv_graph that moves cur_state->new_cur_state is the same as generator index
+            # in this graph that moves new_cur_state->cur_state - this is what we append to the answer.
+            candidates = inv_graph.get_neighbors_decoded(cur_state)
+            candidates_hashes = self.hasher.make_hashes(self.encode_states(candidates))
+            mask = torch.isin(candidates_hashes, hashes[i])
+            assert torch.any(mask), "Not found any neighbor on previous layer."
+            gen_id = mask.nonzero()[0].item()
+            path.append(gen_id)
+            cur_state = candidates[gen_id : gen_id + 1, :]
+        return path[::-1]
 
     def to_networkx_graph(self):
         return self.bfs(
