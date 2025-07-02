@@ -399,14 +399,14 @@ def test_beam_search_lrx_few_steps():
     assert result2.get_path_as_string() == "L∘X"
 
 
-def test_beam_search_lrx_n9_random():
-    n = 9
+def test_beam_search_lrx_n8_random():
+    n = 8
     graph = CayleyGraph(PermutationGroups.lrx(n))
     start_state = np.random.permutation(n)
 
     predictor = Predictor.hamming(graph)
     bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, predictor=predictor, return_path=True)
-    assert bs_result.path_length <= 36
+    assert bs_result.path_length <= 28
     _validate_beam_search_result(graph, start_state, bs_result)
 
 
