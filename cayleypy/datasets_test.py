@@ -31,7 +31,7 @@ def test_lrx_cayley_growth():
 
 def test_lx_cayley_growth():
     # See https://oeis.org/A039745
-    oeis_a039745 = [None, 0, 1, 2, 6, 11, 18, 25, 35, 45, 58, 71, 87, 103]
+    oeis_a039745 = [None, 0, 1, 2, 6, 11, 18, 25, 35, 45, 58, 71, 87, 103, 122]
     for key, layer_sizes in load_dataset("lx_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)

@@ -1,7 +1,8 @@
 import numpy as np
 
 from cayleypy import prepare_graph
-from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES, PermutationGroups
+from cayleypy.cayley_graph import CayleyGraph
+from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES, MEGAMINX_MOVES, PermutationGroups
 from cayleypy.permutation_utils import inverse_permutation, is_permutation
 
 
@@ -204,6 +205,24 @@ def test_pyraminx():
         assert np.all(graph_gens[gen_name] == gen)
         assert np.all(graph_gens[gen_name + "_inv"] == inverse_permutation(gen))
         assert len(gen) == perm_set_length
+
+
+def test_megaminx():
+    perm_set_length = 120
+    graph = prepare_graph("megaminx")
+    assert graph.n_generators == len(MEGAMINX_MOVES) * 2  # inverse generators are not listed in MEGAMINX_MOVES
+
+    graph_gens = dict(zip(graph.generator_names, graph.generators))
+    gen_names = list(MEGAMINX_MOVES.keys())
+    gen_names += [x + "_inv" for x in MEGAMINX_MOVES]
+
+    for gen_name, gen in MEGAMINX_MOVES.items():
+        assert np.all(graph_gens[gen_name] == gen)
+        assert np.all(graph_gens[gen_name + "_inv"] == inverse_permutation(gen))
+        assert len(gen) == perm_set_length
+
+    graph = CayleyGraph(graph, device="cpu")
+    assert graph.bfs(max_diameter=4).layer_sizes == [1, 24, 408, 6208, 90144]
 
 
 def test_three_cycles():

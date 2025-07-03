@@ -6,6 +6,7 @@ __pycache__/
 *.egg-info
 build/
 htmlcov/
+.venv/
 
 # Sphinx
 docs/_build
