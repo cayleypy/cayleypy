@@ -1,5 +1,6 @@
+import math
 import typing
-from abc import ABC, abstractmethod
+from typing import Callable
 
 import torch
 
@@ -7,43 +8,49 @@ if typing.TYPE_CHECKING:
     from .cayley_graph import CayleyGraph
 
 
-class Predictor(ABC):
-    """Abstract class representing a "black box" that estimates distance for states from central state."""
+def _hamming_distance(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
+    return torch.sum((x != y), dim=1)
 
-    @abstractmethod
-    def estimate_distance_to_central_state(self, states: torch.Tensor) -> torch.Tensor:
-        """For each state in `states` returns estimated distance to central state.
 
-        :param states: int64 tensor of shape (n, state_size) with states for which we want to estimate distance.
-        :return: 1D tensor of length `n` with estimated distances (of any numeric type).
+class Predictor:
+    """Estimates distance from central state to given states."""
+
+    def __init__(self, graph: "CayleyGraph", models_or_heuristics):
+        """Initializes Predictor.
+
+        :param graph: Associated CayleyGraph object.
+        :param models_or_heuristics: One of the following:
+
+            - "const" - will use predictor that returns 0 for any state.
+            - "hamming" - will use Hamming distance from central state.
+            - ``torch.nn.Module`` - will use given neural network model.
+            - Any object that has "predict" method (e.g. sklearn models).
+            - Any callable object.
         """
+        self.graph = graph
+        self.predict = lambda x: x  # type: Callable[[torch.Tensor], torch.Tensor]
+
+        if models_or_heuristics == "zero":
+            self.predict = lambda x: torch.zeros((x.shape[0],))
+        elif models_or_heuristics == "hamming":
+            self.predict = lambda x: _hamming_distance(graph.central_state, x)
+        elif isinstance(models_or_heuristics, torch.nn.Module):
+            self.predict = models_or_heuristics
+            self.predict.eval()
+            self.predict.to(graph.device)
+        elif hasattr(models_or_heuristics, "predict"):
+            self.predict = models_or_heuristics.predict
+        elif hasattr(models_or_heuristics, "__call__"):
+            self.predict = models_or_heuristics
+        else:
+            raise ValueError(f"Unable to understand how to call {models_or_heuristics}")
 
     def __call__(self, states: torch.Tensor) -> torch.Tensor:
-        return self.estimate_distance_to_central_state(states)
-
-    @staticmethod
-    def const() -> "ConstPredictor":
-        """Always returns 0."""
-        return ConstPredictor()
-
-    @staticmethod
-    def hamming(graph: "CayleyGraph") -> "HammingPredictor":
-        """Heuristic predictor. Estimate is the number of different elements between estimated and central states."""
-        return HammingPredictor(graph)
-
-
-class ConstPredictor(Predictor):
-    """Always returns 0."""
-
-    def estimate_distance_to_central_state(self, states: torch.Tensor) -> torch.Tensor:
-        return torch.zeros((states.shape[0]))
-
-
-class HammingPredictor(Predictor):
-    """Heuristic predictor. Estimate is the number of different elements between estimated and central states."""
-
-    def __init__(self, graph: "CayleyGraph"):
-        self.central_sate = graph.central_state
-
-    def estimate_distance_to_central_state(self, states: torch.Tensor) -> torch.Tensor:
-        return torch.not_equal(self.central_sate, states).sum(dim=1)
+        num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
+        if num_batches > 1:
+            ans = []  # type: list[torch.Tensor]
+            for batch in states.tensor_split(num_batches, dim=0):
+                ans.append(self.predict(batch))
+            return torch.hstack(ans)
+        else:
+            return self.predict(states)

@@ -8,7 +8,7 @@ from .predictor import Predictor
 def test_hamming_predictor():
     graph_def = PermutationGroups.lrx(5).with_central_state("01001")
     graph = CayleyGraph(graph_def, device="cpu")
-    predictor = Predictor.hamming(graph)
+    predictor = Predictor(graph, "hamming")
     states = torch.tensor(
         [
             [0, 0, 0, 0, 0],

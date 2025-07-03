@@ -436,7 +436,7 @@ class CayleyGraph:
         self,
         *,
         start_state: Union[torch.Tensor, np.ndarray, list],
-        predictor: Predictor = Predictor.const(),
+        predictor: Optional[Predictor] = None,
         beam_width=1000,
         max_iterations=1000,
         return_path=False,
@@ -444,12 +444,15 @@ class CayleyGraph:
         """Tries to find a path from `start_state` to central state using Beam Search algorithm.
 
         :param start_state: State from which to star search.
-        :param predictor: A heuristic that estimates scores for states (lower score= closer to center).
+        :param predictor: A heuristic that estimates scores for states (lower score = closer to center).
+          Defaults to Hamming distance heuristic.
         :param beam_width: Width of the beam (how many "best" states we consider at each step".
         :param max_iterations: Maximum number of iterations before giving up.
         :param return_path: Whether to return parth (consumes much more memory if True).
         :return: BeamSearchResult containing found path length and 9optionally) the path itself.
         """
+        if predictor is None:
+            predictor = Predictor(self, "hamming")
         start_states = self.encode_states(start_state)
         layer1, layer1_hashes, _ = self.get_unique_states(start_states)
         all_layers_hashes = [layer1_hashes]

@@ -4,7 +4,7 @@ import numpy as np
 import pytest
 import torch
 
-from . import BeamSearchResult, Predictor
+from . import BeamSearchResult
 from .bfs_numpy import bfs_numpy
 from .cayley_graph import CayleyGraph
 from .cayley_graph_def import MatrixGenerator, CayleyGraphDef
@@ -406,17 +406,17 @@ def _scramble(graph: CayleyGraph, num_scrambles: int) -> torch.Tensor:
 
 def test_beam_search_lrx_few_steps():
     graph = CayleyGraph(PermutationGroups.lrx(5))
-    result0 = graph.beam_search(start_state=[0, 1, 2, 3, 4], predictor=Predictor.const())
+    result0 = graph.beam_search(start_state=[0, 1, 2, 3, 4])
     assert result0.path_found
     assert result0.path_length == 0
 
-    result1 = graph.beam_search(start_state=[1, 0, 2, 3, 4], predictor=Predictor.const(), return_path=True)
+    result1 = graph.beam_search(start_state=[1, 0, 2, 3, 4], return_path=True)
     assert result1.path_found
     assert result1.path_length == 1
     assert result1.path == [2]
     assert result1.get_path_as_string() == "X"
 
-    result2 = graph.beam_search(start_state=[4, 1, 0, 2, 3], predictor=Predictor.const(), return_path=True)
+    result2 = graph.beam_search(start_state=[4, 1, 0, 2, 3], return_path=True)
     assert result2.path_found
     assert result2.path_length == 2
     assert result2.path == [0, 2]
@@ -428,8 +428,7 @@ def test_beam_search_lrx_n8_random():
     graph = CayleyGraph(PermutationGroups.lrx(n))
     start_state = np.random.permutation(n)
 
-    predictor = Predictor.hamming(graph)
-    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, predictor=predictor, return_path=True)
+    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, return_path=True)
     assert bs_result.path_length <= 28
     _validate_beam_search_result(graph, start_state, bs_result)
 
