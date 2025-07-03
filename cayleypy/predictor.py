@@ -21,7 +21,7 @@ class Predictor:
         :param graph: Associated CayleyGraph object.
         :param models_or_heuristics: One of the following:
 
-            - "const" - will use predictor that returns 0 for any state.
+            - "zero" - will use predictor that returns 0 for any state.
             - "hamming" - will use Hamming distance from central state.
             - ``torch.nn.Module`` - will use given neural network model.
             - Any object that has "predict" method (e.g. sklearn models).
