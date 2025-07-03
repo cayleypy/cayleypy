@@ -413,13 +413,16 @@ class CayleyGraph:
             We also remove states from current layer if they appeared on some previous layer (so this also can be
             called "non-backtracking random walk").
             All states in the output are unique. ``y`` still can be overestimated, but it will be closer to the true
-            distance than in "classic" mode. Size of output is ``<=width*length``.
+            distance than in "classic" mode. Size of output is ``<= width*length``.
+            If ``width`` and ``length`` are large enough (``width`` at least as large as largest BFS layer, and
+            ``length >= diameter``), this will return all states and true distances to the start state.
 
         :param width: Number of random walks to generate.
         :param length: Length of each random walk.
         :param start_state: State from which to start random walk. Defaults to the central state.
         :param mode: Type of random walk (see above). Defaults to "classic".
-        :return: Pair of tensors ``x, y``. ``x`` contains states, ``y`` contains distances to states in ``x``.
+        :return: Pair of tensors ``x, y``. ``x`` contains states. ``y[i]`` is the estimated distance from start state
+          to state ``x[i]``.
         """
         start_state = self.encode_states(start_state or self.central_state)
         if mode == "classic":
