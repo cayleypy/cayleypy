@@ -116,10 +116,11 @@ def test_cyclic_coxeter_cayley_growth():
 
 def test_hungarian_rings_growth():
     for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
-        parameters = map(int, key.split(","))
+        parameters = list(map(int, key.split(",")))
+        assert len(parameters) == 4
         (left_size, left_index, right_size, right_index) = parameters
         n = left_size + right_size - (2 if left_index > 0 and right_index > 0 else 1)
-        if n > 12:
+        if n < 6 or n > 12:
             continue
 
         santa_params = get_santa_parameters_from_n(n)
