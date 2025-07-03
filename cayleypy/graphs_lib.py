@@ -319,10 +319,14 @@ class PermutationGroups:
 
     @staticmethod
     def rapaport_m2(n: int) -> CayleyGraphDef:
-        """Cayley graph for S_n with M2 generators"""
+        """Cayley graph for S_n with M2 generators.
+
+        Reference: E. Rapaport-Strasser. Cayley color groups and hamilton lines. Scr. Math, 24:51–58, 1959.
+        """
         # Generator 1: Transposition (0,1)
-        g1 = list(range(n))
-        g1[0], g1[1] = g1[1], g1[0]
+        g1 = transposition(n, 0, 1)
+        # g1 = list(range(n))
+        # g1[0], g1[1] = g1[1], g1[0]
 
         # Generator 2: Product of transpositions (0,1)(2,3)...
         g2 = list(range(n))

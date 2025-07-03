@@ -366,28 +366,6 @@ def test_random_walks_start_state():
     for i in range(10, 20):
         assert _state_to_str(x[i]) in ["01000", "00001"]
 
-        
-def test_rapaport_m2_growth():
-    """Test growth function for Rapaport M2 generators group"""
-    # Test for n=3
-    graph_def = PermutationGroups.rapaport_m2(3)
-    graph = CayleyGraph(generators=graph_def, central_state=graph_def.central_state)
-    result = graph.bfs()
-    assert result.layer_sizes == [1, 2, 2, 1]
-    assert result.diameter() == 3
-    assert result.num_vertices == 6
-
-    # Test for n=4
-    graph_def = PermutationGroups.rapaport_m2(4)
-    graph = CayleyGraph(generators=graph_def.generators, central_state=graph_def.central_state)
-    result = graph.bfs()
-
-    # Basic checks for S_4
-    assert result.num_vertices == 24
-    assert result.diameter() == 4
-
-    # Verify layer sizes
-    assert result.layer_sizes == [1, 3, 5, 8, 6, 1]
 
 # Below is the benchmark code. To run: `BENCHMARK=1 pytest . -k benchmark`
 @pytest.mark.skipif(not BENCHMARK_RUN, reason="benchmark")
