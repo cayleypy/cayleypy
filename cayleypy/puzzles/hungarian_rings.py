@@ -109,15 +109,14 @@ def get_group(n: int):
     """
     result = []
     full_size_one_intersection = n + 1
-    for left_size in range(2, full_size_one_intersection//2 + 1):
-        right_size = full_size_one_intersection- left_size
+    for left_size in range(2, full_size_one_intersection // 2 + 1):
+        right_size = full_size_one_intersection - left_size
         result.append((left_size, 0, right_size, 0))
     full_size_two_intersections = n + 2
-    for left_size in range(2, full_size_two_intersections//2 + 1):
+    for left_size in range(2, full_size_two_intersections // 2 + 1):
         right_size = full_size_two_intersections - left_size
         result.extend(get_pair_variants(left_size, right_size))
     return result
-
 
 
 def get_pair_variants(left_size, right_size):
@@ -134,8 +133,9 @@ def get_pair_variants(left_size, right_size):
     return result
 
 
-def hungarian_rings_generators(left_size: int, left_index: int,
-                               right_size: int, right_index: int) -> tuple[list[list[int]], list[str]]:
+def hungarian_rings_generators(
+    left_size: int, left_index: int, right_size: int, right_index: int
+) -> tuple[list[list[int]], list[str]]:
     """
     Generators for undirected graph. Rotate rings in both directions by 1 step.
     """

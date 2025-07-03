@@ -142,5 +142,5 @@ def generate_datasets():
     for n in range(2, 10):
         group = get_hr_group(n)
         for parameters in group:
-            keys.append(','.join([str(x) for x in parameters]))
+            keys.append(",".join([str(x) for x in parameters]))
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)

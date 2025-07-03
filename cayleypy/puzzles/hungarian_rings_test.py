@@ -4,8 +4,16 @@ import os
 import pytest
 
 from cayleypy.permutation_utils import compose_permutations
-from .hungarian_rings import hungarian_rings_permutations, _circular_shift, _create_right_ring, _get_intersections, \
-    get_santa_parameters_from_n, get_group, get_pair_variants, hungarian_rings_generators
+from .hungarian_rings import (
+    hungarian_rings_permutations,
+    _circular_shift,
+    _create_right_ring,
+    _get_intersections,
+    get_santa_parameters_from_n,
+    get_group,
+    get_pair_variants,
+    hungarian_rings_generators,
+)
 from .. import CayleyGraphDef, CayleyGraph, bfs_numpy
 
 FAST_RUN = os.getenv("FAST") == "1"
@@ -81,7 +89,11 @@ wreath_moves = [
     (6, 2, 6, 3, 1, [1, 2, 3, 4, 5, 0, 6, 7, 8, 9], [6, 1, 8, 3, 4, 5, 7, 2, 9, 0]),
     (7, 2, 7, 3, 1, [1, 2, 3, 4, 5, 6, 0, 7, 8, 9, 10, 11], [7, 1, 10, 3, 4, 5, 6, 8, 9, 2, 11, 0]),
     (
-        12, 3, 12, 4, 1,
+        12,
+        3,
+        12,
+        4,
+        1,
         [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21],
         [12, 1, 2, 19, 4, 5, 6, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 3, 20, 21, 0],
     ),
@@ -162,46 +174,50 @@ def test_hr_permutations_compensation_bf():
         assert compose_permutations(r_permutations, r_counter_perm) == list(range(full_size))
 
 
-@pytest.mark.parametrize("n, parameters", [
-    (10, (6, 2, 6, 3)),
-    (12, (7, 2, 7, 3)),
-])
+@pytest.mark.parametrize(
+    "n, parameters",
+    [
+        (10, (6, 2, 6, 3)),
+        (12, (7, 2, 7, 3)),
+    ],
+)
 def test_get_santa_parameters_from_n(n: int, parameters):
     assert get_santa_parameters_from_n(n) == parameters
 
+
 pairs_data = {
-    (2, 4) : [
+    (2, 4): [
         (2, 1, 4, 1),
         (2, 1, 4, 2),
     ],
-    (2, 5) : [
+    (2, 5): [
         (2, 1, 5, 1),
         (2, 1, 5, 2),
     ],
-    (2, 6) : [
+    (2, 6): [
         (2, 1, 6, 1),
         (2, 1, 6, 2),
         (2, 1, 6, 3),
     ],
-    (3, 4) : [
+    (3, 4): [
         (3, 1, 4, 1),
         (3, 1, 4, 2),
     ],
-    (3, 5) : [
+    (3, 5): [
         (3, 1, 5, 1),
         (3, 1, 5, 2),
     ],
-    (4, 4) : [
+    (4, 4): [
         (4, 1, 4, 1),
         (4, 1, 4, 2),
         (4, 2, 4, 2),
-    ]
+    ],
 }
 
 groups_data = [
     (4, [(2, 0, 3, 0)] + pairs_data[(2, 4)] + [(3, 1, 3, 1)]),
     (5, [(2, 0, 4, 0), (3, 0, 3, 0)] + pairs_data[(2, 5)] + pairs_data[(3, 4)]),
-    (6, [(2, 0, 5, 0), (3, 0, 4, 0)] + pairs_data[(2, 6)] + pairs_data[(3, 5)] + pairs_data[(4, 4)])
+    (6, [(2, 0, 5, 0), (3, 0, 4, 0)] + pairs_data[(2, 6)] + pairs_data[(3, 5)] + pairs_data[(4, 4)]),
 ]
 
 
@@ -216,9 +232,15 @@ def test_get_group(n: int, group: list):
 
 
 layer_sizes_data = [
-    ((2, 1, 7, 3), [1, 3, 6, 12, 20, 34, 55, 83, 124, 185, 274, 395, 558, 726, 808, 739, 540, 323, 104, 26, 14, 6, 3, 1]),
-    ((7, 3, 2, 1), [1, 3, 6, 12, 20, 34, 55, 83, 124, 185, 274, 395, 558, 726, 808, 739, 540, 323, 104, 26, 14, 6, 3, 1]),
-    ((5, 1, 6, 1), [1, 4, 12, 33, 88, 232, 608, 1596, 4085, 10132, 24209, 53006, 95034, 111383, 56032, 6323, 101, 1])
+    (
+        (2, 1, 7, 3),
+        [1, 3, 6, 12, 20, 34, 55, 83, 124, 185, 274, 395, 558, 726, 808, 739, 540, 323, 104, 26, 14, 6, 3, 1],
+    ),
+    (
+        (7, 3, 2, 1),
+        [1, 3, 6, 12, 20, 34, 55, 83, 124, 185, 274, 395, 558, 726, 808, 739, 540, 323, 104, 26, 14, 6, 3, 1],
+    ),
+    ((5, 1, 6, 1), [1, 4, 12, 33, 88, 232, 608, 1596, 4085, 10132, 24209, 53006, 95034, 111383, 56032, 6323, 101, 1]),
 ]
 
 
