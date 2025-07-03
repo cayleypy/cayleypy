@@ -227,6 +227,9 @@ class BfsResult:
     @cached_property
     def all_states(self) -> torch.Tensor:
         """Explicit states, ordered by index."""
+        assert len(self.layers) == len(
+            self.layer_sizes
+        ), f"Not all layers were stored. Re-run BFS with max_layer_size_to_store={max(self.layer_sizes)}"
         return torch.vstack([self.layers[i] for i in range(len(self.layer_sizes))])
 
     def get_edge_name(self, i1: int, i2: int) -> str:
