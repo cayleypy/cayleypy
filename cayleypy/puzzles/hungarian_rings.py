@@ -148,6 +148,13 @@ def hungarian_rings_generators(left_size: int, left_index: int,
     back_l, back_r = hungarian_rings_permutations(
         left_size=left_size, left_index=left_index, right_size=right_size, right_index=right_index, step=-1
     )
-    generators = [forth_l, forth_r, back_l, back_r]
-    generator_names = ["L", "R", "-L", "-R"]
+    generators = [forth_l, forth_r]
+    generator_names = ["L", "R"]
+    if forth_l != back_l:
+        generators.append(back_l)
+        generator_names.append("-L")
+    if forth_r != back_r:
+        generators.append(back_r)
+        generator_names.append("-R")
+
     return generators, generator_names

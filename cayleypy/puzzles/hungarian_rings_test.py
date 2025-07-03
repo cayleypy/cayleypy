@@ -5,7 +5,8 @@ import pytest
 
 from cayleypy.permutation_utils import compose_permutations
 from .hungarian_rings import hungarian_rings_permutations, _circular_shift, _create_right_ring, _get_intersections, \
-    get_santa_parameters_from_n, get_group, get_pair_variants
+    get_santa_parameters_from_n, get_group, get_pair_variants, hungarian_rings_generators
+from .. import CayleyGraphDef, CayleyGraph, bfs_numpy
 
 FAST_RUN = os.getenv("FAST") == "1"
 
@@ -212,3 +213,19 @@ def test_get_pair_variants(pair: tuple[int, int], variants: list):
 @pytest.mark.parametrize("n, group", groups_data)
 def test_get_group(n: int, group: list):
     assert get_group(n) == group
+
+
+layer_sizes_data = [
+    ((2, 1, 7, 3), [1, 3, 6, 12, 20, 34, 55, 83, 124, 185, 274, 395, 558, 726, 808, 739, 540, 323, 104, 26, 14, 6, 3, 1]),
+    ((7, 3, 2, 1), [1, 3, 6, 12, 20, 34, 55, 83, 124, 185, 274, 395, 558, 726, 808, 739, 540, 323, 104, 26, 14, 6, 3, 1]),
+    ((5, 1, 6, 1), [1, 4, 12, 33, 88, 232, 608, 1596, 4085, 10132, 24209, 53006, 95034, 111383, 56032, 6323, 101, 1])
+]
+
+
+@pytest.mark.parametrize("parameters, layer_sizes", layer_sizes_data)
+def test_layer_sizes(parameters: tuple[int, int, int, int], layer_sizes: list[int]):
+    generators, generator_names = hungarian_rings_generators(*parameters)
+    n = len(generators[0])
+    graph_def = CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+    assert bfs_numpy(CayleyGraph(graph_def)) == layer_sizes
+    assert CayleyGraph(graph_def).bfs().layer_sizes == layer_sizes
