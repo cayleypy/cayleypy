@@ -263,4 +263,4 @@ class BfsResult:
         return ans
 
     def __repr__(self):
-        return "BfsResult(diameter=%d, layer_sizes=%s)" % (self.diameter(), self.layer_sizes)
+        return f"BfsResult(diameter={self.diameter()}, layer_sizes={self.layer_sizes})"
