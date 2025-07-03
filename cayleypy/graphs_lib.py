@@ -325,8 +325,6 @@ class PermutationGroups:
         """
         # Generator 1: Transposition (0,1)
         g1 = transposition(n, 0, 1)
-        # g1 = list(range(n))
-        # g1[0], g1[1] = g1[1], g1[0]
 
         # Generator 2: Product of transpositions (0,1)(2,3)...
         g2 = list(range(n))
