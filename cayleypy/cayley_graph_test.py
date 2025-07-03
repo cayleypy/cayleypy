@@ -400,8 +400,8 @@ def _validate_beam_search_result(graph: CayleyGraph, start_state, bs_result: Bea
     assert torch.equal(path_result, graph.central_state)
 
 
-def _scramble(graph, num_scrambles):
-    return graph.random_walks(rw_num=1, rw_length=num_scrambles + 1)[0][-1]
+def _scramble(graph: CayleyGraph, num_scrambles: int) -> torch.Tensor:
+    return graph.random_walks(width=1, length=num_scrambles + 1)[0][-1]
 
 
 def test_beam_search_lrx_few_steps():
@@ -434,13 +434,19 @@ def test_beam_search_lrx_n8_random():
     _validate_beam_search_result(graph, start_state, bs_result)
 
 
+def test_beam_search_mini_pyramorphix():
+    graph = CayleyGraph(prepare_graph("mini_pyramorphix"))
+    start_state = _scramble(graph, 100)
+    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, return_path=True)
+    assert bs_result.path_length <= 5
+    _validate_beam_search_result(graph, start_state, bs_result)
+
+
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_beam_search_cube222():
     graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
     start_state = _scramble(graph, 100)
-
-    predictor = Predictor.hamming(graph)
-    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, predictor=predictor, return_path=True)
+    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, return_path=True)
     assert bs_result.path_length <= 14
     _validate_beam_search_result(graph, start_state, bs_result)
 
@@ -449,16 +455,14 @@ def test_beam_search_not_found():
     n = 50
     graph = CayleyGraph(PermutationGroups.lrx(n))
     start_state = np.random.permutation(n)
-    bs_result = graph.beam_search(
-        start_state=start_state, beam_width=10, max_iterations=10, predictor=Predictor.const()
-    )
+    bs_result = graph.beam_search(start_state=start_state, beam_width=10, max_iterations=10)
     assert not bs_result.path_found
 
 
 def test_beam_search_matrix_groups():
     graph = CayleyGraph(MatrixGroups.heisenberg())
     start_state = [[1, 2, 3], [0, 1, 1], [0, 0, 1]]
-    bs_result = graph.beam_search(start_state=start_state, predictor=Predictor.const(), return_path=True)
+    bs_result = graph.beam_search(start_state=start_state, return_path=True)
     _validate_beam_search_result(graph, start_state, bs_result)
 
 

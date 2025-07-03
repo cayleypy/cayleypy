@@ -436,7 +436,7 @@ class CayleyGraph:
         self,
         *,
         start_state: Union[torch.Tensor, np.ndarray, list],
-        predictor: Predictor,
+        predictor: Predictor = Predictor.const(),
         beam_width=1000,
         max_iterations=1000,
         return_path=False,
