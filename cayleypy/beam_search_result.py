@@ -22,8 +22,9 @@ class BeamSearchResult:
 
     def __repr__(self):
         if not self.path_found:
-            return "PathNotFound"
-        ans = f"Length={self.path_length}"
+            return "BeamSearchResult(path_found=False)"
+        ans = f"BeamSearchResult(path_length={self.path_length}"
         if self.path is not None and self.path_length > 0:
-            ans += ", Path=" + self.get_path_as_string()
+            ans += ", path=" + self.get_path_as_string()
+        ans += ")"
         return ans

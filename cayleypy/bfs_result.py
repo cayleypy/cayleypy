@@ -261,3 +261,6 @@ class BfsResult:
             label = self.get_edge_name(i1, i2) if with_labels else None
             ans.add_edge(vertex_names[i1], vertex_names[i2], label=label)
         return ans
+
+    def __repr__(self):
+        return "BfsResult(diameter=%d, layer_sizes=%s)" % (self.diameter(), self.layer_sizes)

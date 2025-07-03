@@ -11,7 +11,7 @@ from .cayley_graph_def import CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
 from .predictor import Predictor
 from .string_encoder import StringEncoder
-from .torch_utils import isin_via_searchsorted
+from .torch_utils import isin_via_searchsorted, TorchHashSet
 
 
 class CayleyGraph:
@@ -334,43 +334,24 @@ class CayleyGraph:
             graph=self.definition,
         )
 
-    def random_walks(
-        self,
-        *,
-        rw_num=10,
-        rw_length=10,
-        start_state: Union[None, torch.Tensor, np.ndarray, list] = None,
+    def _random_walks_classic(
+        self, width: int, length: int, start_state: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Generates random walks on this graph.
-
-        Random walk is a path in this graph starting from `start_state`, where on each step the next edge is chosen
-        randomly with equal probability.
-
-        :param rw_num: Number of random walks to generate.
-        :param rw_length: Length of each random walk.
-        :param start_state: State from which to start random walk. Defaults to the central state.
-        :return: Pair of tensors `x, y`.
-                 Tensor `x` has shape `(rw_num*rw_length,state_size)` and contains states.
-                 Tensor `y` has shape `(rw_num*rw_length)` and contains distances to states in `x`.
-                 Here distance means number of random walk steps to get to that state.
-                 i-th random walk can be extracted as: `[x[i+j*rw_num] for j in range(rw_len)]`.
-        """
         # Allocate memory.
-        x_shape = (rw_num * rw_length, self.encoded_state_size)
+        x_shape = (width * length, self.encoded_state_size)
         x = torch.zeros(x_shape, device=self.device, dtype=torch.int64)
-        y = torch.zeros(rw_num * rw_length, device=self.device, dtype=torch.int32)
+        y = torch.zeros(width * length, device=self.device, dtype=torch.int32)
 
         # First state in each walk is the start state.
-        start_state = self.encode_states(start_state or self.central_state).reshape((-1,))
-        x[:rw_num, :] = start_state
-        y[:rw_num] = 0
+        x[:width, :] = start_state.reshape((-1,))
+        y[:width] = 0
 
         # Main loop.
-        for i_step in range(1, rw_length):
-            y[i_step * rw_num : (i_step + 1) * rw_num] = i_step
-            gen_idx = torch.randint(0, self.definition.n_generators, (rw_num,), device=self.device)
-            src = x[(i_step - 1) * rw_num : i_step * rw_num, :]
-            dst = x[i_step * rw_num : (i_step + 1) * rw_num, :]
+        for i_step in range(1, length):
+            y[i_step * width : (i_step + 1) * width] = i_step
+            gen_idx = torch.randint(0, self.definition.n_generators, (width,), device=self.device)
+            src = x[(i_step - 1) * width : i_step * width, :]
+            dst = x[i_step * width : (i_step + 1) * width, :]
             for j in range(self.definition.n_generators):
                 # Go to next state for walks where we chose to use j-th generator on this step.
                 mask = gen_idx == j
@@ -380,6 +361,73 @@ class CayleyGraph:
                 dst[mask, :] = next_states
 
         return self.decode_states(x), y
+
+    def _random_walks_bfs(
+        self, width: int, length: int, start_state: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        x_hashes = TorchHashSet()
+        x_hashes.add_sorted_hashes(self.hasher.make_hashes(start_state))
+        x = [start_state]
+        y = [torch.full((1,), 0, device=self.device, dtype=torch.int32)]
+
+        for i_step in range(1, length):
+            next_states = self.get_neighbors(x[-1])
+            next_states, next_states_hashes, _ = self.get_unique_states(next_states)
+            mask = x_hashes.get_mask_to_remove_seen_hashes(next_states_hashes)
+            next_states, next_states_hashes = next_states[mask], next_states_hashes[mask]
+            layer_size = len(next_states)
+            if layer_size == 0:
+                break
+            if layer_size > width:
+                random_indices = torch.randperm(layer_size)[:width]
+                layer_size = width
+                next_states = next_states[random_indices]
+                next_states_hashes = next_states_hashes[random_indices]
+            x.append(next_states)
+            x_hashes.add_sorted_hashes(next_states_hashes)
+            y.append(torch.full((layer_size,), i_step, device=self.device, dtype=torch.int32))
+        return self.decode_states(torch.vstack(x)), torch.hstack(y)
+
+    def random_walks(
+        self,
+        *,
+        width=5,
+        length=10,
+        mode="classic",
+        start_state: Union[None, torch.Tensor, np.ndarray, list] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Generates random walks on this graph.
+
+        The following modes of random walk generation are supported:
+
+          * "classic" - random walk is a path in this graph starting from `start_state`, where on each step the next
+            edge is chosen randomly with equal probability. We generate `width` such random walks independently.
+            The output will have exactly ``width*length`` states.
+            i-th random walk can be extracted as: ``[x[i+j*width] for j in range(length)]``.
+            ``y[i]`` is equal to number of random steps it took to get to state ``x[i]``.
+            Note that in this mode a lot of states will have overestimated distance (meaning ``y[i]`` may be larger than
+            the length of the shortest path from ``x[i]`` to `start_state`).
+            The same state may appear multiple times with different distance in ``y``.
+          * "bfs" - we perform Breadth First Search starting from ``start_state`` with one modification: if size of
+            next layer is larger than ``width``, only ``width`` states (chosen randomly) will be kept.
+            We also remove states from current layer if they appeared on some previous layer (so this also can be
+            called "non-backtracking random walk").
+            All states in the output are unique. ``y`` still can be overestimated, but it will be closer to the true
+            distance than in "classic" mode. Size of output is ``<=width*length``.
+
+        :param width: Number of random walks to generate.
+        :param length: Length of each random walk.
+        :param start_state: State from which to start random walk. Defaults to the central state.
+        :param mode: Type of random walk (see above). Defaults to "classic".
+        :return: Pair of tensors ``x, y``. ``x`` contains states, ``y`` contains distances to states in ``x``.
+        """
+        start_state = self.encode_states(start_state or self.central_state)
+        if mode == "classic":
+            return self._random_walks_classic(width, length, start_state)
+        elif mode == "bfs":
+            return self._random_walks_bfs(width, length, start_state)
+        else:
+            raise ValueError("Unknown mode:", mode)
 
     def beam_search(
         self,
