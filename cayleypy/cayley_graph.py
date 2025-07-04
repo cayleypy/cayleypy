@@ -103,7 +103,7 @@ class CayleyGraph:
                 ]
                 self.encoded_state_size = self.string_encoder.encoded_length
 
-        self.hasher = StateHasher(self.encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
+        self.hasher = StateHasher(self, random_seed, chunk_size=hash_chunk_size)
         self.central_state_hash = self.hasher.make_hashes(self.encode_states(self.central_state))
 
     def _get_unique_states(
