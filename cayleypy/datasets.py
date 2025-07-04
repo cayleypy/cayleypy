@@ -4,6 +4,7 @@ import csv
 import functools
 import json
 import os
+import math
 from typing import Any, Callable
 
 from .cayley_graph import CayleyGraph
@@ -101,8 +102,25 @@ def _compute_signed_reversals_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.signed_reversals(int(n))).bfs().layer_sizes
 
 
-def _compute_coxeter_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(PermutationGroups.coxeter(int(n))).bfs().layer_sizes
+# For S_n with Coxeter generators (adjacent transpositions), the number of permutations of length k equals
+# the number of permutations in S_n with exactly k inversions.
+# This is the coefficient of q^k in the q-factorial [n]_q!
+def _compute_coxeter_cayley_growth(n_str: str) -> list[int]:
+    # dp[k] = number of permutations in S_n with exactly k inversions.
+    # Using dynamic programming to compute Mahonian numbers.
+    n = int(n_str)
+    max_inv = math.comb(n, 2)
+    dp = [0] * (max_inv + 1)
+    dp[0] = 1  # 1 permutation of length 0 with 0 inversions
+
+    for i in range(1, n):  # i is the number of elements inserted so far
+        new_dp = [0] * (max_inv + 1)
+        for k in range(max_inv + 1):
+            for j in range(min(i + 1, k + 1)):  # insert new element at position j (adds j inversions)
+                new_dp[k] += dp[k - j]
+        dp = new_dp
+
+    return dp
 
 
 def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
@@ -137,10 +155,10 @@ def generate_datasets():
     _update_dataset("top_spin_cayley_growth", keys, _compute_top_spin_cayley_growth)
     keys = [str(n) for n in range(2, 31)]
     _update_dataset("all_transpositions_cayley_growth", keys, _compute_all_transpositions_cayley_growth)
+    _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     keys = [str(n) for n in range(2, 11)]
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
-    _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
     _update_dataset("rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth)
     keys = [str(n) for n in range(1, 8)]
