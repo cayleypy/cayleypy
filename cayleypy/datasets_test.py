@@ -5,7 +5,7 @@ import math
 from .cayley_graph import CayleyGraph
 from .cayley_graph_def import CayleyGraphDef
 from .datasets import load_dataset
-from .graphs_lib import prepare_graph, PermutationGroups, MatrixGroups
+from .graphs_lib import PermutationGroups, MatrixGroups
 from .puzzles.puzzles import Puzzles
 
 

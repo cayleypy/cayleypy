@@ -4,7 +4,6 @@ from typing import Dict
 from ..cayley_graph import CayleyGraphDef
 from ..permutation_utils import (
     compose_permutations,
-    transposition,
     permutation_from_cycles as pfc,
     inverse_permutation,
 )

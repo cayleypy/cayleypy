@@ -1,9 +1,9 @@
+import numpy as np
+
 from .moves import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES, MEGAMINX_MOVES
 from .puzzles import Puzzles
-
-import numpy as np
-from ..permutation_utils import is_permutation, inverse_permutation
 from ..cayley_graph import CayleyGraph
+from ..permutation_utils import is_permutation, inverse_permutation
 
 
 def test_mini_pyramorphix():
