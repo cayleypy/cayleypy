@@ -1,7 +1,7 @@
+import math
 from typing import Callable, Optional, TYPE_CHECKING
 
 import torch
-import math
 
 if TYPE_CHECKING:
     from cayleypy import CayleyGraph
