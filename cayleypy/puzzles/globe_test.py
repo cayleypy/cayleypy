@@ -1,11 +1,11 @@
 # pylint: disable=line-too-long
 import numpy as np
 
-from cayleypy.puzzles import globe_puzzle
+from .puzzles import Puzzles
 
 
 def test_globe_3_4():
-    graph = globe_puzzle(3, 4)
+    graph = Puzzles.globe_puzzle(3, 4)
 
     assert graph.n_generators == 16
     expected_names_1 = ["r0", "r0_inv", "r1", "r1_inv", "r2", "r2_inv", "r3", "r3_inv"]
@@ -36,7 +36,7 @@ def test_globe_3_4():
 
 
 def test_globe_2_6():
-    graph = globe_puzzle(2, 6)
+    graph = Puzzles.globe_puzzle(2, 6)
 
     assert graph.n_generators == 18
     expected_names_1 = ["r0", "r0_inv", "r1", "r1_inv", "r2", "r2_inv"]

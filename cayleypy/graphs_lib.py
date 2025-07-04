@@ -3,102 +3,10 @@
 # pylint: disable=line-too-long
 
 from itertools import permutations
-from warnings import warn
 
 from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
-from .hungarian_rings import hungarian_rings_generators
-from .permutation_utils import (
-    compose_permutations,
-    transposition,
-    permutation_from_cycles as pfc,
-    inverse_permutation,
-)
-
-CUBE222_MOVES = {
-    "f0": pfc(24, [[2, 19, 21, 8], [3, 17, 20, 10], [4, 6, 7, 5]]),
-    "r1": pfc(24, [[1, 5, 21, 14], [3, 7, 23, 12], [8, 10, 11, 9]]),
-    "d0": pfc(24, [[6, 18, 14, 10], [7, 19, 15, 11], [20, 22, 23, 21]]),
-}
-
-CUBE333_MOVES = {
-    "U": pfc(54, [[0, 6, 8, 2], [1, 3, 7, 5], [20, 47, 29, 38], [23, 50, 32, 41], [26, 53, 35, 44]]),
-    "D": pfc(54, [[9, 15, 17, 11], [10, 12, 16, 14], [18, 36, 27, 45], [21, 39, 30, 48], [24, 42, 33, 51]]),
-    "L": pfc(54, [[0, 44, 9, 45], [1, 43, 10, 46], [2, 42, 11, 47], [18, 24, 26, 20], [19, 21, 25, 23]]),
-    "R": pfc(54, [[6, 51, 15, 38], [7, 52, 16, 37], [8, 53, 17, 36], [27, 33, 35, 29], [28, 30, 34, 32]]),
-    "B": pfc(54, [[2, 35, 15, 18], [5, 34, 12, 19], [8, 33, 9, 20], [36, 42, 44, 38], [37, 39, 43, 41]]),
-    "F": pfc(54, [[0, 24, 17, 29], [3, 25, 14, 28], [6, 26, 11, 27], [45, 51, 53, 47], [46, 48, 52, 50]]),
-}
-
-MINI_PYRAMORPHIX_ALLOWED_MOVES = {
-    "M_DF": [0, 1, 2, 3, 4, 5, 11, 9, 10, 7, 8, 6, 15, 16, 17, 12, 13, 14, 18, 19, 20, 21, 22, 23],
-    "M_RL": [3, 4, 5, 0, 1, 2, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 22, 23, 18, 19, 20],
-    "M_DFv": [3, 4, 5, 0, 1, 2, 11, 9, 10, 7, 8, 6, 15, 16, 17, 12, 13, 14, 21, 22, 23, 18, 19, 20],
-    "M_LF": [8, 6, 7, 3, 4, 5, 1, 2, 0, 9, 10, 11, 18, 19, 20, 15, 16, 17, 12, 13, 14, 21, 22, 23],
-    "M_RD": [0, 1, 2, 10, 11, 9, 6, 7, 8, 5, 3, 4, 12, 13, 14, 21, 22, 23, 18, 19, 20, 15, 16, 17],
-    "M_LFv": [8, 6, 7, 10, 11, 9, 1, 2, 0, 5, 3, 4, 18, 19, 20, 21, 22, 23, 12, 13, 14, 15, 16, 17],
-    "M_DL": [0, 1, 2, 8, 6, 7, 4, 5, 3, 9, 10, 11, 12, 13, 14, 18, 19, 20, 15, 16, 17, 21, 22, 23],
-    "M_FR": [10, 11, 9, 3, 4, 5, 6, 7, 8, 2, 0, 1, 21, 22, 23, 15, 16, 17, 18, 19, 20, 12, 13, 14],
-    "M_DLv": [10, 11, 9, 8, 6, 7, 4, 5, 3, 2, 0, 1, 21, 22, 23, 18, 19, 20, 15, 16, 17, 12, 13, 14],
-    "M_Fv": [7, 8, 6, 5, 3, 4, 10, 11, 9, 1, 2, 0, 13, 14, 12, 22, 23, 21, 16, 17, 15, 19, 20, 18],
-    "M_Fvi": [11, 9, 10, 4, 5, 3, 2, 0, 1, 8, 6, 7, 14, 12, 13, 20, 18, 19, 23, 21, 22, 17, 15, 16],
-    "M_Dv": [2, 0, 1, 9, 10, 11, 3, 4, 5, 6, 7, 8, 19, 20, 18, 16, 17, 15, 22, 23, 21, 13, 14, 12],
-    "M_Dvi": [1, 2, 0, 6, 7, 8, 9, 10, 11, 3, 4, 5, 23, 21, 22, 17, 15, 16, 14, 12, 13, 20, 18, 19],
-    "M_Lv": [5, 3, 4, 7, 8, 6, 0, 1, 2, 11, 9, 10, 22, 23, 21, 13, 14, 12, 19, 20, 18, 16, 17, 15],
-    "M_Lvi": [6, 7, 8, 1, 2, 0, 5, 3, 4, 10, 11, 9, 17, 15, 16, 23, 21, 22, 20, 18, 19, 14, 12, 13],
-    "M_Rv": [9, 10, 11, 2, 0, 1, 8, 6, 7, 4, 5, 3, 16, 17, 15, 19, 20, 18, 13, 14, 12, 22, 23, 21],
-    "M_Rvi": [4, 5, 3, 11, 9, 10, 7, 8, 6, 0, 1, 2, 20, 18, 19, 14, 12, 13, 17, 15, 16, 23, 21, 22],
-}
-
-# fmt: off
-PYRAMINX_MOVES = {
-    "r": pfc(36, [[31, 33, 32]], offset=1),
-    "l": pfc(36, [[34, 36, 35]], offset=1),
-    "b": pfc(36, [[28, 30, 29]], offset=1),
-    "u": pfc(36, [[25, 27, 26]], offset=1),
-    "BL": pfc(36, [[1, 8, 4], [2, 7, 3], [13, 22, 18], [14, 23, 16], [15, 24, 17], [25, 34, 30], [26, 35, 28], [27, 36, 29]], offset=1),
-    "BR": pfc(36, [[3, 11, 10], [4, 12, 9], [13, 17, 19], [14, 18, 20], [15, 16, 21], [25, 29, 31], [26, 30, 32], [27, 28, 33]], offset=1),
-    "F": pfc(36, [[1, 10, 5], [2, 9, 6], [13, 21, 23], [14, 19, 24], [15, 20, 22], [25, 33, 35], [26, 31, 36], [27, 32, 34]], offset=1),
-    "D": pfc(36, [[5, 12, 7], [6, 11, 8], [16, 22, 19], [17, 23, 20], [18, 24, 21], [28, 34, 31], [29, 35, 32], [30, 36, 33]], offset=1),
-}
-
-STARMINX_MOVES = {
-    'M_UFR': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 44, 45, 38, 39, 40, 41, 42, 43, 47, 46, 37, 36, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 104, 102, 103, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_DIBF': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 51, 50, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 25, 24, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 38, 39, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 98, 96, 97, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_ULF': [0, 1, 2, 3, 4, 5, 6, 7, 31, 30, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 45, 44, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 8, 9, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 86, 84, 85, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_DBFE': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 21, 20, 50, 51, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 19, 18, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 101, 99, 100, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_AFL': [0, 1, 2, 3, 4, 5, 6, 7, 11, 10, 28, 29, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 9, 8, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 74, 72, 73, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_BREBF': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 57, 56, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 59, 58, 20, 21, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 83, 81, 82, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_UBLL': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 31, 30, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 35, 34, 32, 33, 12, 13, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 77, 75, 76, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_DEC': [0, 1, 2, 3, 4, 5, 19, 18, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 41, 40, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 6, 7, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 71, 69, 70, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_ILBL': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 34, 35, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 15, 14, 33, 32, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 80, 78, 79, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_RCE': [0, 1, 43, 42, 4, 5, 2, 3, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 7, 6, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 119, 117, 118],
-    'M_UBRBL': [13, 12, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 55, 54, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 0, 1, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 95, 93, 94, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_DCA': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 53, 52, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 27, 26, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 40, 41, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 113, 111, 112, 114, 115, 116, 117, 118, 119],
-    'M_BFBLBR': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 58, 59, 50, 51, 52, 53, 48, 49, 56, 57, 54, 55, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 116, 114, 115, 117, 118, 119],
-    'M_FAC': [0, 1, 2, 3, 52, 53, 6, 7, 8, 9, 4, 5, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 10, 11, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 68, 66, 67, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_URBR': [16, 17, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 47, 46, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 1, 0, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 62, 60, 61, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_DAI': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 26, 27, 23, 22, 25, 24, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 92, 90, 91, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_CRF': [0, 1, 5, 4, 36, 37, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 3, 2, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 65, 63, 64, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_BLBFI': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 39, 38, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 49, 48, 40, 41, 42, 43, 44, 45, 46, 47, 14, 15, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 107, 105, 106, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_EBRR': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 56, 57, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 17, 16, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 43, 42, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 110, 108, 109, 111, 112, 113, 114, 115, 116, 117, 118, 119],
-    'M_LIA': [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 33, 32, 24, 25, 26, 27, 22, 23, 30, 31, 29, 28, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50, 51, 52, 53, 54, 55, 56, 57, 58, 59, 60, 61, 62, 63, 64, 65, 66, 67, 68, 69, 70, 71, 72, 73, 74, 75, 76, 77, 78, 79, 80, 81, 82, 83, 84, 85, 86, 89, 87, 88, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119]
-}
-
-MEGAMINX_MOVES = {
-    'M_U': pfc(120, [[1,4,19,22,7], [2,5,20,23,8], [3,6,21,24,9], [61,63,75,73,77], [62,64,76,74,78]], offset=1),
-    'M_D': pfc(120, [[37,55,58,52,40], [38,56,59,53,41], [39,57,60,54,42], [93,115,117,111,95], [94,116,118,112,96]], offset=1),
-    'M_F': pfc(120, [[1,9,31,35,12], [2,7,32,36,10], [3,8,33,34,11], [61,66,87,68,80], [62,65,88,67,79]], offset=1),
-    'M_B': pfc(120, [[25,41,52,47,30], [26,42,53,48,28], [27,40,54,46,29], [97,112,113,108,99], [98,111,114,107,100]], offset=1),
-    'M_L': pfc(120, [[1,11,15,16,5], [2,12,13,17,6], [3,10,14,18,4], [63,79,69,81,71], [64,80,70,82,72]], offset=1),
-    'M_DR': pfc(120, [[43,47,54,59,51], [44,48,52,60,49], [45,46,53,58,50], [101,103,113,117,119], [102,104,114,118,120]], offset=1),
-    'M_BL': pfc(120, [[4,17,27,28,20], [5,18,25,29,21], [6,16,26,30,19], [71,84,99,86,76], [72,83,100,85,75]], offset=1),
-    'M_FR': pfc(120, [[31,50,60,56,36], [32,51,58,57,34], [33,49,59,55,35], [87,109,120,115,90], [88,110,119,116,89]], offset=1),
-    'M_BR': pfc(120, [[19,29,48,43,23], [20,30,46,44,24], [21,28,47,45,22], [73,86,107,103,106], [74,85,108,104,105]], offset=1),
-    'M_FL': pfc(120, [[10,35,57,38,15], [11,36,55,39,13], [12,34,56,37,14], [67,90,94,91,70], [68,89,93,92,69]], offset=1),
-    'M_R': pfc(120, [[7,24,43,50,33], [8,22,44,51,31], [9,23,45,49,32], [65,77,105,101,109], [66,78,106,102,110]], offset=1),
-    'M_DL': pfc(120, [[13,38,40,26,18], [14,39,41,27,16], [15,37,42,25,17], [81,91,95,97,83], [82,92,96,98,84]], offset=1),
-}
-# fmt: on
+from .permutation_utils import transposition, permutation_from_cycles
+from .puzzles.puzzles import Puzzles
 
 
 def _create_coxeter_generators(n: int) -> list[list[int]]:
@@ -315,7 +223,7 @@ class PermutationGroups:
         generator_names = []
         for a, b, c in permutations(range(n), 3):
             if a < b and a < c:
-                generators.append(pfc(n, [[a, b, c]]))
+                generators.append(permutation_from_cycles(n, [[a, b, c]]))
                 generator_names.append(f"({a} {b} {c})")
         return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
@@ -325,7 +233,7 @@ class PermutationGroups:
         generators = []
         generator_names = []
         for i, j in permutations(range(1, n), 2):
-            generators.append(pfc(n, [[0, i, j]]))
+            generators.append(permutation_from_cycles(n, [[0, i, j]]))
             generator_names.append(f"({0} {i} {j})")
         return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
@@ -342,117 +250,67 @@ class PermutationGroups:
                 generator_names.append(f"D{idx}")
         return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
+    @staticmethod
+    def rapaport_m2(n: int) -> CayleyGraphDef:
+        """Cayley graph for S_n with M2 generators.
+
+        Reference: E. Rapaport-Strasser. Cayley color groups and hamilton lines. Scr. Math, 24:51–58, 1959.
+        """
+        # Generator 1: Transposition (0,1)
+        g1 = transposition(n, 0, 1)
+
+        # Generator 2: Product of transpositions (0,1)(2,3)...
+        g2 = list(range(n))
+        for i in range(0, n - 1, 2):
+            g2[i], g2[i + 1] = g2[i + 1], g2[i]
+
+        # Generator 3: Product of transpositions (1,2)(3,4)...
+        g3 = list(range(n))
+        for i in range(1, n - 1, 2):
+            g3[i], g3[i + 1] = g3[i + 1], g3[i]
+
+        generators = [g1, g2, g3]
+        generator_names = ["(0,1)", "EvenDisjTrans", "OddDisjTrans"]
+
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+
 
 def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
-    """Returns pre-defined Cayley or Schreier coset graph.
+    """Returns pre-defined graph by codename.
 
-    TODO: move everything out and remove this function.
-    DO NOT ADD ANY NEW GRAPHS HERE!
-
-    Supported graphs:
-      * "cube_2/2/2_6gensQTM" - Schreier coset graph for 2x2x2 Rubik's cube with fixed back left upper corner and only
-          quarter-turns allowed. There are 6 generators (front, right, down face - clockwise and counterclockwise).
-      * "cube_2/2/2_9gensHTM" - same as above, but allowing half-turns (it has 9 generators).
-      * "cube_3/3/3_12gensQTM" - Schreier coset graph for 3x3x3 Rubik's cube with fixed central pieces and only
-          quarter-turns allowed. There are 12 generators (clockwise and counterclockwise rotation for each face).
-      * "cube_3/3/3_18gensHTM" - same as above, but allowing half-turns (it has 18 generators).
-      * "mini_pyramorphix" – Cayley graph for a subgroup of S_24, acting on 24 titles. It is generated by 17 moves
-          inspired by a simplified version of the Pyramorphix puzzle. Moves are based on overlapping 2- and 3-cycles
-          and result in a symmetric, undirected graph. (order of the graph 24, degree 17, order of the group 288)
-      * "pyraminx" - Cayley graph for a subgroup pf S_36 acting on 36 tiles. It is generated by 8 elements inspired
-          by Pyraminx puzzle. 4 elemets represent rotations  of the tetrahedron tips, while 4 others -- rotations
-          of its base layers.
-      * "hungarian_rings" - Cayley graph for S_n (n>=4), generated by rotating two rings in both directions.
-          For each ring structure and their intersection it has four generators.
-      * "starminx" - Cayley graph, generated by 20 moves of Starminx puzzle. Each move is a rotation of a
-          corner, centered around one of the dodecahedron’s pentagonal faces (face centres never move). A single turn
-          corresponds to a set of disjoint 3-cycles, each on one triangular sticker.
-
-    :param name: name of pre-defined graph.
-    :param n: parameter (if applicable).
-    :return: requested graph as `CayleyGraphDef`.
+    This function exists for convenience.
+    Do not add new graphs here unless this is necessary!
+    If you add a graph here, it must be one line calling a function defined elsewhere.
     """
     if name == "cube_2/2/2_6gensQTM":
-        generators, generator_names = [], []
-        for move_id, perm in CUBE222_MOVES.items():
-            generators += [perm, inverse_permutation(perm)]
-            generator_names += [move_id, move_id + "'"]
-        central_state = [color for color in range(6) for _ in range(4)]
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.rubik_cube(2, "QTM")
     elif name == "cube_2/2/2_9gensHTM":
-        generators, generator_names = [], []
-        for move_id, perm in CUBE222_MOVES.items():
-            generators += [perm, inverse_permutation(perm), compose_permutations(perm, perm)]
-            generator_names += [move_id, move_id + "'", move_id + "^2"]
-        central_state = [color for color in range(6) for _ in range(4)]
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.rubik_cube(2, "HTM")
     elif name == "cube_3/3/3_12gensQTM":
-        generators, generator_names = [], []
-        for move_id, perm in CUBE333_MOVES.items():
-            generators += [perm, inverse_permutation(perm)]
-            generator_names += [move_id, move_id + "'"]
-        central_state = [color for color in range(6) for _ in range(9)]
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.rubik_cube(3, "QTM")
     elif name == "cube_3/3/3_18gensHTM":
-        generators, generator_names = [], []
-        for move_id, perm in CUBE333_MOVES.items():
-            generators += [perm, inverse_permutation(perm), compose_permutations(perm, perm)]
-            generator_names += [move_id, move_id + "'", move_id + "^2"]
-        central_state = [color for color in range(6) for _ in range(9)]
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.rubik_cube(3, "HTM")
     elif name == "mini_pyramorphix":
-        generator_names = list(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
-        generators = [MINI_PYRAMORPHIX_ALLOWED_MOVES[k] for k in generator_names]
-        central_state = list(range(len(generators[0])))
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.mini_pyramorphix()
     elif name == "pyraminx":
-        generator_names = []
-        generators = []
-        for move_id, perm in PYRAMINX_MOVES.items():
-            generators += [perm, inverse_permutation(perm)]
-            generator_names += [move_id, move_id + "_inv"]
-        central_state = list(range(len(generators[0])))
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.pyraminx()
     elif name == "hungarian_rings":
-        assert n % 2 == 0
-        ring_size = (n + 2) // 2
-        assert ring_size >= 4
-        generators, generator_names = hungarian_rings_generators(ring_size=ring_size)
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        return Puzzles.hungarian_rings(n)
     elif name == "starminx":
-        generator_names = list(STARMINX_MOVES.keys())
-        generators = [STARMINX_MOVES[k] for k in generator_names]
-        inversed_names = [f"inv_{k}" for k in generator_names]
-        generator_names.extend(inversed_names)
-        inversed = [inverse_permutation(p) for p in generators]
-        generators.extend(inversed)
-        central_state = list(range(len(generators[0])))
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.starminx()
     elif name == "megaminx":
-        generator_names = []
-        generators = []
-        for move_id, perm in MEGAMINX_MOVES.items():
-            generators += [perm, inverse_permutation(perm)]
-            generator_names += [move_id, move_id + "_inv"]
-        central_state = list(range(len(generators[0])))
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.megaminx()
     elif name == "lrx":
-        warn("Use PermutationGroups.lrx instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.lrx(n)
     elif name == "top_spin":
-        warn("Use PermutationGroups.top_spin instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.top_spin(n)
     elif name == "all_transpositions":
-        warn("Use PermutationGroups.all_transpositions instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.all_transpositions(n)
     elif name == "full_reversals":
-        warn("Use PermutationGroups.full_reversals instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.full_reversals(n)
     elif name == "coxeter":
-        warn("Use PermutationGroups.coxeter instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.coxeter(n)
     elif name == "pancake":
-        warn("Use PermutationGroups.pancake instead of prepare_graph!", DeprecationWarning, stacklevel=2)
         return PermutationGroups.pancake(n)
     else:
         raise ValueError(f"Unknown generator set: {name}")
@@ -475,10 +333,8 @@ class MatrixGroups:
         :return: requested graph as `CayleyGraphDef`.
         """
         x = MatrixGenerator.create([[1, 1, 0], [0, 1, 0], [0, 0, 1]], modulo=modulo)
-        x_inv = MatrixGenerator.create([[1, -1, 0], [0, 1, 0], [0, 0, 1]], modulo=modulo)
         y = MatrixGenerator.create([[1, 0, 0], [0, 1, 1], [0, 0, 1]], modulo=modulo)
-        y_inv = MatrixGenerator.create([[1, 0, 0], [0, 1, -1], [0, 0, 1]], modulo=modulo)
         return CayleyGraphDef.for_matrix_group(
-            generators=[x, x_inv, y, y_inv],
+            generators=[x, x.inv, y, y.inv],
             generator_names=["x", "x'", "y", "y'"],
         )

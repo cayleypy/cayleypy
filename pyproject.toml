@@ -88,6 +88,7 @@ max-line-length = 120
 [tool.pylint."MESSAGES CONTROL"]
 disable = [
     "consider-using-enumerate",
+    "fixme",
     "missing-function-docstring",
     "missing-module-docstring",
     "no-else-return",

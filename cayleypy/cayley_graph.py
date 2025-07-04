@@ -5,11 +5,13 @@ from typing import Optional, Union
 import numpy as np
 import torch
 
+from .beam_search_result import BeamSearchResult
 from .bfs_result import BfsResult
 from .cayley_graph_def import CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
+from .predictor import Predictor
 from .string_encoder import StringEncoder
-from .torch_utils import isin_via_searchsorted
+from .torch_utils import isin_via_searchsorted, TorchHashSet
 
 
 class CayleyGraph:
@@ -83,7 +85,7 @@ class CayleyGraph:
             print(f"Using device: {self.device}.")
 
         self.central_state = torch.as_tensor(definition.central_state, device=self.device, dtype=torch.int64)
-        encoded_state_size: int = self.definition.state_size
+        self.encoded_state_size: int = self.definition.state_size
         self.string_encoder: Optional[StringEncoder] = None
 
         if definition.is_permutation_group():
@@ -99,9 +101,10 @@ class CayleyGraph:
                 self.encoded_generators = [
                     self.string_encoder.implement_permutation(perm) for perm in definition.generators_permutations
                 ]
-                encoded_state_size = self.string_encoder.encoded_length
+                self.encoded_state_size = self.string_encoder.encoded_length
 
-        self.hasher = StateHasher(encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
+        self.hasher = StateHasher(self.encoded_state_size, random_seed, self.device, chunk_size=hash_chunk_size)
+        self.central_state_hash = self.hasher.make_hashes(self.encode_states(self.central_state))
 
     def get_unique_states(
         self, states: torch.Tensor, hashes: Optional[torch.Tensor] = None
@@ -141,7 +144,6 @@ class CayleyGraph:
 
     def _apply_generator_batched(self, i: int, src: torch.Tensor, dst: torch.Tensor):
         """Applies i-th generator to encoded states in `src`, writes output to `dst`."""
-
         states_num = src.shape[0]
         if self.definition.is_permutation_group():
             if self.string_encoder is not None:
@@ -156,6 +158,21 @@ class CayleyGraph:
             src = src.reshape((states_num, n, m))
             dst[:, :] = mx.apply_batch_torch(src).reshape((states_num, n * m))
 
+    def apply_path(self, states: torch.Tensor, generator_ids: list[int]) -> torch.Tensor:
+        """Applies multiple generators to given state(s) in order.
+
+        :param states: one or more states (as torch.Tensor) to which to apply the states.
+        :param generator_ids: Indexes of generators to apply.
+        :return: States after applying specified generators in order.
+        """
+        states = self.encode_states(states)
+        for gen_id in generator_ids:
+            assert 0 <= gen_id < self.definition.n_generators
+            new_states = torch.zeros_like(states)
+            self._apply_generator_batched(gen_id, states, new_states)
+            states = new_states
+        return self.decode_states(states)
+
     def get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates all neighbors of `states` (in internal representation)."""
         states_num = states.shape[0]
@@ -166,6 +183,10 @@ class CayleyGraph:
             dst = neighbors[i * states_num : (i + 1) * states_num, :]
             self._apply_generator_batched(i, states, dst)
         return neighbors
+
+    def get_neighbors_decoded(self, states: torch.Tensor) -> torch.Tensor:
+        """Calculates neighbors in decoded (external) representation."""
+        return self.decode_states(self.get_neighbors(self.encode_states(states)))
 
     def bfs(
         self,
@@ -313,43 +334,24 @@ class CayleyGraph:
             graph=self.definition,
         )
 
-    def random_walks(
-        self,
-        *,
-        rw_num=10,
-        rw_length=10,
-        start_state: Union[None, torch.Tensor, np.ndarray, list] = None,
+    def _random_walks_classic(
+        self, width: int, length: int, start_state: torch.Tensor
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Generates random walks on this graph.
-
-        Random walk is a path in this graph starting from `start_state`, where on each step the next edge is chosen
-        randomly with equal probability.
-
-        :param rw_num: Number of random walks to generate.
-        :param rw_length: Length of each random walk.
-        :param start_state: State from which to start random walk. Defaults to the central state.
-        :return: Pair of tensors `x, y`.
-                 Tensor `x` has shape `(rw_num*rw_length,state_size)` and contains states.
-                 Tensor `y` has shape `(rw_num*rw_length)` and contains distances to states in `x`.
-                 Here distance means number of random walk steps to get to that state.
-                 i-th random walk can be extracted as: `[x[i+j*rw_num] for j in range(rw_len)]`.
-        """
         # Allocate memory.
-        x_shape = (rw_num * rw_length, self.definition.state_size)
+        x_shape = (width * length, self.encoded_state_size)
         x = torch.zeros(x_shape, device=self.device, dtype=torch.int64)
-        y = torch.zeros(rw_num * rw_length, device=self.device, dtype=torch.int32)
+        y = torch.zeros(width * length, device=self.device, dtype=torch.int32)
 
         # First state in each walk is the start state.
-        start_state = self.encode_states(start_state or self.central_state).reshape((-1,))
-        x[:rw_num, :] = start_state
-        y[:rw_num] = 0
+        x[:width, :] = start_state.reshape((-1,))
+        y[:width] = 0
 
         # Main loop.
-        for i_step in range(1, rw_length):
-            y[i_step * rw_num : (i_step + 1) * rw_num] = i_step
-            gen_idx = torch.randint(0, self.definition.n_generators, (rw_num,), device=self.device)
-            src = x[(i_step - 1) * rw_num : i_step * rw_num, :]
-            dst = x[i_step * rw_num : (i_step + 1) * rw_num, :]
+        for i_step in range(1, length):
+            y[i_step * width : (i_step + 1) * width] = i_step
+            gen_idx = torch.randint(0, self.definition.n_generators, (width,), device=self.device)
+            src = x[(i_step - 1) * width : i_step * width, :]
+            dst = x[i_step * width : (i_step + 1) * width, :]
             for j in range(self.definition.n_generators):
                 # Go to next state for walks where we chose to use j-th generator on this step.
                 mask = gen_idx == j
@@ -359,6 +361,157 @@ class CayleyGraph:
                 dst[mask, :] = next_states
 
         return self.decode_states(x), y
+
+    def _random_walks_bfs(
+        self, width: int, length: int, start_state: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        x_hashes = TorchHashSet()
+        x_hashes.add_sorted_hashes(self.hasher.make_hashes(start_state))
+        x = [start_state]
+        y = [torch.full((1,), 0, device=self.device, dtype=torch.int32)]
+
+        for i_step in range(1, length):
+            next_states = self.get_neighbors(x[-1])
+            next_states, next_states_hashes, _ = self.get_unique_states(next_states)
+            mask = x_hashes.get_mask_to_remove_seen_hashes(next_states_hashes)
+            next_states, next_states_hashes = next_states[mask], next_states_hashes[mask]
+            layer_size = len(next_states)
+            if layer_size == 0:
+                break
+            if layer_size > width:
+                random_indices = torch.randperm(layer_size)[:width]
+                layer_size = width
+                next_states = next_states[random_indices]
+                next_states_hashes = next_states_hashes[random_indices]
+            x.append(next_states)
+            x_hashes.add_sorted_hashes(next_states_hashes)
+            y.append(torch.full((layer_size,), i_step, device=self.device, dtype=torch.int32))
+        return self.decode_states(torch.vstack(x)), torch.hstack(y)
+
+    def random_walks(
+        self,
+        *,
+        width=5,
+        length=10,
+        mode="classic",
+        start_state: Union[None, torch.Tensor, np.ndarray, list] = None,
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Generates random walks on this graph.
+
+        The following modes of random walk generation are supported:
+
+          * "classic" - random walk is a path in this graph starting from `start_state`, where on each step the next
+            edge is chosen randomly with equal probability. We generate `width` such random walks independently.
+            The output will have exactly ``width*length`` states.
+            i-th random walk can be extracted as: ``[x[i+j*width] for j in range(length)]``.
+            ``y[i]`` is equal to number of random steps it took to get to state ``x[i]``.
+            Note that in this mode a lot of states will have overestimated distance (meaning ``y[i]`` may be larger than
+            the length of the shortest path from ``x[i]`` to `start_state`).
+            The same state may appear multiple times with different distance in ``y``.
+          * "bfs" - we perform Breadth First Search starting from ``start_state`` with one modification: if size of
+            next layer is larger than ``width``, only ``width`` states (chosen randomly) will be kept.
+            We also remove states from current layer if they appeared on some previous layer (so this also can be
+            called "non-backtracking random walk").
+            All states in the output are unique. ``y`` still can be overestimated, but it will be closer to the true
+            distance than in "classic" mode. Size of output is ``<= width*length``.
+            If ``width`` and ``length`` are large enough (``width`` at least as large as largest BFS layer, and
+            ``length >= diameter``), this will return all states and true distances to the start state.
+
+        :param width: Number of random walks to generate.
+        :param length: Length of each random walk.
+        :param start_state: State from which to start random walk. Defaults to the central state.
+        :param mode: Type of random walk (see above). Defaults to "classic".
+        :return: Pair of tensors ``x, y``. ``x`` contains states. ``y[i]`` is the estimated distance from start state
+          to state ``x[i]``.
+        """
+        start_state = self.encode_states(start_state or self.central_state)
+        if mode == "classic":
+            return self._random_walks_classic(width, length, start_state)
+        elif mode == "bfs":
+            return self._random_walks_bfs(width, length, start_state)
+        else:
+            raise ValueError("Unknown mode:", mode)
+
+    def beam_search(
+        self,
+        *,
+        start_state: Union[torch.Tensor, np.ndarray, list],
+        predictor: Optional[Predictor] = None,
+        beam_width=1000,
+        max_iterations=1000,
+        return_path=False,
+    ) -> BeamSearchResult:
+        """Tries to find a path from `start_state` to central state using Beam Search algorithm.
+
+        :param start_state: State from which to star search.
+        :param predictor: A heuristic that estimates scores for states (lower score = closer to center).
+          Defaults to Hamming distance heuristic.
+        :param beam_width: Width of the beam (how many "best" states we consider at each step".
+        :param max_iterations: Maximum number of iterations before giving up.
+        :param return_path: Whether to return parth (consumes much more memory if True).
+        :return: BeamSearchResult containing found path length and 9optionally) the path itself.
+        """
+        if predictor is None:
+            predictor = Predictor(self, "hamming")
+        start_states = self.encode_states(start_state)
+        layer1, layer1_hashes, _ = self.get_unique_states(start_states)
+        all_layers_hashes = [layer1_hashes]
+        debug_scores = {}  # type: dict[int, float]
+
+        if self.central_state_hash[0] == layer1_hashes[0]:
+            # Start state is the central state.
+            return BeamSearchResult(True, 0, [], debug_scores, self.definition)
+
+        for i in range(max_iterations):
+            # Create states on the next layer.
+            layer2, layer2_hashes, _ = self.get_unique_states(self.get_neighbors(layer1))
+
+            if bool(isin_via_searchsorted(self.central_state_hash, layer2_hashes)):
+                # Path found.
+                path = None
+                if return_path:
+                    path = self._restore_beam_search_path(all_layers_hashes)
+                return BeamSearchResult(True, i + 1, path, debug_scores, self.definition)
+
+            # Pick `beam_width` states with lowest scores.
+            if len(layer2) >= beam_width:
+                scores = predictor(self.decode_states(layer2))
+                idx = torch.argsort(scores)[:beam_width]
+                layer2 = layer2[idx, :]
+                layer2_hashes = layer2_hashes[idx]
+                best_score = float(scores[idx[0]])
+                debug_scores[i] = best_score
+                if self.verbose >= 2:
+                    print(f"Iteration {i}, best score {best_score}.")
+
+            layer1 = layer2
+            layer1_hashes = layer2_hashes
+            if return_path:
+                all_layers_hashes.append(layer1_hashes)
+
+        # Path not found.
+        return BeamSearchResult(False, 0, None, debug_scores, self.definition)
+
+    def _restore_beam_search_path(self, hashes: list[torch.Tensor]) -> list[int]:
+        """Restores path found by the Beam Search algorithm."""
+        inv_graph = CayleyGraph(self.definition.with_inverted_generators())
+        assert len(hashes[0]) == 1
+        path = []  # type: list[int]
+        cur_state = self.decode_states(self.encode_states(self.central_state))
+
+        for i in range(len(hashes) - 1, -1, -1):
+            # Find hash in hashes[i] from which we could go to cur_state.
+            # Corresponding state will be new_cur_state.
+            # The generator index in inv_graph that moves cur_state->new_cur_state is the same as generator index
+            # in this graph that moves new_cur_state->cur_state - this is what we append to the answer.
+            candidates = inv_graph.get_neighbors_decoded(cur_state)
+            candidates_hashes = self.hasher.make_hashes(self.encode_states(candidates))
+            mask = torch.isin(candidates_hashes, hashes[i])
+            assert torch.any(mask), "Not found any neighbor on previous layer."
+            gen_id = int(mask.nonzero()[0].item())
+            path.append(gen_id)
+            cur_state = candidates[gen_id : gen_id + 1, :]
+        return path[::-1]
 
     def to_networkx_graph(self):
         return self.bfs(

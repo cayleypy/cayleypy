@@ -5,8 +5,8 @@ import math
 from .cayley_graph import CayleyGraph
 from .cayley_graph_def import CayleyGraphDef
 from .datasets import load_dataset
-from .graphs_lib import prepare_graph, PermutationGroups, MatrixGroups
-from .puzzles import rubik_cube, globe_puzzle
+from .graphs_lib import PermutationGroups, MatrixGroups
+from .puzzles.puzzles import Puzzles
 
 
 def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int], max_layer_size=1000):
@@ -133,13 +133,20 @@ def test_cyclic_coxeter_cayley_growth():
         _verify_layers_fast(PermutationGroups.cyclic_coxeter(n), layer_sizes)
 
 
+def test_rapaport_m2_cayley_growth():
+    for key, layer_sizes in load_dataset("rapaport_m2_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        _verify_layers_fast(PermutationGroups.rapaport_m2(n), layer_sizes)
+
+
 def test_hungarian_rings_growth():
     for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
         n = int(key)
         assert n % 2 == 0
         ring_size = (n + 2) // 2
         assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
-        _verify_layers_fast(prepare_graph("hungarian_rings", n=n), layer_sizes)
+        _verify_layers_fast(Puzzles.hungarian_rings(n), layer_sizes)
 
 
 def test_heisenberg_growth():
@@ -151,17 +158,17 @@ def test_heisenberg_growth():
 
 def test_puzzles_growth():
     data = load_dataset("puzzles_growth")
-    _verify_layers_fast(prepare_graph("cube_2/2/2_9gensHTM"), data["cube_222_htm"])
-    _verify_layers_fast(prepare_graph("cube_2/2/2_6gensQTM"), data["cube_222_qtm"])
-    _verify_layers_fast(prepare_graph("cube_3/3/3_18gensHTM"), data["cube_333_htm"])
-    _verify_layers_fast(prepare_graph("cube_3/3/3_12gensQTM"), data["cube_333_qtm"])
-    _verify_layers_fast(rubik_cube(2, metric="QSTM"), data["cube_222_qstm"])
-    _verify_layers_fast(prepare_graph("mini_pyramorphix"), data["mini_pyramorphix"])
-    _verify_layers_fast(prepare_graph("pyraminx"), data["pyraminx"])
-    _verify_layers_fast(prepare_graph("starminx"), data["starminx"])
+    _verify_layers_fast(Puzzles.rubik_cube(2, metric="HTM"), data["cube_222_htm"])
+    _verify_layers_fast(Puzzles.rubik_cube(2, metric="QTM"), data["cube_222_qtm"])
+    _verify_layers_fast(Puzzles.rubik_cube(3, metric="HTM"), data["cube_333_htm"])
+    _verify_layers_fast(Puzzles.rubik_cube(3, metric="QTM"), data["cube_333_qtm"])
+    _verify_layers_fast(Puzzles.rubik_cube(2, metric="QSTM"), data["cube_222_qstm"])
+    _verify_layers_fast(Puzzles.mini_pyramorphix(), data["mini_pyramorphix"])
+    _verify_layers_fast(Puzzles.pyraminx(), data["pyraminx"])
+    _verify_layers_fast(Puzzles.starminx(), data["starminx"])
 
 
 def test_globes_growth():
     for key, layer_sizes in load_dataset("globes_growth").items():
         a, b = map(int, key.split(","))
-        _verify_layers_fast(globe_puzzle(a, b), layer_sizes)
+        _verify_layers_fast(Puzzles.globe_puzzle(a, b), layer_sizes)

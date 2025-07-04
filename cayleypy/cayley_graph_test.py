@@ -4,13 +4,14 @@ import numpy as np
 import pytest
 import torch
 
+from . import BeamSearchResult
 from .bfs_numpy import bfs_numpy
 from .cayley_graph import CayleyGraph
 from .cayley_graph_def import MatrixGenerator, CayleyGraphDef
 from .datasets import load_dataset
 from .graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 
-FAST_RUN = os.getenv("FAST") == "1"
+RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
 
 
@@ -237,8 +238,9 @@ def test_lrx_coset_growth():
         assert result.layer_sizes == expected_layer_sizes
 
 
-# To skip slower tests ike this, do `FAST=1 pytest`
-@pytest.mark.skipif(FAST_RUN, reason="slow test")
+# Skipped by default.
+# To run slow tests like this, do `RUN_SLOW_TESTS=1 pytest`
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_cube222_qtm():
     graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
     result = graph.bfs()
@@ -247,7 +249,7 @@ def test_cube222_qtm():
     assert result.layer_sizes == load_dataset("puzzles_growth")["cube_222_qtm"]
 
 
-@pytest.mark.skipif(FAST_RUN, reason="slow test")
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_cube222_htm():
     graph = CayleyGraph(prepare_graph("cube_2/2/2_9gensHTM"))
     result = graph.bfs()
@@ -340,7 +342,7 @@ def _state_to_str(state: torch.Tensor):
 
 def test_random_walks_single_walk():
     graph = CayleyGraph(PermutationGroups.lrx(5))
-    x, y = graph.random_walks(rw_num=1, rw_length=5)
+    x, y = graph.random_walks(width=1, length=5)
     assert x.shape == (5, 5)
     assert y.shape == (5,)
     assert _state_to_str(x[0]) == "01234"
@@ -350,7 +352,7 @@ def test_random_walks_single_walk():
 
 def test_random_walks_matrix_group():
     graph = CayleyGraph(MatrixGroups.heisenberg())
-    x, y = graph.random_walks(rw_num=20, rw_length=10)
+    x, y = graph.random_walks(width=20, length=10)
     assert x.shape == (200, 3, 3)
     assert y.shape == (200,)
     assert np.array_equal(y, [i for i in range(10) for _ in range(20)])
@@ -358,13 +360,109 @@ def test_random_walks_matrix_group():
 
 def test_random_walks_start_state():
     graph = CayleyGraph(PermutationGroups.lx(5))
-    x, y = graph.random_walks(rw_num=10, rw_length=5, start_state=[1, 0, 0, 0, 0])
+    x, y = graph.random_walks(width=10, length=5, start_state=[1, 0, 0, 0, 0])
     assert x.shape == (50, 5)
     assert y.shape == (50,)
     for i in range(10):
         assert _state_to_str(x[i]) == "10000"
     for i in range(10, 20):
         assert _state_to_str(x[i]) in ["01000", "00001"]
+
+
+def test_random_walks_bfs_small():
+    graph = CayleyGraph(PermutationGroups.lrx(4))
+    x, y = graph.random_walks(width=50, length=100, mode="bfs")
+    assert x.shape == (24, 4)
+    assert y.shape == (24,)
+    assert np.array_equal(y.cpu().numpy(), [0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6])
+
+
+def test_random_walks_bfs():
+    graph = CayleyGraph(PermutationGroups.lrx(20))
+    x, y = graph.random_walks(width=100, length=50, mode="bfs")
+    assert x.shape == (4485, 20)
+    assert y.shape == (4485,)
+    assert y[0] == 0
+    assert y[-1] == 49
+
+
+def test_random_walks_bfs_matrix_groups():
+    graph = CayleyGraph(MatrixGroups.heisenberg())
+    x, y = graph.random_walks(width=100, length=50, mode="bfs")
+    assert x.shape == (4635, 3, 3)
+    assert y.shape == (4635,)
+
+
+def _validate_beam_search_result(graph: CayleyGraph, start_state, bs_result: BeamSearchResult):
+    assert bs_result.path_found
+    assert bs_result.path is not None
+    path_result = graph.apply_path(start_state, bs_result.path).reshape((-1))
+    assert torch.equal(path_result, graph.central_state)
+
+
+def _scramble(graph: CayleyGraph, num_scrambles: int) -> torch.Tensor:
+    return graph.random_walks(width=1, length=num_scrambles + 1)[0][-1]
+
+
+def test_beam_search_lrx_few_steps():
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    result0 = graph.beam_search(start_state=[0, 1, 2, 3, 4])
+    assert result0.path_found
+    assert result0.path_length == 0
+
+    result1 = graph.beam_search(start_state=[1, 0, 2, 3, 4], return_path=True)
+    assert result1.path_found
+    assert result1.path_length == 1
+    assert result1.path == [2]
+    assert result1.get_path_as_string() == "X"
+
+    result2 = graph.beam_search(start_state=[4, 1, 0, 2, 3], return_path=True)
+    assert result2.path_found
+    assert result2.path_length == 2
+    assert result2.path == [0, 2]
+    assert result2.get_path_as_string() == "L∘X"
+
+
+def test_beam_search_lrx_n8_random():
+    n = 8
+    graph = CayleyGraph(PermutationGroups.lrx(n))
+    start_state = np.random.permutation(n)
+
+    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, return_path=True)
+    assert bs_result.path_length <= 28
+    _validate_beam_search_result(graph, start_state, bs_result)
+
+
+def test_beam_search_mini_pyramorphix():
+    graph = CayleyGraph(prepare_graph("mini_pyramorphix"))
+    start_state = _scramble(graph, 100)
+    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, return_path=True)
+    assert bs_result.path_length <= 5
+    _validate_beam_search_result(graph, start_state, bs_result)
+
+
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
+def test_beam_search_cube222():
+    graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
+    start_state = _scramble(graph, 100)
+    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, return_path=True)
+    assert bs_result.path_length <= 14
+    _validate_beam_search_result(graph, start_state, bs_result)
+
+
+def test_beam_search_not_found():
+    n = 50
+    graph = CayleyGraph(PermutationGroups.lrx(n))
+    start_state = np.random.permutation(n)
+    bs_result = graph.beam_search(start_state=start_state, beam_width=10, max_iterations=10)
+    assert not bs_result.path_found
+
+
+def test_beam_search_matrix_groups():
+    graph = CayleyGraph(MatrixGroups.heisenberg())
+    start_state = [[1, 2, 3], [0, 1, 1], [0, 0, 1]]
+    bs_result = graph.beam_search(start_state=start_state, return_path=True)
+    _validate_beam_search_result(graph, start_state, bs_result)
 
 
 # Below is the benchmark code. To run: `BENCHMARK=1 pytest . -k benchmark`

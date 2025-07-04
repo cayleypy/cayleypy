@@ -1,9 +1,6 @@
 import numpy as np
 
-from cayleypy import prepare_graph
-from cayleypy.cayley_graph import CayleyGraph
-from cayleypy.graphs_lib import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES, MEGAMINX_MOVES, PermutationGroups
-from cayleypy.permutation_utils import inverse_permutation, is_permutation
+from cayleypy.graphs_lib import PermutationGroups
 
 
 def test_lrx():
@@ -172,14 +169,6 @@ def test_signed_reversals():
     )
 
 
-def test_cube333():
-    graph = prepare_graph("cube_3/3/3_12gensQTM")
-    assert graph.n_generators == 12
-
-    graph = prepare_graph("cube_3/3/3_18gensHTM")
-    assert graph.n_generators == 18
-
-
 def test_cyclic_coxeter():
     graph = PermutationGroups.cyclic_coxeter(4)
     assert graph.n_generators == 4
@@ -189,57 +178,6 @@ def test_cyclic_coxeter():
     graph = PermutationGroups.cyclic_coxeter(3)
     assert graph.n_generators == 3
     assert np.array_equal(graph.generators, [[1, 0, 2], [0, 2, 1], [2, 1, 0]])
-
-
-def test_mini_pyramorphix():
-    graph = prepare_graph("mini_pyramorphix")
-    assert graph.n_generators == len(MINI_PYRAMORPHIX_ALLOWED_MOVES)
-    assert graph.generator_names == list(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
-    expected_generators = np.array([MINI_PYRAMORPHIX_ALLOWED_MOVES[k] for k in graph.generator_names])
-    assert np.array_equal(graph.generators, expected_generators)
-    for gen in graph.generators:
-        assert len(gen) == 24
-        assert is_permutation(gen)
-    identity = list(range(24))
-    assert any(gen != identity for gen in graph.generators)
-    for gen in graph.generators:
-        inverse = inverse_permutation(gen)
-        restored = [gen[i] for i in inverse]
-        assert restored == list(range(24))
-    assert set(graph.generator_names) == set(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
-
-
-def test_pyraminx():
-    perm_set_length = 36
-    graph = prepare_graph("pyraminx")
-    assert graph.n_generators == len(PYRAMINX_MOVES) * 2  # inverse generators are not listed in PYRAMINX_MOVES
-
-    graph_gens = dict(zip(graph.generator_names, graph.generators))
-    gen_names = list(PYRAMINX_MOVES.keys())
-    gen_names += [x + "_inv" for x in PYRAMINX_MOVES]
-
-    for gen_name, gen in PYRAMINX_MOVES.items():
-        assert np.all(graph_gens[gen_name] == gen)
-        assert np.all(graph_gens[gen_name + "_inv"] == inverse_permutation(gen))
-        assert len(gen) == perm_set_length
-
-
-def test_megaminx():
-    perm_set_length = 120
-    graph = prepare_graph("megaminx")
-    assert graph.n_generators == len(MEGAMINX_MOVES) * 2  # inverse generators are not listed in MEGAMINX_MOVES
-
-    graph_gens = dict(zip(graph.generator_names, graph.generators))
-    gen_names = list(MEGAMINX_MOVES.keys())
-    gen_names += [x + "_inv" for x in MEGAMINX_MOVES]
-
-    for gen_name, gen in MEGAMINX_MOVES.items():
-        assert np.all(graph_gens[gen_name] == gen)
-        assert np.all(graph_gens[gen_name + "_inv"] == inverse_permutation(gen))
-        assert len(gen) == perm_set_length
-
-    graph = CayleyGraph(graph, device="cpu")
-    assert graph.bfs(max_diameter=4).layer_sizes == [1, 24, 408, 6208, 90144]
 
 
 def test_three_cycles():
@@ -270,3 +208,10 @@ def test_derangements():
     assert PermutationGroups.derangements(3).generators == [[1, 2, 0], [2, 0, 1]]
     assert len(PermutationGroups.derangements(4).generators) == 9
     assert len(PermutationGroups.derangements(5).generators) == 44
+
+
+def test_rapaport_m2():
+    graph_n5 = PermutationGroups.rapaport_m2(5)
+    assert graph_n5.generators == [[1, 0, 2, 3, 4], [1, 0, 3, 2, 4], [0, 2, 1, 4, 3]]
+    graph_n6 = PermutationGroups.rapaport_m2(6)
+    assert graph_n6.generators == [[1, 0, 2, 3, 4, 5], [1, 0, 3, 2, 5, 4], [0, 2, 1, 4, 3, 5]]

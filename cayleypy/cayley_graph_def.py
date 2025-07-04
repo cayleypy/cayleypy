@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from enum import Enum
 from functools import cached_property
-from typing import Optional, Union
+from typing import Optional, Union, Any
 
 import numpy as np
 import torch
@@ -77,6 +77,19 @@ class MatrixGenerator:
             ans %= self.modulo
         return ans
 
+    @cached_property
+    def inv(self):
+        """Inverse of this matrix. Throws error if matrix is not invertible."""
+        # TODO: implement modular inverse, if needed.
+        matrix_inv = np.array(np.linalg.inv(self.matrix), dtype=np.int64)
+        assert np.array_equal(self.apply(matrix_inv), np.eye(self.n)), "Matrix is not invertible."
+        return MatrixGenerator.create(matrix_inv, self.modulo)
+
+    def __eq__(self, other: Any) -> bool:
+        if not isinstance(other, MatrixGenerator):
+            return False
+        return self.modulo == other.modulo and np.array_equal(self.matrix, other.matrix)
+
 
 @dataclass(frozen=True)
 class CayleyGraphDef:
@@ -134,7 +147,7 @@ class CayleyGraphDef:
         *,
         generators: list[MatrixGenerator],
         generator_names: Optional[list[str]] = None,
-        central_state: Union[np.ndarray, list[list[int]], None] = None,
+        central_state: Union[np.ndarray, list[list[int]], list[int], None] = None,
     ):
         """Creates Cayley Graph definition (when generators are matrices).
 
@@ -147,12 +160,9 @@ class CayleyGraphDef:
         if central_state is None:
             # By default, central element is the identity matrix.
             central_state = np.eye(generators[0].n, dtype=np.int64)
-        else:
-            central_state = np.array(central_state)
-            assert len(central_state.shape) == 2, "Central state must be a matrix."
-            n = generators[0].n
-            assert central_state.shape[0] == n, f"Central state must have shape {n}*m."
         central_state_list = CayleyGraphDef.normalize_central_state(central_state)
+        n = generators[0].n
+        assert len(central_state) % n == 0, "Wrong size of central state."
         return CayleyGraphDef(GeneratorType.MATRIX, [], generators, generator_names, central_state_list)
 
     def __post_init__(self):
@@ -197,6 +207,7 @@ class CayleyGraphDef:
             generators_set = set(tuple(perm) for perm in self.generators_permutations)
             return all(tuple(inverse_permutation(p)) in generators_set for p in self.generators_permutations)
         else:
+            assert self.generators_type == GeneratorType.MATRIX
             return all(any(g1.is_inverse_to(g2) for g2 in self.generators_matrices) for g1 in self.generators_matrices)
 
     @cached_property
@@ -205,13 +216,18 @@ class CayleyGraphDef:
         if self.generators_type == GeneratorType.PERMUTATION:
             return (self.state_size,)
         else:
+            assert self.generators_type == GeneratorType.MATRIX
             n = self.generators_matrices[0].n
             m = self.state_size // n
             assert self.state_size == n * m
             return n, m
 
     @staticmethod
-    def normalize_central_state(central_state: Union[list[int], torch.Tensor, np.ndarray, str]) -> list[int]:
+    def normalize_central_state(
+        central_state: Union[list[int], list[list[int]], torch.Tensor, np.ndarray, str],
+    ) -> list[int]:
+        if isinstance(central_state, list):
+            central_state = np.array(central_state)
         if hasattr(central_state, "reshape"):
             central_state = central_state.reshape((-1,))  # Flatten.
         return [int(x) for x in central_state]
@@ -232,3 +248,20 @@ class CayleyGraphDef:
     def is_matrix_group(self):
         """Whether generators in this graph are matrices."""
         return self.generators_type == GeneratorType.MATRIX
+
+    def with_inverted_generators(self) -> "CayleyGraphDef":
+        """Returns the same graph where generators are replaced with inverses (in the same order).
+
+        This is needed for restoring path in the Beam Search algorithm.
+        """
+        if self.generators_type == GeneratorType.PERMUTATION:
+            return CayleyGraphDef.create(
+                generators=[inverse_permutation(p) for p in self.generators_permutations],
+                central_state=self.central_state,
+            )
+        else:
+            assert self.generators_type == GeneratorType.MATRIX
+            return CayleyGraphDef.for_matrix_group(
+                generators=[m.inv for m in self.generators_matrices],
+                central_state=self.central_state,
+            )

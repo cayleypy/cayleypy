@@ -1,10 +1,10 @@
 import numpy as np
 
-from cayleypy.puzzles import rubik_cube
+from .puzzles import Puzzles
 
 
 def test_cube_222_qstm():
-    graph = rubik_cube(2, metric="QSTM")
+    graph = Puzzles.rubik_cube(2, metric="QSTM")
     assert graph.n_generators == 12
     exp_names = ["f0", "f0_inv", "f1", "f1_inv", "r0", "r0_inv", "r1", "r1_inv", "d0", "d0_inv", "d1", "d1_inv"]
     assert graph.generator_names == exp_names
@@ -25,3 +25,23 @@ def test_cube_222_qstm():
             [2, 0, 3, 1, 8, 9, 6, 7, 12, 13, 10, 11, 16, 17, 14, 15, 4, 5, 18, 19, 20, 21, 22, 23],
         ],
     )
+
+
+def test_cube_222_qtm():
+    graph = Puzzles.rubik_cube(2, metric="QTM")
+    assert graph.n_generators == 6
+
+
+def test_cube_222_htm():
+    graph = Puzzles.rubik_cube(2, metric="HTM")
+    assert graph.n_generators == 9
+
+
+def test_cube_333_qtm():
+    graph = Puzzles.rubik_cube(3, metric="QTM")
+    assert graph.n_generators == 12
+
+
+def test_cube_333_htm():
+    graph = Puzzles.rubik_cube(3, metric="HTM")
+    assert graph.n_generators == 18
