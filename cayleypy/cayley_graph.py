@@ -456,6 +456,7 @@ class CayleyGraph:
         start_states = self.encode_states(start_state)
         layer1, layer1_hashes, _ = self.get_unique_states(start_states)
         all_layers_hashes = [layer1_hashes]
+        debug_scores = dict()  # type: dict[int, float]
 
         for i in range(max_iterations):
             if bool(isin_via_searchsorted(self.central_state_hash, layer1_hashes)):
@@ -463,7 +464,7 @@ class CayleyGraph:
                 path = None
                 if return_path:
                     path = self._restore_beam_search_path(all_layers_hashes)
-                return BeamSearchResult(True, i, path, self.definition)
+                return BeamSearchResult(True, i, path, debug_scores, self.definition)
 
             # Create states on the next layer.
             layer2, layer2_hashes, _ = self.get_unique_states(self.get_neighbors(layer1))
@@ -474,8 +475,9 @@ class CayleyGraph:
                 idx = torch.argsort(scores)[:beam_width]
                 layer2 = layer2[idx, :]
                 layer2_hashes = layer2_hashes[idx]
+                best_score = float(scores[idx[0]])
+                debug_scores[i] = best_score
                 if self.verbose >= 2:
-                    best_score = scores[idx[0]]
                     print(f"Iteration {i}, best score {best_score}.")
 
             layer1 = layer2
@@ -484,7 +486,7 @@ class CayleyGraph:
                 all_layers_hashes.append(layer1_hashes)
 
         # Path not found.
-        return BeamSearchResult(False, 0, None, self.definition)
+        return BeamSearchResult(False, 0, None, debug_scores, self.definition)
 
     def _restore_beam_search_path(self, hashes: list[torch.Tensor]) -> list[int]:
         """Restores path found by the Beam Search algorithm."""

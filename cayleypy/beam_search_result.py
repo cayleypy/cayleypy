@@ -10,6 +10,7 @@ class BeamSearchResult:
     path_found: bool  # Whether full graph was explored.
     path_length: int  # Distance of found path from start state to central state.
     path: Optional[list[int]]  # Path from start state to central state (edges are generator indexes), if requested.
+    debug_scores: dict[int, float]  # Scores achieved on each step.
     graph: CayleyGraphDef  # Definition of graph on which beam search was run.
 
     def __post_init__(self):
