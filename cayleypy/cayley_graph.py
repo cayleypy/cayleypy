@@ -456,7 +456,7 @@ class CayleyGraph:
         start_states = self.encode_states(start_state)
         layer1, layer1_hashes, _ = self.get_unique_states(start_states)
         all_layers_hashes = [layer1_hashes]
-        debug_scores = dict()  # type: dict[int, float]
+        debug_scores = {}  # type: dict[int, float]
 
         for i in range(max_iterations):
             if bool(isin_via_searchsorted(self.central_state_hash, layer1_hashes)):

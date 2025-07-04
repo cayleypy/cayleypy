@@ -12,7 +12,7 @@ class TorchHashSet:
     """A set of int64 numbers, backed by one or more sorted tensors."""
 
     def __init__(self):
-        self.data = []  # type: list[torch.Tensor]
+        self.data = []
 
     def add_sorted_hashes(self, sorted_numbers: torch.Tensor):
         """IMPORTANT: Assumes that new numbers are sorted and do not appear in the set before."""
