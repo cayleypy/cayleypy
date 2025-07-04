@@ -272,10 +272,7 @@ class CayleyGraph:
                     layer2_hashes_batches.append(layer2_hashes_batch)
                 layer2_hashes = torch.hstack(layer2_hashes_batches)
                 layer2_hashes, _ = torch.sort(layer2_hashes)
-                if self.hasher.is_identity:
-                    layer2 = layer2_hashes.reshape((-1, 1))
-                else:
-                    layer2 = torch.vstack(layer2_batches)
+                layer2 = layer2_hashes.reshape((-1, 1)) if self.hasher.is_identity else torch.vstack(layer2_batches)
             else:
                 layer1_neighbors = self.get_neighbors(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
