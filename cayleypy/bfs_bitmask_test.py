@@ -7,6 +7,12 @@ from cayleypy import load_dataset, bfs_bitmask, CayleyGraph, PermutationGroups
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 
 
+def test_bfs_bitmask_lx9():
+    graph = CayleyGraph(PermutationGroups.lx(9))
+    result = bfs_bitmask(graph)
+    assert result == load_dataset("lx_cayley_growth")["9"]
+
+
 def test_bfs_bitmask_lrx_10_first_5_layers():
     graph = CayleyGraph(PermutationGroups.lrx(10))
     result = bfs_bitmask(graph, max_diameter=5)
