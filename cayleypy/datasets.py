@@ -105,14 +105,6 @@ def _compute_coxeter_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.coxeter(int(n))).bfs().layer_sizes
 
 
-def _compute_mini_pyramorphix_cayley_growth(_: str) -> list[int]:
-    return CayleyGraph(prepare_graph("mini_pyramorphix")).bfs().layer_sizes
-
-
-def _compute_pyraminx_cayley_growth(max_diam: str) -> list[int]:
-    return CayleyGraph(prepare_graph("pyraminx")).bfs(max_diameter=int(max_diam)).layer_sizes
-
-
 def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.cyclic_coxeter(int(n))).bfs().layer_sizes
 
@@ -154,7 +146,6 @@ def generate_datasets():
     keys = [str(n) for n in range(1, 8)]
     _update_dataset("burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth)
     _update_dataset("signed_reversals_cayley_growth", keys, _compute_signed_reversals_cayley_growth)
-    _update_dataset("mini_pyramorphix_cayley_growth", ["24"], _compute_mini_pyramorphix_cayley_growth)
     keys = [str(n) for n in range(6, 14, 2)]
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
     keys = [str(n) for n in range(2, 51)]
