@@ -154,8 +154,7 @@ def test_bfs_batching_coxeter20():
     assert not graph.hasher.is_identity
     assert graph.string_encoder.encoded_length == 2
     result = graph.bfs(max_diameter=7)
-    assert result.layer_sizes == [1, 19, 189, 1310, 7105, 32110, 125761, 438407]
-    # assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
+    assert result.layer_sizes == load_dataset("coxeter_cayley_growth")["20"][:8]
 
 
 def test_bfs_batching_all_transpositions():
