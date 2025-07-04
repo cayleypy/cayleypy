@@ -3,6 +3,8 @@ import torch
 
 def isin_via_searchsorted(elements: torch.Tensor, test_elements_sorted: torch.Tensor):
     """Equivalent to torch.isin but faster."""
+    if len(test_elements_sorted) == 0:
+        return torch.zeros_like(elements, dtype=torch.bool)
     ts = torch.searchsorted(test_elements_sorted, elements)
     ts[ts >= len(test_elements_sorted)] = len(test_elements_sorted) - 1
     return test_elements_sorted[ts] == elements
