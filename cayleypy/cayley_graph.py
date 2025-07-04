@@ -244,32 +244,45 @@ class CayleyGraph:
         seen_states_hashes = [layer1_hashes]
 
         # Returns mask where 0s are at positions in `current_layer_hashes` that were seen previously.
-        def remove_seen_states(current_layer_hashes: torch.Tensor) -> torch.Tensor:
+        def _remove_seen_states(current_layer_hashes: torch.Tensor) -> torch.Tensor:
             ans = ~isin_via_searchsorted(current_layer_hashes, seen_states_hashes[-1])
             for h in seen_states_hashes[:-1]:
                 ans &= ~isin_via_searchsorted(current_layer_hashes, h)
             return ans
+
+        # Applies the same mask to states and hashes.
+        # If states and hashes are the same thing, it will not create a copy.
+        def _apply_mask(states, hashes, mask):
+            new_states = states[mask]
+            new_hashes = self.hasher.make_hashes(new_states) if self.hasher.is_identity else hashes[mask]
+            return new_states, new_hashes
 
         # BFS iteration: layer2 := neighbors(layer1)-layer0-layer1.
         for i in range(1, max_diameter + 1):
             if do_batching and len(layer1) > self.batch_size:
                 num_batches = int(math.ceil(layer1_hashes.shape[0] / self.batch_size))
                 layer2_batches = []  # type: list[torch.Tensor]
+                layer2_hashes_batches = []  # type: list[torch.Tensor]
                 for layer1_batch in layer1.tensor_split(num_batches, dim=0):
-                    layer2_batch = self.get_neighbors(layer1_batch).reshape((-1,))
-                    layer2_batch = torch.unique(layer2_batch, sorted=True)
-                    mask = remove_seen_states(layer2_batch)
-                    for other_batch in layer2_batches:
-                        mask &= ~isin_via_searchsorted(layer2_batch, other_batch)
-                    layer2_batch = layer2_batch[mask]
+                    layer2_batch = self.get_neighbors(layer1_batch)
+                    layer2_batch, layer2_hashes_batch, _ = self.get_unique_states(layer2_batch)
+                    mask = _remove_seen_states(layer2_hashes_batch)
+                    for other_batch_hashes in layer2_hashes_batches:
+                        mask &= ~isin_via_searchsorted(layer2_hashes_batch, other_batch_hashes)
+                    layer2_batch, layer2_hashes_batch = _apply_mask(layer2_batch, layer2_hashes_batch, mask)
                     if len(layer2_batch) > 0:
                         layer2_batches.append(layer2_batch)
+                        layer2_hashes_batches.append(layer2_hashes_batch)
                 if len(layer2_batches) == 0:
                     layer2_hashes = torch.empty((0,))
+                    layer2 = torch.empty((0, 0))
                 else:
-                    layer2_hashes = torch.hstack(layer2_batches)
-                    layer2_hashes, _ = torch.sort(layer2_hashes)
-                layer2 = layer2_hashes.reshape((-1, 1))
+                    layer2_hashes = torch.hstack(layer2_hashes_batches)
+                    layer2_hashes, idx = torch.sort(layer2_hashes)
+                    if self.hasher.is_identity:
+                        layer2 = layer2_hashes.reshape((-1, 1))
+                    else:
+                        layer2 = torch.hstack(layer2_batches)[idx]
             else:
                 layer1_neighbors = self.get_neighbors(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
@@ -278,9 +291,8 @@ class CayleyGraph:
                     edges_list_ends.append(layer1_neighbors_hashes)
 
                 layer2, layer2_hashes, _ = self.get_unique_states(layer1_neighbors, hashes=layer1_neighbors_hashes)
-                mask = remove_seen_states(layer2_hashes)
-                layer2 = layer2[mask]
-                layer2_hashes = self.hasher.make_hashes(layer2) if self.hasher.is_identity else layer2_hashes[mask]
+                mask = _remove_seen_states(layer2_hashes)
+                layer2, layer2_hashes = _apply_mask(layer2, layer2_hashes, mask)
 
             if layer2.shape[0] * layer2.shape[1] * 8 > 0.1 * self.memory_limit_bytes:
                 self.free_memory()
