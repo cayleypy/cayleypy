@@ -8,26 +8,12 @@ from warnings import warn
 from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
 from .hungarian_rings import hungarian_rings_generators
 from .permutation_utils import (
-    compose_permutations,
     transposition,
     permutation_from_cycles as pfc,
     inverse_permutation,
 )
+from .puzzles.puzzles import Puzzles
 
-CUBE222_MOVES = {
-    "f0": pfc(24, [[2, 19, 21, 8], [3, 17, 20, 10], [4, 6, 7, 5]]),
-    "r1": pfc(24, [[1, 5, 21, 14], [3, 7, 23, 12], [8, 10, 11, 9]]),
-    "d0": pfc(24, [[6, 18, 14, 10], [7, 19, 15, 11], [20, 22, 23, 21]]),
-}
-
-CUBE333_MOVES = {
-    "U": pfc(54, [[0, 6, 8, 2], [1, 3, 7, 5], [20, 47, 29, 38], [23, 50, 32, 41], [26, 53, 35, 44]]),
-    "D": pfc(54, [[9, 15, 17, 11], [10, 12, 16, 14], [18, 36, 27, 45], [21, 39, 30, 48], [24, 42, 33, 51]]),
-    "L": pfc(54, [[0, 44, 9, 45], [1, 43, 10, 46], [2, 42, 11, 47], [18, 24, 26, 20], [19, 21, 25, 23]]),
-    "R": pfc(54, [[6, 51, 15, 38], [7, 52, 16, 37], [8, 53, 17, 36], [27, 33, 35, 29], [28, 30, 34, 32]]),
-    "B": pfc(54, [[2, 35, 15, 18], [5, 34, 12, 19], [8, 33, 9, 20], [36, 42, 44, 38], [37, 39, 43, 41]]),
-    "F": pfc(54, [[0, 24, 17, 29], [3, 25, 14, 28], [6, 26, 11, 27], [45, 51, 53, 47], [46, 48, 52, 50]]),
-}
 
 MINI_PYRAMORPHIX_ALLOWED_MOVES = {
     "M_DF": [0, 1, 2, 3, 4, 5, 11, 9, 10, 7, 8, 6, 15, 16, 17, 12, 13, 14, 18, 19, 20, 21, 22, 23],
@@ -372,33 +358,13 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
     :return: requested graph as `CayleyGraphDef`.
     """
     if name == "cube_2/2/2_6gensQTM":
-        generators, generator_names = [], []
-        for move_id, perm in CUBE222_MOVES.items():
-            generators += [perm, inverse_permutation(perm)]
-            generator_names += [move_id, move_id + "'"]
-        central_state = [color for color in range(6) for _ in range(4)]
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.rubik_cube(2, "QTM")
     elif name == "cube_2/2/2_9gensHTM":
-        generators, generator_names = [], []
-        for move_id, perm in CUBE222_MOVES.items():
-            generators += [perm, inverse_permutation(perm), compose_permutations(perm, perm)]
-            generator_names += [move_id, move_id + "'", move_id + "^2"]
-        central_state = [color for color in range(6) for _ in range(4)]
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.rubik_cube(2, "HTM")
     elif name == "cube_3/3/3_12gensQTM":
-        generators, generator_names = [], []
-        for move_id, perm in CUBE333_MOVES.items():
-            generators += [perm, inverse_permutation(perm)]
-            generator_names += [move_id, move_id + "'"]
-        central_state = [color for color in range(6) for _ in range(9)]
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.rubik_cube(3, "QTM")
     elif name == "cube_3/3/3_18gensHTM":
-        generators, generator_names = [], []
-        for move_id, perm in CUBE333_MOVES.items():
-            generators += [perm, inverse_permutation(perm), compose_permutations(perm, perm)]
-            generator_names += [move_id, move_id + "'", move_id + "^2"]
-        central_state = [color for color in range(6) for _ in range(9)]
-        return CayleyGraphDef.create(generators, central_state=central_state, generator_names=generator_names)
+        return Puzzles.rubik_cube(3, "HTM")
     elif name == "mini_pyramorphix":
         generator_names = list(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
         generators = [MINI_PYRAMORPHIX_ALLOWED_MOVES[k] for k in generator_names]

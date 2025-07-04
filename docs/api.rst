@@ -23,6 +23,7 @@ Graphs library
 
     cayleypy.PermutationGroups
     cayleypy.MatrixGroups
+    cayleypy.Puzzles
 
 Beam search
 '''''''''''

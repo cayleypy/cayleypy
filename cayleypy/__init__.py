@@ -7,3 +7,4 @@ from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
 from .datasets import load_dataset
 from .graphs_lib import prepare_graph, PermutationGroups, MatrixGroups
 from .predictor import Predictor
+from .puzzles.puzzles import Puzzles

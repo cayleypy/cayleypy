@@ -6,7 +6,7 @@ from .cayley_graph import CayleyGraph
 from .cayley_graph_def import CayleyGraphDef
 from .datasets import load_dataset
 from .graphs_lib import prepare_graph, PermutationGroups, MatrixGroups
-from .puzzles import rubik_cube, globe_puzzle
+from .puzzles.puzzles import Puzzles
 
 
 def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int], max_layer_size=1000):
@@ -151,11 +151,11 @@ def test_heisenberg_growth():
 
 def test_puzzles_growth():
     data = load_dataset("puzzles_growth")
-    _verify_layers_fast(prepare_graph("cube_2/2/2_9gensHTM"), data["cube_222_htm"])
-    _verify_layers_fast(prepare_graph("cube_2/2/2_6gensQTM"), data["cube_222_qtm"])
-    _verify_layers_fast(prepare_graph("cube_3/3/3_18gensHTM"), data["cube_333_htm"])
-    _verify_layers_fast(prepare_graph("cube_3/3/3_12gensQTM"), data["cube_333_qtm"])
-    _verify_layers_fast(rubik_cube(2, metric="QSTM"), data["cube_222_qstm"])
+    _verify_layers_fast(Puzzles.rubik_cube(2, metric="HTM"), data["cube_222_htm"])
+    _verify_layers_fast(Puzzles.rubik_cube(2, metric="QTM"), data["cube_222_qtm"])
+    _verify_layers_fast(Puzzles.rubik_cube(3, metric="HTM"), data["cube_333_htm"])
+    _verify_layers_fast(Puzzles.rubik_cube(3, metric="QTM"), data["cube_333_qtm"])
+    _verify_layers_fast(Puzzles.rubik_cube(2, metric="QSTM"), data["cube_222_qstm"])
     _verify_layers_fast(prepare_graph("mini_pyramorphix"), data["mini_pyramorphix"])
     _verify_layers_fast(prepare_graph("pyraminx"), data["pyraminx"])
     _verify_layers_fast(prepare_graph("starminx"), data["starminx"])
@@ -164,4 +164,4 @@ def test_puzzles_growth():
 def test_globes_growth():
     for key, layer_sizes in load_dataset("globes_growth").items():
         a, b = map(int, key.split(","))
-        _verify_layers_fast(globe_puzzle(a, b), layer_sizes)
+        _verify_layers_fast(Puzzles.globe_puzzle(a, b), layer_sizes)
