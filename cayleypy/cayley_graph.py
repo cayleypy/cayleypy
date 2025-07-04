@@ -232,12 +232,9 @@ class CayleyGraph:
         all_layers_hashes = []
         max_layer_size_to_store = max_layer_size_to_store or 10**15
 
-        # When state fits in a single int64 and we don't need edges, we can apply more memory-efficient algorithm
-        # with batching. This algorithm finds neighbors in batches and removes duplicates from batches before
-        # stacking them.
-        do_batching = (
-            self.string_encoder is not None and self.string_encoder.encoded_length == 1 and not return_all_edges
-        )
+        # When we don't need edges, we can apply more memory-efficient algorithm with batching.
+        # This algorithm finds neighbors in batches and removes duplicates from batches before stacking them.
+        do_batching = not return_all_edges
 
         # Stores hashes of previous layers, so BFS does not visit already visited states again.
         # If generators are inverse closed, only 2 last layers are stored here.
@@ -282,7 +279,7 @@ class CayleyGraph:
                     if self.hasher.is_identity:
                         layer2 = layer2_hashes.reshape((-1, 1))
                     else:
-                        layer2 = torch.hstack(layer2_batches)[idx]
+                        layer2 = torch.vstack(layer2_batches)[idx]
             else:
                 layer1_neighbors = self.get_neighbors(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
@@ -335,7 +332,10 @@ class CayleyGraph:
         if return_all_hashes:
             vertices_hashes = torch.hstack(all_layers_hashes)
 
-        layers[len(layer_sizes) - 1] = self.decode_states(layer1)
+        # Always store the last layer.
+        last_layer_id = len(layer_sizes) - 1
+        if full_graph_explored and last_layer_id not in layers:
+            layers[last_layer_id] = self.decode_states(layer1)
 
         return BfsResult(
             layer_sizes=layer_sizes,

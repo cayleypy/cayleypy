@@ -147,6 +147,17 @@ def test_bfs_batching_lrx(batch_size: int):
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
+# Test that batching works when state doesn't fit in int64.
+def test_bfs_batching_coxeter20():
+    graph_def = PermutationGroups.coxeter(20)
+    graph = CayleyGraph(graph_def, batch_size=10000)
+    assert not graph.hasher.is_identity
+    assert graph.string_encoder.encoded_length == 2
+    result = graph.bfs(max_diameter=7)
+    assert result.layer_sizes == [1, 19, 189, 1310, 7105, 32110, 125761, 438407]
+    # assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
+
+
 def test_bfs_batching_all_transpositions():
     graph_def = PermutationGroups.all_transpositions(8)
     graph = CayleyGraph(graph_def, batch_size=2**10)
