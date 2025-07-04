@@ -139,7 +139,7 @@ def test_hungarian_rings_growth():
         assert n % 2 == 0
         ring_size = (n + 2) // 2
         assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
-        _verify_layers_fast(prepare_graph("hungarian_rings", n=n), layer_sizes)
+        _verify_layers_fast(Puzzles.hungarian_rings(n), layer_sizes)
 
 
 def test_heisenberg_growth():
