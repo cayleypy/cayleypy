@@ -58,8 +58,8 @@ class StateHasher:
 
     def _hash_combine(self, states: torch.Tensor) -> torch.Tensor:
         """Hash function inspired by boost::hash_combine."""
-        result = torch.zeros(len(states), dtype=torch.int64, device=states.device)
+        result = states[:, 0].clone()
         seed: int = 0x9E3779B97F4A7C15
-        for i in range(self.state_size):
+        for i in range(1, self.state_size):
             result ^= states[:, i] + seed + (result << 6) + (result >> 2)
         return result
