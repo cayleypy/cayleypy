@@ -124,6 +124,7 @@ def test_coxeter_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         _verify_layers_fast(PermutationGroups.coxeter(n), layer_sizes)
         assert len(layer_sizes) - 1 == n * (n - 1) // 2
+        assert layer_sizes == layer_sizes[::-1]  # Growth function is a palindrome.
 
 
 def test_cyclic_coxeter_cayley_growth():
