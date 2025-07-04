@@ -156,9 +156,9 @@ def test_puzzles_growth():
     _verify_layers_fast(Puzzles.rubik_cube(3, metric="HTM"), data["cube_333_htm"])
     _verify_layers_fast(Puzzles.rubik_cube(3, metric="QTM"), data["cube_333_qtm"])
     _verify_layers_fast(Puzzles.rubik_cube(2, metric="QSTM"), data["cube_222_qstm"])
-    _verify_layers_fast(prepare_graph("mini_pyramorphix"), data["mini_pyramorphix"])
-    _verify_layers_fast(prepare_graph("pyraminx"), data["pyraminx"])
-    _verify_layers_fast(prepare_graph("starminx"), data["starminx"])
+    _verify_layers_fast(Puzzles.mini_pyramorphix(), data["mini_pyramorphix"])
+    _verify_layers_fast(Puzzles.pyraminx(), data["pyraminx"])
+    _verify_layers_fast(Puzzles.starminx(), data["starminx"])
 
 
 def test_globes_growth():
