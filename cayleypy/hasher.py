@@ -45,11 +45,6 @@ class StateHasher:
             -MAX_INT, MAX_INT, size=(self.state_size, 1), device=graph.device, dtype=torch.int64
         )
 
-        # Dot product is not safe for bit-encoded states, it has high probability of collisions.
-        if graph.string_encoder is not None:
-            self.make_hashes = self._hash_splitmix64
-            return
-
         try:
             trial_states = torch.zeros((2, self.state_size), device=graph.device, dtype=torch.int64)
             _ = self._make_hashes_cpu_and_modern_gpu(trial_states)
