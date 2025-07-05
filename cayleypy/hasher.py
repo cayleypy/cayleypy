@@ -7,7 +7,7 @@ import torch
 if TYPE_CHECKING:
     from cayleypy import CayleyGraph
 
-MAX_INT = 2**63
+MAX_INT = 2**62
 
 
 def _splitmix64(x: torch.Tensor) -> torch.Tensor:
