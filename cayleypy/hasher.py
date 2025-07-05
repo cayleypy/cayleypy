@@ -1,10 +1,22 @@
 import math
+import random
 from typing import Callable, Optional, TYPE_CHECKING
 
 import torch
 
 if TYPE_CHECKING:
     from cayleypy import CayleyGraph
+
+MAX_INT = 2**63
+
+
+def _splitmix64(x: torch.Tensor) -> torch.Tensor:
+    x = x ^ (x >> 30)
+    x = x * 0xBF58476D1CE4E5B9
+    x = x ^ (x >> 27)
+    x = x * 0x94D049BB133111EB
+    x = x ^ (x >> 31)
+    return x
 
 
 class StateHasher:
@@ -21,17 +33,16 @@ class StateHasher:
             return
 
         self.is_identity = False
+        self.seed = random_seed or random.randint(-MAX_INT, MAX_INT)
 
         # Dot product is not safe for bit-encoded states, it has high probability of collisions.
         if graph.string_encoder is not None:
-            self.make_hashes = self._hash_combine
+            self.make_hashes = self._hash_splitmix64
             return
 
-        if random_seed is not None:
-            torch.manual_seed(random_seed)
-        max_int = int((2**62))
+        torch.manual_seed(self.seed)
         self.vec_hasher = torch.randint(
-            -max_int, max_int + 1, size=(self.state_size, 1), device=graph.device, dtype=torch.int64
+            -MAX_INT, MAX_INT, size=(self.state_size, 1), device=graph.device, dtype=torch.int64
         )
 
         try:
@@ -56,10 +67,10 @@ class StateHasher:
             parts = int(math.ceil(states.shape[0] / self.chunk_size))
             return torch.hstack([torch.sum(z * self.vec_hasher, dim=1) for z in torch.tensor_split(states, parts)])
 
-    def _hash_combine(self, states: torch.Tensor) -> torch.Tensor:
-        """Hash function inspired by boost::hash_combine."""
-        result = states[:, 0].clone()
-        seed: int = 0x9E3779B97F4A7C15
-        for i in range(1, self.state_size):
-            result ^= states[:, i] + seed + (result << 6) + (result >> 2)
-        return result
+    def _hash_splitmix64(self, x: torch.Tensor) -> torch.Tensor:
+        n, m = x.shape
+        h = torch.full((n,), self.seed, dtype=torch.int64, device=x.device)
+        for i in range(m):
+            h ^= _splitmix64(x[:, i])
+            h = h * 0x85EBCA6B
+        return h

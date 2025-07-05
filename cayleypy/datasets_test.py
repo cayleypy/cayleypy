@@ -1,12 +1,17 @@
 """Sanity checks for datasets."""
 
 import math
+import os
+
+import pytest
 
 from .cayley_graph import CayleyGraph
 from .cayley_graph_def import CayleyGraphDef
 from .datasets import load_dataset
 from .graphs_lib import PermutationGroups, MatrixGroups
 from .puzzles.puzzles import Puzzles
+
+RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 
 
 def _verify_layers_fast(graph_def: CayleyGraphDef, layer_sizes: list[int], max_layer_size=1000):
@@ -124,7 +129,14 @@ def test_coxeter_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         assert len(layer_sizes) - 1 == n * (n - 1) // 2
         assert layer_sizes == layer_sizes[::-1]  # Growth function is a palindrome.
-        _verify_layers_fast(PermutationGroups.coxeter(n), layer_sizes)
+
+
+# This test checks that the hash function is good when states are bit-encoded (and there are no collisions).
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
+def test_coxeter_cayley_growth_upto_200000():
+    for key, layer_sizes in load_dataset("coxeter_cayley_growth").items():
+        n = int(key)
+        _verify_layers_fast(PermutationGroups.coxeter(n), layer_sizes, max_layer_size=200000)
 
 
 def test_cyclic_coxeter_cayley_growth():
