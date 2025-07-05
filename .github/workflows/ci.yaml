@@ -61,9 +61,7 @@ jobs:
       - name: Install requirements
         run: pip install .[torch,test]
       - name: Run tests
-        run: |
-          set RUN_SLOW_TESTS=1 
-          pytest
+        run: pytest
   pytest-macos:
     name: Tests (MacOS)
     runs-on: macos-latest
