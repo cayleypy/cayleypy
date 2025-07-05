@@ -74,7 +74,9 @@ jobs:
       - name: Install requirements
         run: pip install .[torch,test]
       - name: Run tests
-        run: RUN_SLOW_TESTS=1 pytest
+        run: |
+          set RUN_SLOW_TESTS=1 
+          pytest
   build-docs:
     name: Build documentation
     runs-on: ubuntu-latest
