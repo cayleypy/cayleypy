@@ -146,6 +146,13 @@ def test_cyclic_coxeter_cayley_growth():
         _verify_layers_fast(PermutationGroups.cyclic_coxeter(n), layer_sizes)
 
 
+def test_rapaport_m1_cayley_growth():
+    for key, layer_sizes in load_dataset("rapaport_m1_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        _verify_layers_fast(PermutationGroups.rapaport_m1(n), layer_sizes)
+
+
 def test_rapaport_m2_cayley_growth():
     for key, layer_sizes in load_dataset("rapaport_m2_cayley_growth").items():
         n = int(key)

@@ -135,6 +135,10 @@ def _compute_heisenberg_growth(n: str) -> list[int]:
     return CayleyGraph(prepare_graph("heisenberg", n=int(n))).bfs().layer_sizes
 
 
+def _compute_rapaport_m1_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.rapaport_m1(int(n))).bfs().layer_sizes
+
+
 def _compute_rapaport_m2_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.rapaport_m2(int(n))).bfs().layer_sizes
 
@@ -160,6 +164,7 @@ def generate_datasets():
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
     _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
+    _update_dataset("rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth)
     _update_dataset("rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth)
     keys = [str(n) for n in range(1, 8)]
     _update_dataset("burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth)

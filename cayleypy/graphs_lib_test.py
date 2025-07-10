@@ -210,6 +210,15 @@ def test_derangements():
     assert len(PermutationGroups.derangements(5).generators) == 44
 
 
+def test_rapaport_m1():
+    graph_n4 = PermutationGroups.rapaport_m1(4)
+    assert graph_n4.generators == [[1, 0, 2, 3], [1, 0, 3, 2], [0, 2, 1, 3]]
+    graph_n5 = PermutationGroups.rapaport_m1(5)
+    assert graph_n5.generators == [[1, 0, 2, 3, 4], [1, 0, 3, 2, 4], [0, 2, 1, 3, 4], [0, 2, 1, 4, 3]]
+    graph_n6 = PermutationGroups.rapaport_m1(6)
+    assert graph_n6.generators == [[1, 0, 2, 3, 4, 5], [1, 0, 3, 2, 4, 5], [1, 0, 3, 2, 5, 4], [0, 2, 1, 3, 4, 5], [0, 2, 1, 4, 3, 5]]
+
+
 def test_rapaport_m2():
     graph_n5 = PermutationGroups.rapaport_m2(5)
     assert graph_n5.generators == [[1, 0, 2, 3, 4], [1, 0, 3, 2, 4], [0, 2, 1, 4, 3]]
