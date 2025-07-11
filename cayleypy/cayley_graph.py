@@ -543,7 +543,6 @@ class CayleyGraph:
             cur_layer = bfs_result.vertices_hashes[i : i + layer_size]
             i += layer_size
             if bool(isin_via_searchsorted(end_state_hash, cur_layer)):
-                print("HASH IS THERE i=", i)
                 return self._restore_path(layers_hashes, end_state)
             layers_hashes.append(cur_layer)
         return None
