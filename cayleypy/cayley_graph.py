@@ -529,9 +529,9 @@ class CayleyGraph:
     def find_path_to(
         self, end_state: Union[torch.Tensor, np.ndarray, list], bfs_result: BfsResult
     ) -> Optional[list[int]]:
-        """Finds path from `central_state` to `end_state` using pre-computed BfsResult.
+        """Finds path from central_state to end_state using pre-computed BfsResult.
 
-        :param end_state: State from which the path starts.
+        :param end_state: Final state of the path.
         :param bfs_result: Pre-computed BFS result (call `bfs(return_all_hashes=True)` to get this).
         :return: The found path (list of generator ids), or None if `end_state` is not reachable from `start_state`.
         """
@@ -550,7 +550,14 @@ class CayleyGraph:
     def find_path_from(
         self, start_state: Union[torch.Tensor, np.ndarray, list], bfs_result: BfsResult
     ) -> Optional[list[int]]:
-        """Finds path from `start_state` to `central_state` using pre-computed BfsResult."""
+        """Finds path from start_state to central_state using pre-computed BfsResult.
+
+        This is possible only for inverse-closed generators.
+
+        :param start_state: First state of the path.
+        :param bfs_result: Pre-computed BFS result (call `bfs(return_all_hashes=True)` to get this).
+        :return: The found path (list of generator ids), or None if central_state is not reachable from start_state.
+        """
         assert self.definition.generators_inverse_closed
         path_to = self.find_path_to(start_state, bfs_result)
         if path_to is None:
