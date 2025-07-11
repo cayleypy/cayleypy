@@ -202,7 +202,7 @@ class CayleyGraphDef:
 
     @cached_property
     def generators_reverse_map(self) -> Optional[list[int]]:
-        """Maps generators to their reverses, (or None if not inverse-closed)."""
+        """Maps generators to their reverses. Returns None if generators are not inverse-closed."""
         ans = []
         if self.generators_type == GeneratorType.PERMUTATION:
             generators_idx = {tuple(self.generators_permutations[i]): i for i in range(self.n_generators)}
