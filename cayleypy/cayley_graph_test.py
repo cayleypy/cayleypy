@@ -475,6 +475,18 @@ def test_beam_search_matrix_groups():
     _validate_beam_search_result(graph, start_state, bs_result)
 
 
+def test_path_to_from():
+    n = 8
+    graph = CayleyGraph(PermutationGroups.lrx(n))
+    br = graph.bfs(return_all_hashes=True)
+    for _ in range(5):
+        start_state = torch.tensor(np.random.permutation(n))
+        path1 = graph.find_path_from(start_state, br)
+        assert torch.equal(graph.apply_path(start_state, path1)[0], graph.central_state)
+        path2 = graph.find_path_to(start_state, br)
+        assert torch.equal(start_state, graph.apply_path(graph.central_state, path2)[0])
+
+
 # Below is the benchmark code. To run: `BENCHMARK=1 pytest . -k benchmark`
 @pytest.mark.skipif(not BENCHMARK_RUN, reason="benchmark")
 @pytest.mark.parametrize("benchmark_mode", ["baseline", "bit_encoded", "bfs_numpy"])
