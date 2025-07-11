@@ -497,7 +497,7 @@ class CayleyGraph:
         # Path not found.
         return BeamSearchResult(False, 0, None, debug_scores, self.definition)
 
-    def _restore_path(self, hashes: list[torch.Tensor], to_state: torch.Tensor) -> list[int]:
+    def _restore_path(self, hashes: list[torch.Tensor], to_state: Union[torch.Tensor, np.ndarray, list]) -> list[int]:
         """Restores path from layers hashes.
 
         Layers must be such that there is edge from state on previous layer to state on next layer.
@@ -538,7 +538,7 @@ class CayleyGraph:
         end_state_hash = self.hasher.make_hashes(self.encode_states(end_state))
         assert bfs_result.vertices_hashes is not None, "Run bfs with return_all_hashes=True."
         i = 0
-        layers_hashes = []
+        layers_hashes = []  # type: list[torch.Tensor]
         for layer_size in bfs_result.layer_sizes:
             cur_layer = bfs_result.vertices_hashes[i : i + layer_size]
             i += layer_size

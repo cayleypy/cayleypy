@@ -291,4 +291,5 @@ class CayleyGraphDef:
         """Given path A->B, returns path B->A. Only for inverse-closed generators."""
         assert self.generators_inverse_closed
         idx = self.generators_reverse_map
+        assert idx is not None
         return [idx[i] for i in path[::-1]]
