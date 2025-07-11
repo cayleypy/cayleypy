@@ -454,7 +454,7 @@ class CayleyGraph:
         :param beam_width: Width of the beam (how many "best" states we consider at each step".
         :param max_iterations: Maximum number of iterations before giving up.
         :param return_path: Whether to return parth (consumes much more memory if True).
-        :return: BeamSearchResult containing found path length and 9optionally) the path itself.
+        :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         if predictor is None:
             predictor = Predictor(self, "hamming")
@@ -475,7 +475,7 @@ class CayleyGraph:
                 # Path found.
                 path = None
                 if return_path:
-                    path = self._restore_beam_search_path(all_layers_hashes)
+                    path = self._restore_path(all_layers_hashes, self.central_state)
                 return BeamSearchResult(True, i + 1, path, debug_scores, self.definition)
 
             # Pick `beam_width` states with lowest scores.
@@ -497,12 +497,20 @@ class CayleyGraph:
         # Path not found.
         return BeamSearchResult(False, 0, None, debug_scores, self.definition)
 
-    def _restore_beam_search_path(self, hashes: list[torch.Tensor]) -> list[int]:
-        """Restores path found by the Beam Search algorithm."""
+    def _restore_path(self, hashes: list[torch.Tensor], to_state: torch.Tensor) -> list[int]:
+        """Restores path from layers hashes.
+
+        Layers must be such that there is edge from state on previous layer to state on next layer.
+        First layer in `hashes` must have exactly one state, this is the start of the path.
+        The end of the path is to_state.
+        Last layer in `hashes` must contain a state from which there is a transition to `to_state`.
+        `to_state` must be in "decoded" format.
+        Length of returned path is equal to number of layers.
+        """
         inv_graph = CayleyGraph(self.definition.with_inverted_generators())
         assert len(hashes[0]) == 1
         path = []  # type: list[int]
-        cur_state = self.decode_states(self.encode_states(self.central_state))
+        cur_state = self.decode_states(self.encode_states(to_state))
 
         for i in range(len(hashes) - 1, -1, -1):
             # Find hash in hashes[i] from which we could go to cur_state.
@@ -517,6 +525,38 @@ class CayleyGraph:
             path.append(gen_id)
             cur_state = candidates[gen_id : gen_id + 1, :]
         return path[::-1]
+
+    def find_path_to(
+        self, end_state: Union[torch.Tensor, np.ndarray, list], bfs_result: BfsResult
+    ) -> Optional[list[int]]:
+        """Finds path from `central_state` to `end_state` using pre-computed BfsResult.
+
+        :param end_state: State from which the path starts.
+        :param bfs_result: Pre-computed BFS result (call `bfs(return_all_hashes=True)` to get this).
+        :return: The found path (list of generator ids), or None if `end_state` is not reachable from `start_state`.
+        """
+        end_state_hash = self.hasher.make_hashes(self.encode_states(end_state))
+        assert bfs_result.vertices_hashes is not None, "Run bfs with return_all_hashes=True."
+        i = 0
+        layers_hashes = []
+        for layer_size in bfs_result.layer_sizes:
+            cur_layer = bfs_result.vertices_hashes[i : i + layer_size]
+            i += layer_size
+            if bool(isin_via_searchsorted(end_state_hash, cur_layer)):
+                print("HASH IS THERE i=", i)
+                return self._restore_path(layers_hashes, end_state)
+            layers_hashes.append(cur_layer)
+        return None
+
+    def find_path_from(
+        self, start_state: Union[torch.Tensor, np.ndarray, list], bfs_result: BfsResult
+    ) -> Optional[list[int]]:
+        """Finds path from `start_state` to `central_state` using pre-computed BfsResult."""
+        assert self.definition.generators_inverse_closed
+        path_to = self.find_path_to(start_state, bfs_result)
+        if path_to is None:
+            return None
+        return self.definition.revert_path(path_to)
 
     def to_networkx_graph(self):
         return self.bfs(

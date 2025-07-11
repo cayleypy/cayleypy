@@ -17,9 +17,9 @@ class BeamSearchResult:
         if self.path is not None:
             assert len(self.path) == self.path_length
 
-    def get_path_as_string(self, delimiter="∘"):
+    def get_path_as_string(self, delimiter="."):
         assert self.path is not None
-        return delimiter.join(self.graph.generator_names[i] for i in self.path)
+        return self.graph.path_to_string(self.path, delimiter)
 
     def __repr__(self):
         if not self.path_found:

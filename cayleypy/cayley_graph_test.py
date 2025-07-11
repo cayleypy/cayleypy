@@ -430,7 +430,7 @@ def test_beam_search_lrx_few_steps():
     assert result2.path_found
     assert result2.path_length == 2
     assert result2.path == [0, 2]
-    assert result2.get_path_as_string() == "L∘X"
+    assert result2.get_path_as_string() == "L.X"
 
 
 def test_beam_search_lrx_n8_random():
