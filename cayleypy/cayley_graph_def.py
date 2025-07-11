@@ -201,8 +201,8 @@ class CayleyGraphDef:
         return len(self.central_state)
 
     @cached_property
-    def generators_reverse_map(self) -> Optional[list[int]]:
-        """Maps generators to their reverses. Returns None if generators are not inverse-closed."""
+    def generators_inverse_map(self) -> Optional[list[int]]:
+        """Maps generators to their inverses. Returns None if generators are not inverse-closed."""
         ans = []
         if self.generators_type == GeneratorType.PERMUTATION:
             generators_idx = {tuple(self.generators_permutations[i]): i for i in range(self.n_generators)}
@@ -226,7 +226,7 @@ class CayleyGraphDef:
     @cached_property
     def generators_inverse_closed(self) -> bool:
         """Whether for each generator its inverse is also a generator."""
-        return self.generators_reverse_map is not None
+        return self.generators_inverse_map is not None
 
     @cached_property
     def decoded_state_shape(self) -> tuple[int, ...]:
@@ -289,7 +289,6 @@ class CayleyGraphDef:
 
     def revert_path(self, path: list[int]) -> list[int]:
         """Given path A->B, returns path B->A. Only for inverse-closed generators."""
-        assert self.generators_inverse_closed
-        idx = self.generators_reverse_map
-        assert idx is not None
+        idx = self.generators_inverse_map
+        assert idx is not None, "Cannot revert path because generators are not inverse closed."
         return [idx[i] for i in path[::-1]]
