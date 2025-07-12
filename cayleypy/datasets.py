@@ -10,6 +10,7 @@ from typing import Any, Callable
 from .cayley_graph import CayleyGraph
 from .graphs_lib import prepare_graph, PermutationGroups
 from .puzzles.hungarian_rings import get_group as get_hr_group
+from .puzzles.puzzles import Puzzles
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -130,7 +131,7 @@ def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
 
 def _compute_hungarian_rings_growth(key: str) -> list[int]:
     parameters = map(int, key.split(","))
-    return CayleyGraph(PermutationGroups.hungarian_rings(*parameters)).bfs().layer_sizes
+    return CayleyGraph(Puzzles.hungarian_rings(*parameters)).bfs().layer_sizes
 
 
 def _compute_heisenberg_growth(n: str) -> list[int]:

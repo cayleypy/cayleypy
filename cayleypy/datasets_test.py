@@ -10,7 +10,6 @@ from .cayley_graph_def import CayleyGraphDef
 from .datasets import load_dataset
 from .graphs_lib import PermutationGroups, MatrixGroups
 from .puzzles.puzzles import Puzzles
-from .puzzles.hungarian_rings import get_santa_parameters_from_n, hungarian_rings_generators
 
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 

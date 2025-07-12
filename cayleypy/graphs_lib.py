@@ -7,7 +7,7 @@ from itertools import permutations
 from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
 from .permutation_utils import transposition, permutation_from_cycles
 from .puzzles.puzzles import Puzzles
-from .puzzles.hungarian_rings import hungarian_rings_generators, get_santa_parameters_from_n
+from .puzzles.hungarian_rings import get_santa_parameters_from_n
 
 
 def _create_coxeter_generators(n: int) -> list[list[int]]:
@@ -307,12 +307,6 @@ class PermutationGroups:
 
         return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
-    @staticmethod
-    def hungarian_rings(left_size: int, left_index: int, right_size: int, right_index: int):
-        generators, generator_names = hungarian_rings_generators(left_size, left_index, right_size, right_index)
-        n = len(generators[0])
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
-
 
 def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
     """Returns pre-defined graph by codename.
@@ -335,7 +329,7 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
         return Puzzles.pyraminx()
     elif name == "hungarian_rings":
         hr_params = get_santa_parameters_from_n(n)
-        return PermutationGroups.hungarian_rings(*hr_params)
+        return Puzzles.hungarian_rings(*hr_params)
     elif name == "starminx":
         return Puzzles.starminx()
     elif name == "megaminx":
