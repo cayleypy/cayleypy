@@ -8,10 +8,11 @@ from .permutation_utils import inverse_permutation
 
 def bfs_numpy(graph: CayleyGraph, max_diameter: int = 1000000) -> list[int]:
     """Simple version of BFS (from destination_state) using numpy, optimized for memory usage."""
+    assert graph.definition.is_permutation_group(), "Only works for permutations."
     assert graph.definition.generators_inverse_closed, "Only supports undirected graph."
     assert graph.string_encoder is not None
     assert graph.string_encoder.encoded_length == 1, "Only works on states encoded by single int64."
-    perms = [list(x) for x in graph.generators]
+    perms = graph.definition.generators_permutations
     perm_funcs = [graph.string_encoder.implement_permutation_1d(p) for p in perms]
     pn = len(perms)
     start_state_tensor = graph.encode_states(graph.central_state).cpu().numpy().reshape(-1)

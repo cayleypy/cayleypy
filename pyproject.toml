@@ -1,3 +1,72 @@
+[build-system]
+build-backend = "setuptools.build_meta"
+requires = ["setuptools"]
+
+[project]
+# https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
+name = "cayleypy"
+version = "0.1.0"
+description = "Library for studying Cayley graphs and Schreier coset graphs"
+readme = "README.md"
+requires-python = ">=3.9"
+license = { file = "LICENSE" }
+authors = [{ name = "CayleyPy Foundation" }]
+
+# https://pypi.org/classifiers/
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "License :: OSI Approved :: MIT License",
+    "Topic :: Scientific/Engineering :: Mathematics",
+]
+
+# https://peps.python.org/pep-0508/
+dependencies = [
+    "h5py",
+    "numba",
+    "numpy",
+    "scipy",
+]
+
+# Development dependencies
+# pip install .[torch,lint,test,dev,docs]
+[project.optional-dependencies]
+torch = [
+    # torch is required, but it is optional here because if it's in dependencies,
+    # Kaggle would spend several minutes installing some dependencies, even though
+    # it has torch installed.
+    "torch"
+]
+lint = [
+    "black",
+    "mypy==1.15.0",
+    "pylint"
+]
+test = [
+    "pytest",
+    "pytest-benchmark",
+]
+dev = [
+    "coverage",
+    "networkx",
+    "setuptools",
+]
+docs = [
+    # Libraries needed to build documentation.
+    "sphinx",
+    "sphinx_rtd_theme",
+    "sphinx_markdown_parser",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/cayleypy/cayleypy"
+"Documentation" = "https://cayleypy.github.io/cayleypy-docs/api.html"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.package-data]
+"cayleypy" = ["data/*.csv"]
+
 [[tool.mypy.overrides]]
 module = ["networkx.*"]
 ignore_missing_imports = true
@@ -10,12 +79,16 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["scipy.*"]
 ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["h5py.*"]
+ignore_missing_imports = true
 
 [tool.pylint."FORMAT"]
 max-line-length = 120
 [tool.pylint."MESSAGES CONTROL"]
 disable = [
     "consider-using-enumerate",
+    "fixme",
     "missing-function-docstring",
     "missing-module-docstring",
     "no-else-return",

@@ -4,6 +4,7 @@ import csv
 import functools
 import json
 import os
+import math
 from typing import Any, Callable
 
 from .cayley_graph import CayleyGraph
@@ -62,6 +63,10 @@ def _compute_lrx_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(prepare_graph("lrx", n=int(n))).bfs().layer_sizes
 
 
+def _compute_lx_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.lx(int(n))).bfs().layer_sizes
+
+
 def _compute_top_spin_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(prepare_graph("top_spin", n=int(n))).bfs().layer_sizes
 
@@ -94,16 +99,29 @@ def _compute_full_reversals_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.full_reversals(int(n))).bfs().layer_sizes
 
 
-def _compute_coxeter_cayley_growth(n: str) -> list[int]:
-    return CayleyGraph(PermutationGroups.coxeter(int(n))).bfs().layer_sizes
+def _compute_signed_reversals_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.signed_reversals(int(n))).bfs().layer_sizes
 
 
-def _compute_mini_pyramorphix_cayley_growth(_: str) -> list[int]:
-    return CayleyGraph(prepare_graph("mini_pyramorphix")).bfs().layer_sizes
+# For S_n with Coxeter generators (adjacent transpositions), the number of permutations of length k equals
+# the number of permutations in S_n with exactly k inversions.
+# This is the coefficient of q^k in the q-factorial [n]_q!
+def _compute_coxeter_cayley_growth(n_str: str) -> list[int]:
+    # dp[k] = number of permutations in S_n with exactly k inversions.
+    # Using dynamic programming to compute Mahonian numbers.
+    n = int(n_str)
+    max_inv = math.comb(n, 2)
+    dp = [0] * (max_inv + 1)
+    dp[0] = 1  # 1 permutation of length 0 with 0 inversions
 
+    for i in range(1, n):  # i is the number of elements inserted so far
+        new_dp = [0] * (max_inv + 1)
+        for k in range(max_inv + 1):
+            for j in range(min(i + 1, k + 1)):  # insert new element at position j (adds j inversions)
+                new_dp[k] += dp[k - j]
+        dp = new_dp
 
-def _compute_pyraminx_cayley_growth(max_diam: str) -> list[int]:
-    return CayleyGraph(prepare_graph("pyraminx")).bfs(max_diameter=int(max_diam)).layer_sizes
+    return dp
 
 
 def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
@@ -113,6 +131,18 @@ def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
 def _compute_hungarian_rings_growth(key: str) -> list[int]:
     parameters = map(int, key.split(","))
     return CayleyGraph(PermutationGroups.hungarian_rings(*parameters)).bfs().layer_sizes
+
+
+def _compute_heisenberg_growth(n: str) -> list[int]:
+    return CayleyGraph(prepare_graph("heisenberg", n=int(n))).bfs().layer_sizes
+
+
+def _compute_rapaport_m1_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.rapaport_m1(int(n))).bfs().layer_sizes
+
+
+def _compute_rapaport_m2_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.rapaport_m2(int(n))).bfs().layer_sizes
 
 
 def generate_datasets():
@@ -126,21 +156,26 @@ def generate_datasets():
     _update_dataset("top_spin_coset_growth", keys, _compute_top_spin_coset_growth)
     keys = [str(n) for n in range(3, 12)]
     _update_dataset("lrx_cayley_growth", keys, _compute_lrx_cayley_growth)
+    _update_dataset("lx_cayley_growth", keys, _compute_lx_cayley_growth)
     keys = [str(n) for n in range(4, 12)]
     _update_dataset("top_spin_cayley_growth", keys, _compute_top_spin_cayley_growth)
     keys = [str(n) for n in range(2, 31)]
     _update_dataset("all_transpositions_cayley_growth", keys, _compute_all_transpositions_cayley_growth)
+    _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     keys = [str(n) for n in range(2, 11)]
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
-    _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
+    _update_dataset("rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth)
+    _update_dataset("rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth)
     keys = [str(n) for n in range(1, 8)]
     _update_dataset("burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth)
-    _update_dataset("mini_pyramorphix_cayley_growth", ["24"], _compute_mini_pyramorphix_cayley_growth)
+    _update_dataset("signed_reversals_cayley_growth", keys, _compute_signed_reversals_cayley_growth)
     keys = []
     for n in range(2, 10):
         group = get_hr_group(n)
         for parameters in group:
             keys.append(",".join([str(x) for x in parameters]))
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
+    keys = [str(n) for n in range(2, 51)]
+    _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)

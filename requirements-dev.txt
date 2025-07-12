@@ -1,5 +1,0 @@
-black
-mypy==1.15.0
-pylint
-pytest
-pytest-benchmark

@@ -3,4 +3,11 @@ __pycache__/
 .ipynb_checkpoints/
 *.ipynb
 .coverage
+*.egg-info
+build/
 htmlcov/
+.venv/
+
+# Sphinx
+docs/_build
+docs/generated
