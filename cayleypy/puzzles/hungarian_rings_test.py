@@ -4,7 +4,17 @@ import os
 import pytest
 
 from cayleypy.permutation_utils import compose_permutations
-from .hungarian_rings import hungarian_rings_permutations, _circular_shift, _create_right_ring, _get_intersections
+from .hungarian_rings import (
+    hungarian_rings_permutations,
+    _circular_shift,
+    _create_right_ring,
+    _get_intersections,
+    get_santa_parameters_from_n,
+    get_group,
+    get_pair_variants,
+    hungarian_rings_generators,
+)
+from .. import CayleyGraphDef, CayleyGraph, bfs_numpy
 
 FAST_RUN = os.getenv("FAST") == "1"
 
@@ -143,8 +153,10 @@ def test_hr_permutations_compensation(left_size: int, left_index: int, right_siz
 
 @pytest.mark.skipif(FAST_RUN, reason="slow test")
 def test_hr_permutations_compensation_bf():
-    parameters = [range(2, 6), range(1, 5), range(2, 6), range(1, 5), range(-7, 8)]
-    for left_size, left_index, right_size, right_index, step in list(itertools.product(*parameters)):
+    two_inter_params = [range(2, 6), range(1, 5), range(2, 6), range(1, 5), range(-7, 8)]
+    one_inter_params = [range(2, 6), [0], range(2, 6), [0], range(-7, 8)]
+    parameters = list(itertools.product(*one_inter_params)) + list(itertools.product(*two_inter_params))
+    for left_size, left_index, right_size, right_index, step in parameters:
         if left_index >= left_size or right_index >= right_size:
             continue
         l_permutations, r_permutations = hungarian_rings_permutations(
@@ -160,3 +172,82 @@ def test_hr_permutations_compensation_bf():
         assert len(l_permutations) == len(r_permutations) == full_size
         assert compose_permutations(l_permutations, l_counter_perm) == list(range(full_size))
         assert compose_permutations(r_permutations, r_counter_perm) == list(range(full_size))
+
+
+@pytest.mark.parametrize(
+    "n, parameters",
+    [
+        (10, (6, 2, 6, 3)),
+        (12, (7, 2, 7, 3)),
+    ],
+)
+def test_get_santa_parameters_from_n(n: int, parameters):
+    assert get_santa_parameters_from_n(n) == parameters
+
+
+pairs_data = {
+    (2, 4): [
+        (2, 1, 4, 1),
+        (2, 1, 4, 2),
+    ],
+    (2, 5): [
+        (2, 1, 5, 1),
+        (2, 1, 5, 2),
+    ],
+    (2, 6): [
+        (2, 1, 6, 1),
+        (2, 1, 6, 2),
+        (2, 1, 6, 3),
+    ],
+    (3, 4): [
+        (3, 1, 4, 1),
+        (3, 1, 4, 2),
+    ],
+    (3, 5): [
+        (3, 1, 5, 1),
+        (3, 1, 5, 2),
+    ],
+    (4, 4): [
+        (4, 1, 4, 1),
+        (4, 1, 4, 2),
+        (4, 2, 4, 2),
+    ],
+}
+
+groups_data = [
+    (4, [(2, 0, 3, 0)] + pairs_data[(2, 4)] + [(3, 1, 3, 1)]),
+    (5, [(2, 0, 4, 0), (3, 0, 3, 0)] + pairs_data[(2, 5)] + pairs_data[(3, 4)]),
+    (6, [(2, 0, 5, 0), (3, 0, 4, 0)] + pairs_data[(2, 6)] + pairs_data[(3, 5)] + pairs_data[(4, 4)]),
+]
+
+
+@pytest.mark.parametrize("pair, variants", pairs_data.items())
+def test_get_pair_variants(pair: tuple[int, int], variants: list):
+    assert get_pair_variants(*pair) == variants
+
+
+@pytest.mark.parametrize("n, group", groups_data)
+def test_get_group(n: int, group: list):
+    assert get_group(n) == group
+
+
+layer_sizes_data = [
+    (
+        (2, 1, 7, 3),
+        [1, 3, 6, 12, 20, 34, 55, 83, 124, 185, 274, 395, 558, 726, 808, 739, 540, 323, 104, 26, 14, 6, 3, 1],
+    ),
+    (
+        (7, 3, 2, 1),
+        [1, 3, 6, 12, 20, 34, 55, 83, 124, 185, 274, 395, 558, 726, 808, 739, 540, 323, 104, 26, 14, 6, 3, 1],
+    ),
+    ((5, 1, 6, 1), [1, 4, 12, 33, 88, 232, 608, 1596, 4085, 10132, 24209, 53006, 95034, 111383, 56032, 6323, 101, 1]),
+]
+
+
+@pytest.mark.parametrize("parameters, layer_sizes", layer_sizes_data)
+def test_layer_sizes(parameters: tuple[int, int, int, int], layer_sizes: list[int]):
+    generators, generator_names = hungarian_rings_generators(*parameters)
+    n = len(generators[0])
+    graph_def = CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+    assert bfs_numpy(CayleyGraph(graph_def)) == layer_sizes
+    assert CayleyGraph(graph_def).bfs().layer_sizes == layer_sizes

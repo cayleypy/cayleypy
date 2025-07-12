@@ -162,11 +162,13 @@ def test_rapaport_m2_cayley_growth():
 
 def test_hungarian_rings_growth():
     for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
-        n = int(key)
-        assert n % 2 == 0
-        ring_size = (n + 2) // 2
-        assert sum(layer_sizes) == math.factorial(n) // (2 if (ring_size % 2 > 0) else 1)
-        _verify_layers_fast(Puzzles.hungarian_rings(n), layer_sizes)
+        parameters = list(map(int, key.split(",")))
+        assert len(parameters) == 4
+        (left_size, left_index, right_size, right_index) = parameters
+        n = left_size + right_size - (2 if left_index > 0 and right_index > 0 else 1)
+        if n < 6 or n > 12:
+            continue
+        _verify_layers_fast(Puzzles.hungarian_rings(*parameters), layer_sizes)
 
 
 def test_heisenberg_growth():

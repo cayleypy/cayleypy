@@ -9,6 +9,8 @@ from typing import Any, Callable
 
 from .cayley_graph import CayleyGraph
 from .graphs_lib import prepare_graph, PermutationGroups
+from .puzzles.hungarian_rings import get_group as get_hr_group
+from .puzzles.puzzles import Puzzles
 
 DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
@@ -127,8 +129,9 @@ def _compute_cyclic_coxeter_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.cyclic_coxeter(int(n))).bfs().layer_sizes
 
 
-def _compute_hungarian_rings_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("hungarian_rings", n=int(n))).bfs().layer_sizes
+def _compute_hungarian_rings_growth(key: str) -> list[int]:
+    parameters = map(int, key.split(","))
+    return CayleyGraph(Puzzles.hungarian_rings(*parameters)).bfs().layer_sizes
 
 
 def _compute_heisenberg_growth(n: str) -> list[int]:
@@ -169,7 +172,11 @@ def generate_datasets():
     keys = [str(n) for n in range(1, 8)]
     _update_dataset("burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth)
     _update_dataset("signed_reversals_cayley_growth", keys, _compute_signed_reversals_cayley_growth)
-    keys = [str(n) for n in range(6, 14, 2)]
+    keys = []
+    for n in range(2, 10):
+        group = get_hr_group(n)
+        for parameters in group:
+            keys.append(",".join([str(x) for x in parameters]))
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
     keys = [str(n) for n in range(2, 51)]
     _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)
