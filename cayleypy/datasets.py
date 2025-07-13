@@ -98,6 +98,10 @@ def _compute_full_reversals_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.full_reversals(int(n))).bfs().layer_sizes
 
 
+def _compute_all_cycles_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.all_cycles(int(n))).bfs().layer_sizes
+
+
 def _compute_signed_reversals_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.signed_reversals(int(n))).bfs().layer_sizes
 
@@ -173,3 +177,4 @@ def generate_datasets():
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
     keys = [str(n) for n in range(2, 51)]
     _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)
+    _update_dataset("all_cycles_cayley_growth", [str(n) for n in range(2, 11)], _compute_all_cycles_cayley_growth)
