@@ -230,3 +230,22 @@ def test_rapaport_m2():
     assert graph_n5.generators == [[1, 0, 2, 3, 4], [1, 0, 3, 2, 4], [0, 2, 1, 4, 3]]
     graph_n6 = PermutationGroups.rapaport_m2(6)
     assert graph_n6.generators == [[1, 0, 2, 3, 4, 5], [1, 0, 3, 2, 5, 4], [0, 2, 1, 4, 3, 5]]
+
+
+def test_all_cycles():
+    graph = PermutationGroups.all_cycles(3)
+    assert graph.n_generators == 5
+    expected = [
+        [1, 0, 2],  # (0 1)
+        [2, 1, 0],  # (0 2)
+        [0, 2, 1],  # (1 2)
+        [1, 2, 0],  # (0 1 2)
+        [2, 0, 1],  # (0 2 1)
+    ]
+    for gen in expected:
+        assert gen in graph.generators
+
+    # https://oeis.org/A006231
+    assert PermutationGroups.all_cycles(4).n_generators == 20
+    assert PermutationGroups.all_cycles(5).n_generators == 84
+    assert PermutationGroups.all_cycles(6).n_generators == 409

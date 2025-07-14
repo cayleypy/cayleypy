@@ -194,3 +194,12 @@ def test_globes_growth():
     for key, layer_sizes in load_dataset("globes_growth").items():
         a, b = map(int, key.split(","))
         _verify_layers_fast(Puzzles.globe_puzzle(a, b), layer_sizes)
+
+
+def test_all_cycles_cayley_growth():
+    for key, layer_sizes in load_dataset("all_cycles_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        assert all(isinstance(x, int) and x >= 0 for x in layer_sizes)
+        if n <= 5:
+            _verify_layers_fast(PermutationGroups.all_cycles(n), layer_sizes)
