@@ -197,7 +197,7 @@ def test_globes_growth():
 def test_all_cycles_cayley_growth():
     for key, layer_sizes in load_dataset("all_cycles_cayley_growth").items():
         n = int(key)
-        total = sum(layer_sizes)
-        assert total <= math.factorial(n), f"Too many states for n={n}: {total} > {math.factorial(n)}"
+        assert sum(layer_sizes) == math.factorial(n)
         assert all(isinstance(x, int) and x >= 0 for x in layer_sizes)
-        _verify_layers_fast(PermutationGroups.all_cycles(n), layer_sizes)
+        if n <= 5:
+            _verify_layers_fast(PermutationGroups.all_cycles(n), layer_sizes)

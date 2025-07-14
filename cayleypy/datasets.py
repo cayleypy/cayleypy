@@ -177,4 +177,5 @@ def generate_datasets():
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
     keys = [str(n) for n in range(2, 51)]
     _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)
+    keys = [str(n) for n in range(2, 8)]
     _update_dataset("all_cycles_cayley_growth", keys, _compute_all_cycles_cayley_growth)

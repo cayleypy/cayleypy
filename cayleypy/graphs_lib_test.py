@@ -244,3 +244,8 @@ def test_all_cycles():
     ]
     for gen in expected:
         assert gen in graph.generators
+
+    # https://oeis.org/A006231
+    assert PermutationGroups.all_cycles(4).n_generators == 20
+    assert PermutationGroups.all_cycles(5).n_generators == 84
+    assert PermutationGroups.all_cycles(6).n_generators == 409
