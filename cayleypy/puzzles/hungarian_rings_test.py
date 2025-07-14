@@ -16,7 +16,7 @@ from .hungarian_rings import (
 )
 from .. import CayleyGraphDef, CayleyGraph, bfs_numpy
 
-FAST_RUN = os.getenv("FAST") == "1"
+RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 
 circular_shift_test_data = [
     (10, 1, [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]),
@@ -151,7 +151,7 @@ def test_hr_permutations_compensation(left_size: int, left_index: int, right_siz
     assert compose_permutations(r_permutations, r_counter_perm) == list(range(full_size))
 
 
-@pytest.mark.skipif(FAST_RUN, reason="slow test")
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_hr_permutations_compensation_bf():
     two_inter_params = [range(2, 6), range(1, 5), range(2, 6), range(1, 5), range(-7, 8)]
     one_inter_params = [range(2, 6), [0], range(2, 6), [0], range(-7, 8)]
