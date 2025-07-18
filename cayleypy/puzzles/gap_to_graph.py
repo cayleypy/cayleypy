@@ -62,10 +62,9 @@ def cycle_str_to_list(cycle_str: str, offset: int = 0) -> list[list[int]]:
 
 
 # pylint: disable=C0103
-def gap_to_CayleyGraphDef(gap_file_path: Union[str, Path]) -> CayleyGraphDef:
-    gap_generators = read_txt(gap_file_path)
-    gap_generators = filter_gap_generator_lines(gap_generators)
-    gens_cyclic_strings = gap_lines_to_dict(gap_generators)
+def gap_to_CayleyGraphDef(gap_generators: str) -> CayleyGraphDef:
+    gap_generators_list = filter_gap_generator_lines(gap_generators)
+    gens_cyclic_strings = gap_lines_to_dict(gap_generators_list)
     gens_cyclic = {k: cycle_str_to_list(v, 1) for k, v in gens_cyclic_strings.items()}
     n = get_permuted_set_length(gens_cyclic)
     gens_oneline = {k: permutation_from_cycles(n, v) for k, v in gens_cyclic.items()}
@@ -105,4 +104,5 @@ def cayley_graph_for_puzzle_gap(puzzle_name: str) -> CayleyGraphDef:
     gap_file_path = get_gaps_dir() / "defaults" / f"{puzzle_name}.gap"
     if not gap_file_path.exists():
         raise FileNotFoundError(f"GAP file {gap_file_path} does not exist.")
-    return gap_to_CayleyGraphDef(gap_file_path)
+    gap_generators = read_txt(gap_file_path)
+    return gap_to_CayleyGraphDef(gap_generators)
