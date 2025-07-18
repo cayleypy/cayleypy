@@ -1,14 +1,14 @@
+from typing import Union
 import re
 from pathlib import Path
 import numpy as np
-import torch
 from ..io_utils import read_txt
-from ..permutation_utils import inverse_permutation, permutation_from_cycles, inverse_permutation
+from ..permutation_utils import inverse_permutation, permutation_from_cycles
 from ..cayley_graph_def import CayleyGraphDef
 
 
 def perm_is_id(perm: list[int]) -> bool:
-    return np.all(perm == np.arange(len(perm)))
+    return bool(np.all(perm == np.arange(len(perm))))
 
 
 def add_inv_permutations(perms_dict: dict[str, list[int]]) -> dict[str, list[int]]:
@@ -23,11 +23,11 @@ def add_inv_permutations(perms_dict: dict[str, list[int]]) -> dict[str, list[int
             perms_dict_all[name] = perm
             inv_perm = inverse_permutation(perm)
             if not np.all(inv_perm == perm):
-                perms_dict_all[name + "_inv"] = np.array(inverse_permutation(perm))
+                perms_dict_all[name + "_inv"] = inv_perm
     return perms_dict_all
 
 
-def get_permuted_set_length(perms_cyclic: dict[list[list[int]]]) -> int:
+def get_permuted_set_length(perms_cyclic: dict[str, list[list[int]]]) -> int:
     """
     Assuming that the first element is 0.
     """
@@ -35,8 +35,7 @@ def get_permuted_set_length(perms_cyclic: dict[list[list[int]]]) -> int:
     for v in perms_cyclic.values():
         for cycle in v:
             for idx in cycle:
-                if idx > max_idx:
-                    max_idx = idx
+                max_idx = max(max_idx, idx)
 
     max_idx += 1  # because we start from 0
     return max_idx
@@ -62,13 +61,14 @@ def cycle_str_to_list(cycle_str: str, offset: int = 0) -> list[list[int]]:
     return [list(map(lambda x: int(x) - offset, group.split(","))) for group in re.findall(r"\(([\d,]+)\)", cycle_str)]
 
 
-def gap_to_CayleyGraphDef(gap_file_path: str) -> CayleyGraphDef:
+# pylint: disable=C0103
+def gap_to_CayleyGraphDef(gap_file_path: Union[str, Path]) -> CayleyGraphDef:
     gap_generators = read_txt(gap_file_path)
     gap_generators = filter_gap_generator_lines(gap_generators)
-    gens_cyclic = gap_lines_to_dict(gap_generators)
-    gens_cyclic = {k: cycle_str_to_list(v, 1) for k, v in gens_cyclic.items()}
-    N = get_permuted_set_length(gens_cyclic)
-    gens_oneline = {k: permutation_from_cycles(N, v) for k, v in gens_cyclic.items()}
+    gens_cyclic_strings = gap_lines_to_dict(gap_generators)
+    gens_cyclic = {k: cycle_str_to_list(v, 1) for k, v in gens_cyclic_strings.items()}
+    n = get_permuted_set_length(gens_cyclic)
+    gens_oneline = {k: permutation_from_cycles(n, v) for k, v in gens_cyclic.items()}
     gens_oneline = add_inv_permutations(gens_oneline)
     names = []
     gens = []
@@ -78,7 +78,10 @@ def gap_to_CayleyGraphDef(gap_file_path: str) -> CayleyGraphDef:
     return CayleyGraphDef.create(generators=gens, generator_names=names)
 
 
-def get_gaps_dir() -> str:
+# pylint: enable=C0103
+
+
+def get_gaps_dir() -> Path:
     return Path(__file__).parent / "gap_files"
 
 
@@ -93,10 +96,12 @@ def cayley_graph_for_puzzle_gap(puzzle_name: str) -> CayleyGraphDef:
     """
     puzzle_name = puzzle_name.replace(" ", "_")
     list_of_puzzles = list_gap_puzzles_defaults()
+    # pylint: disable=C0301
+    # fmt: off
     if puzzle_name not in list_of_puzzles:
-        raise ValueError(
-            f"Puzzle {puzzle_name} not found in the default GAP puzzles. Check list_gap_puzzles_defaults() for available puzzles."
-        )
+        raise ValueError(f"Puzzle {puzzle_name} not found in the default GAP puzzles. Check list_gap_puzzles_defaults() for available puzzles.")
+    # fmt: on
+    # pylint: disable=C0301
     gap_file_path = get_gaps_dir() / "defaults" / f"{puzzle_name}.gap"
     if not gap_file_path.exists():
         raise FileNotFoundError(f"GAP file {gap_file_path} does not exist.")

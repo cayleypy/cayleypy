@@ -1,5 +1,4 @@
 from cayleypy.puzzles.gap_to_graph import (
-    gap_to_CayleyGraphDef,
     get_gaps_dir,
     cayley_graph_for_puzzle_gap,
     list_gap_puzzles_defaults,
