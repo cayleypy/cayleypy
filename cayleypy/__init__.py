@@ -7,4 +7,11 @@ from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
 from .datasets import load_dataset
 from .graphs_lib import prepare_graph, PermutationGroups, MatrixGroups
 from .predictor import Predictor
-from .puzzles.puzzles import Puzzles
+from .puzzles import (
+    Puzzles,
+    cayley_graph_for_puzzle_gap,
+    list_gap_puzzles_defaults,
+    get_gaps_dir,
+    gap_to_CayleyGraphDef,
+)
+from .io_utils import read_txt, write_txt, read_json, write_json

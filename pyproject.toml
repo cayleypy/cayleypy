@@ -31,7 +31,7 @@ dependencies = [
 # pip install .[torch,lint,test,dev,docs]
 [project.optional-dependencies]
 torch = [
-    # torch is required, but it is optional here because if it's in dependencies,
+    # torch is required, but it is optional here because if it is  in dependencies,
     # Kaggle would spend several minutes installing some dependencies, even though
     # it has torch installed.
     "torch"
@@ -65,7 +65,7 @@ docs = [
 include-package-data = true
 
 [tool.setuptools.package-data]
-"cayleypy" = ["data/*.csv"]
+"cayleypy" = ["data/*.csv", "puzzles/gap_files/**"]
 
 [[tool.mypy.overrides]]
 module = ["networkx.*"]
