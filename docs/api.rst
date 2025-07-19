@@ -24,6 +24,7 @@ Graphs library
     cayleypy.PermutationGroups
     cayleypy.MatrixGroups
     cayleypy.Puzzles
+    cayleypy.GapPuzzles
 
 Beam search
 '''''''''''

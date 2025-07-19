@@ -1,6 +1,6 @@
 import pytest
 
-from cayleypy import CayleyGraphDef, MatrixGenerator
+from cayleypy import CayleyGraphDef, MatrixGenerator, Puzzles, PermutationGroups
 
 
 def test_inverse_permutations():
@@ -19,3 +19,12 @@ def test_inverse_matrices(modulo: int):
     assert inv.is_matrix_group()
     assert len(inv.generators_matrices) == 1
     assert inv.generators_matrices[0] == x_inv
+
+
+def test_make_inverse_closed():
+    graph = PermutationGroups.lrx(4)
+    assert graph.make_inverse_closed() == graph
+
+    graph = PermutationGroups.lx(4).make_inverse_closed()
+    assert graph.generators_permutations == [[1, 2, 3, 0], [1, 0, 2, 3], [3, 0, 1, 2]]
+    assert graph.generator_names == ["L", "X", "L'"]

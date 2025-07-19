@@ -271,6 +271,8 @@ class CayleyGraphDef:
         """Returns the same graph where generators are replaced with inverses (in the same order).
 
         This is needed for restoring path in the Beam Search algorithm.
+        Note that even when generators are self-inverse, this will be a different graph because order of generators
+        changes. For example, LRX generators turn into RLX generators.
         """
         if self.generators_type == GeneratorType.PERMUTATION:
             return CayleyGraphDef.create(
@@ -283,6 +285,32 @@ class CayleyGraphDef:
                 generators=[m.inv for m in self.generators_matrices],
                 central_state=self.central_state,
             )
+
+    def make_inverse_closed(self) -> "CayleyGraphDef":
+        """Makes generators inverse-closed, adding extra generators when necessary.
+
+        If generators are already inverse-closed, returns self.
+        Otherwise, for each generator that does not have its inverse in the set of generators, adds an inverse generator
+        to the set.
+        """
+        if self.generators_inverse_closed:
+            return self
+        if self.generators_type == GeneratorType.PERMUTATION:
+            generators_set = {tuple(self.generators_permutations[i]) for i in range(self.n_generators)}
+            new_generators = []
+            new_generator_names = []  # type: list[str]
+            for i in range(self.n_generators):
+                inv_perm = inverse_permutation(self.generators_permutations[i])
+                if tuple(inv_perm) not in generators_set:
+                    new_generators.append(inv_perm)
+                    new_generator_names.append(self.generator_names[i] + "'")
+            return CayleyGraphDef.create(
+                generators=self.generators + new_generators,
+                generator_names=self.generator_names + new_generator_names,
+                central_state=self.central_state,
+            )
+        else:
+            assert False, "Not implemented."
 
     def path_to_string(self, path: list[int], delimiter=".") -> str:
         return delimiter.join(self.generator_names[i] for i in path)
