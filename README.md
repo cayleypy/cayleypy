@@ -39,10 +39,24 @@ Mathematical applications:
 * Library of datasets with solutions to some problems (e.g. growth functions like
   [here](https://www.kaggle.com/code/fedimser/bfs-for-binary-string-permutations)).
 
-## Usage
+## Examples
 
-See this demo [Kaggle notebook](https://www.kaggle.com/code/fedimser/cayleypy-demo) for examples
-on how this library can be used.
+See the following Kaggle notebooks for examples of library usage:
+
+* [Basic usage](https://www.kaggle.com/code/fedimser/cayleypy-demo) - defining Cayley graphs for permutation and matrix groups, running BFS, getting explicit Networkx graphs.
+* [Computing spectra](https://www.kaggle.com/code/fedimser/computing-spectra-of-cayley-graphs-using-cayleypy).
+* Path finding in Cayley Graphs:
+  * [Beam seacrh with CayleyPy](https://www.kaggle.com/code/fedimser/beam-search-with-cayleypy) - simple example of finding paths for LRX (n=12) using beam search and neural network.
+  * [Finidng shortest paths for LRX (n=8) using BFS](https://www.kaggle.com/code/fedimser/lrx-solution).
+  * [Finidng shortest paths for LRX cosets (n=16 and n=32) using BFS](https://www.kaggle.com/code/fedimser/lrx-binary-with-cayleypy-bfs-only).
+  * [Beam search with neural network for LRX cosets (n=32)](https://www.kaggle.com/code/fedimser/solve-lrx-binary-with-cayleypy).
+* Growth function computations:
+  * [For LX](https://www.kaggle.com/code/fedimser/growth-function-for-lx-cayley-graph).
+  * [For TopSpin cosets](https://www.kaggle.com/code/fedimser/growth-functions-for-topspin-cosets).
+* Becnhmarks:
+  * [Benchmarks versions of BFS in CayleyPy](https://www.kaggle.com/code/fedimser/benchmark-versions-of-bfs-in-cayleypy).
+  * [Becnhmark BFS on GPU](https://www.kaggle.com/code/fedimser/benchmark-bfs-in-cayleypy-on-gpu-p100).
+
 
 ## Documentation
 
