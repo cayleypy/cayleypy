@@ -2,6 +2,7 @@
 # Inspired by https://github.com/InferLO/inferlo/blob/master/tools/build_docs.sh
 
 set -e
+export SPHINX_BUILD=1
 
 # Get the working directory to the repo root.
 cd "$(git rev-parse --show-toplevel)"/docs
