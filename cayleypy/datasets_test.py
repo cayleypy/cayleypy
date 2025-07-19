@@ -193,6 +193,7 @@ def test_puzzles_growth():
 
 def test_gap_puzzles_growth():
     data = load_dataset("puzzles_growth")
+    _verify_layers_fast(GapPuzzles.puzzle("pyramorphix"), data["pyramorphix"])
     _verify_layers_fast(GapPuzzles.puzzle("dino"), data["dino"])
     _verify_layers_fast(GapPuzzles.puzzle("2x2x2"), data["cube_222_qstm"])
     _verify_layers_fast(GapPuzzles.puzzle("3x3x3"), data["cube_333_qtm"])
