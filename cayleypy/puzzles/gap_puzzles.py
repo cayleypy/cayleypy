@@ -1,4 +1,5 @@
 import json
+import os
 import re
 from pathlib import Path
 from typing import Optional, Union
@@ -107,3 +108,7 @@ class GapPuzzles:
             raise ValueError(
                 f"No such puzzle {puzzle_name}. Use GapPuzzles.list_puzzles() to see list of available puzzles."
             ) from exc
+
+
+if os.getenv("SPHINX_BUILD") == "1":
+    GapPuzzles.__doc__ = "%s\n\n Supported puzzles: %s." % (GapPuzzles.__doc__, GapPuzzles.list_puzzles())
