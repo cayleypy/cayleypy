@@ -5,6 +5,7 @@ import os
 
 import pytest
 
+from . import GapPuzzles
 from .cayley_graph import CayleyGraph
 from .cayley_graph_def import CayleyGraphDef
 from .datasets import load_dataset
@@ -188,6 +189,15 @@ def test_puzzles_growth():
     _verify_layers_fast(Puzzles.mini_pyramorphix(), data["mini_pyramorphix"])
     _verify_layers_fast(Puzzles.pyraminx(), data["pyraminx"])
     _verify_layers_fast(Puzzles.starminx(), data["starminx"])
+
+
+def test_gap_puzzles_growth():
+    data = load_dataset("puzzles_growth")
+    _verify_layers_fast(GapPuzzles.puzzle("dino"), data["dino"])
+    _verify_layers_fast(GapPuzzles.puzzle("2x2x2"), data["cube_222_qstm"])
+    _verify_layers_fast(GapPuzzles.puzzle("3x3x3"), data["cube_333_qtm"])
+    _verify_layers_fast(GapPuzzles.puzzle("pyraminx"), data["pyraminx"])
+    _verify_layers_fast(GapPuzzles.puzzle("starminx"), data["starminx"])
 
 
 def test_globes_growth():
