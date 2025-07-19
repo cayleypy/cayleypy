@@ -189,6 +189,7 @@ def test_puzzles_growth():
     _verify_layers_fast(Puzzles.mini_pyramorphix(), data["mini_pyramorphix"])
     _verify_layers_fast(Puzzles.pyraminx(), data["pyraminx"])
     _verify_layers_fast(Puzzles.starminx(), data["starminx"])
+    _verify_layers_fast(Puzzles.starminx_2(), data["starminx_2"])
 
 
 def test_gap_puzzles_growth():
@@ -199,6 +200,7 @@ def test_gap_puzzles_growth():
     _verify_layers_fast(GapPuzzles.puzzle("3x3x3"), data["cube_333_qtm"])
     _verify_layers_fast(GapPuzzles.puzzle("pyraminx"), data["pyraminx"])
     _verify_layers_fast(GapPuzzles.puzzle("starminx"), data["starminx"])
+    _verify_layers_fast(GapPuzzles.puzzle("starminx_2"), data["starminx_2"])
 
 
 def test_globes_growth():

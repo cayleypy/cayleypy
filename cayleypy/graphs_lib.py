@@ -357,6 +357,8 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
         return Puzzles.hungarian_rings(*hr_params)
     elif name == "starminx":
         return Puzzles.starminx()
+    elif name == "starminx_2":
+        return Puzzles.starminx_2()
     elif name == "megaminx":
         return Puzzles.megaminx()
     elif name == "lrx":
