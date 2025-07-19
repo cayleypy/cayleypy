@@ -45,6 +45,7 @@ See the following Kaggle notebooks for examples of library usage:
 
 * [Basic usage](https://www.kaggle.com/code/fedimser/cayleypy-demo) - defining Cayley graphs for permutation and matrix groups, running BFS, getting explicit Networkx graphs.
 * [Computing spectra](https://www.kaggle.com/code/fedimser/computing-spectra-of-cayley-graphs-using-cayleypy).
+* [Library of puzzles in GAP format in CayleyPy](https://www.kaggle.com/code/fedimser/library-of-puzzles-in-gap-format-in-cayleypy).
 * Path finding in Cayley Graphs:
   * [Beam seacrh with CayleyPy](https://www.kaggle.com/code/fedimser/beam-search-with-cayleypy) - simple example of finding paths for LRX (n=12) using beam search and neural network.
   * [Finidng shortest paths for LRX (n=8) using BFS](https://www.kaggle.com/code/fedimser/lrx-solution).
