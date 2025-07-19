@@ -89,9 +89,22 @@ class BfsResult:
             else:
                 f["edges_list_hashes"] = torch.empty([])
 
-            f["graph__generators"] = self.graph.generators
+            # Save graph definition based on generator type
             f["graph__generator_names"] = self.graph.generator_names
             f["graph__central_state"] = self.graph.central_state
+            f["graph__generators_type"] = self.graph.generators_type.value
+
+            if self.graph.is_permutation_group():
+                f["graph__generators"] = self.graph.generators_permutations
+            else:
+                # Save matrix generators and their moduli
+                matrices = []
+                moduli = []
+                for gen in self.graph.generators_matrices:
+                    matrices.append(gen.matrix)
+                    moduli.append(gen.modulo)
+                f["graph__generator_matrices"] = np.array(matrices)
+                f["graph__generator_moduli"] = np.array(moduli)
 
     @staticmethod
     def load(path: str):
@@ -111,17 +124,46 @@ class BfsResult:
             else:
                 edges_list_hashes = f["edges_list_hashes"][()]
 
+            # Determine generator type and create appropriate graph definition
+            generator_names = [x.decode("utf-8") for x in f["graph__generator_names"][()]]
+            central_state = f["graph__central_state"][()].tolist()
+
+            # Check if this is a new format file with generator type info
+            if "graph__generators_type" in f:
+                from .cayley_graph_def import GeneratorType, MatrixGenerator  # pylint: disable=import-outside-toplevel
+
+                generators_type = GeneratorType(f["graph__generators_type"][()])
+
+                if generators_type == GeneratorType.PERMUTATION:
+                    graph = CayleyGraphDef.create(
+                        generators=f["graph__generators"][()].tolist(),
+                        generator_names=generator_names,
+                        central_state=central_state,
+                    )
+                else:  # MATRIX
+                    matrices = f["graph__generator_matrices"][()]
+                    moduli = f["graph__generator_moduli"][()]
+                    generators = [MatrixGenerator.create(matrices[i], moduli[i]) for i in range(len(matrices))]
+                    graph = CayleyGraphDef.for_matrix_group(
+                        generators=generators,
+                        generator_names=generator_names,
+                        central_state=central_state,
+                    )
+            else:
+                # Legacy format - assume permutation group
+                graph = CayleyGraphDef.create(
+                    generators=f["graph__generators"][()].tolist(),
+                    generator_names=generator_names,
+                    central_state=central_state,
+                )
+
             loaded_result = BfsResult(
                 bfs_completed=bool(f["bfs_completed"][()]),
                 layer_sizes=layer_sizes,
                 layers={x: f[f"layer__{str(x)}"][()] for x in range(len(layer_sizes))},
                 edges_list_hashes=edges_list_hashes,
                 vertices_hashes=vertices_hashes,
-                graph=CayleyGraphDef.create(
-                    generators=f["graph__generators"][()].tolist(),
-                    generator_names=[x.decode("utf-8") for x in f["graph__generator_names"][()]],
-                    central_state=f["graph__central_state"][()].tolist(),
-                ),
+                graph=graph,
             )
         # pylint: enable=no-member
         return loaded_result
