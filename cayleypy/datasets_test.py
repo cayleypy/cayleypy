@@ -192,15 +192,28 @@ def test_puzzles_growth():
     _verify_layers_fast(Puzzles.starminx_2(), data["starminx_2"])
 
 
-def test_gap_puzzles_growth():
+def test_gap_puzzles_growth_cubes():
     data = load_dataset("puzzles_growth")
-    _verify_layers_fast(GapPuzzles.puzzle("pyramorphix"), data["pyramorphix"])
-    _verify_layers_fast(GapPuzzles.puzzle("dino"), data["dino"])
     _verify_layers_fast(GapPuzzles.puzzle("2x2x2"), data["cube_222_qstm"])
     _verify_layers_fast(GapPuzzles.puzzle("3x3x3"), data["cube_333_qtm"])
-    _verify_layers_fast(GapPuzzles.puzzle("pyraminx"), data["pyraminx"])
-    _verify_layers_fast(GapPuzzles.puzzle("starminx"), data["starminx"])
-    _verify_layers_fast(GapPuzzles.puzzle("starminx_2"), data["starminx_2"])
+
+
+@pytest.mark.parametrize(
+    "puzzle_name",
+    [
+        "dino",
+        "master_pyramorphix",
+        "mastermorphix",
+        "pyraminx",
+        "pyramorphix",
+        "skewb_diamond",
+        "starminx",
+        "starminx_2",
+        "tetraminx",
+    ],
+)
+def test_gap_puzzles_growth(puzzle_name: str):
+    _verify_layers_fast(GapPuzzles.puzzle(puzzle_name), load_dataset("puzzles_growth")[puzzle_name])
 
 
 def test_globes_growth():
