@@ -109,6 +109,8 @@ First, you need to decide where in the library to put it:
     `Puzzles` in `caylepy/puzzles/puzzles.py`. If it requires non-trivial construction,
     move that to separate function(s) and put them in separate file in `cayleypy/puzzles`.
     If the puzzle is defined by hardcoded permutations, put them in `cayleypy/puzzles/moves.py`. 
+* If it's a graph for a puzzle, and you have definition in GAP format, put the `.gap` file in
+    `puzzles/gap_files/default`. It will become available via `cayleypy.GapPuzzles`.
 * If it's a new type of graph, check with @fedimser where to put it.
 
 Do not add new graphs to `prepare_graph`! We want new graphs to be added in different 

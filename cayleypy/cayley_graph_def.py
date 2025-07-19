@@ -305,7 +305,7 @@ class CayleyGraphDef:
                     new_generators.append(inv_perm)
                     new_generator_names.append(self.generator_names[i] + "'")
             return CayleyGraphDef.create(
-                generators=self.generators + new_generators,
+                generators=self.generators_permutations + new_generators,
                 generator_names=self.generator_names + new_generator_names,
                 central_state=self.central_state,
             )

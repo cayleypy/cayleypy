@@ -1,6 +1,6 @@
 import pytest
 
-from cayleypy import CayleyGraphDef, MatrixGenerator, Puzzles, PermutationGroups
+from cayleypy import CayleyGraphDef, MatrixGenerator, PermutationGroups
 
 
 def test_inverse_permutations():

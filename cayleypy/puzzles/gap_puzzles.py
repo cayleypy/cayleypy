@@ -1,7 +1,7 @@
 import json
 import re
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Union
 
 from ..cayley_graph_def import CayleyGraphDef
 from ..permutation_utils import permutation_from_cycles
@@ -23,7 +23,7 @@ def _central_state_from_ip(n: int, ip: list[list[int]]) -> list[int]:
     Values in this array are integers from 0 to k-1 where k is number of colors.
     It is allowed to not specify singleton groups of equivalent pieces.
     """
-    pos_to_eq_list = dict()  # type: dict[int, list[int]]
+    pos_to_eq_list = {}  # type: dict[int, list[int]]
     for eq_list in ip:
         for pos in eq_list:
             pos_to_eq_list[pos - 1] = eq_list
@@ -43,7 +43,7 @@ def _central_state_from_ip(n: int, ip: list[list[int]]) -> list[int]:
 
 
 def _parse_gap_file(text: str) -> CayleyGraphDef:
-    generators_dict = dict()  # type: dict[str, list[list[int]]]
+    generators_dict = {}  # type: dict[str, list[list[int]]]
     generator_names = []  # type: list[str]
     ip = None  # type: Optional[list[list[int]]]
     for line in text.split("\n"):
@@ -70,14 +70,14 @@ class GapPuzzles:
     """Library of puzzles defined in GAP format."""
 
     @staticmethod
-    def load_puzzle_from_file(file_name: str | Path) -> CayleyGraphDef:
+    def load_puzzle_from_file(file_name: Union[str, Path]) -> CayleyGraphDef:
         """Reads puzzle from given file in GAP format.
 
         Automatically adds inverse generators (if they are not already present).
         """
         file_name = str(file_name)
         assert file_name.endswith(".gap"), "Must be .fap file."
-        with open(file_name, "r") as file:
+        with open(file_name, "r", encoding="utf-8") as file:
             text = file.read()
         graph = _parse_gap_file(text)
         return graph.make_inverse_closed()
@@ -103,7 +103,7 @@ class GapPuzzles:
         file_name = str(GapPuzzles.get_gaps_dir() / "defaults" / f"{puzzle_name}.gap")
         try:
             return GapPuzzles.load_puzzle_from_file(file_name)
-        except FileNotFoundError:
+        except FileNotFoundError as exc:
             raise ValueError(
                 f"No such puzzle {puzzle_name}. Use GapPuzzles.list_puzzles() to see list of available puzzles."
-            )
+            ) from exc
