@@ -36,8 +36,8 @@ Beam search and ML
     cayleypy.Predictor
     cayleypy.models.ModelConfig
 
-Algorithms
-''''''''''
+Special algorithms
+''''''''''''''''''
 .. autosummary::
     :toctree: generated/
 
