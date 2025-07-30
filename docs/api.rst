@@ -36,11 +36,11 @@ Beam search and ML
     cayleypy.Predictor
     cayleypy.models.ModelConfig
 
-Special BFS algorithms
-''''''''''''''''''''''
+Algorithms
+''''''''''
 .. autosummary::
     :toctree: generated/
 
+    cayleypy.algo.bfs_bitmask
+    cayleypy.algo.bfs_numpy
     cayleypy.algo.find_path_bfs_mitm
-    cayleypy.bfs_bitmask
-    cayleypy.bfs_numpy

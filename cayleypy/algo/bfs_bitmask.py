@@ -6,8 +6,8 @@ import math
 import numba
 import numpy as np
 
-from .cayley_graph import CayleyGraph
-from .permutation_utils import is_permutation
+from cayleypy.cayley_graph import CayleyGraph
+from cayleypy.permutation_utils import is_permutation
 
 R = 8  # Chunk prefix size.
 CHUNK_SIZE = math.factorial(R)

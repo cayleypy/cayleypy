@@ -2,7 +2,8 @@ import os
 
 import pytest
 
-from cayleypy import load_dataset, bfs_bitmask, CayleyGraph, PermutationGroups
+from cayleypy import load_dataset, CayleyGraph, PermutationGroups
+from cayleypy.algo import bfs_bitmask
 
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 

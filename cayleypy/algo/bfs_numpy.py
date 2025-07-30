@@ -2,8 +2,8 @@
 
 import numpy as np
 
-from .cayley_graph import CayleyGraph
-from .permutation_utils import inverse_permutation
+from cayleypy.cayley_graph import CayleyGraph
+from cayleypy.permutation_utils import inverse_permutation
 
 
 def bfs_numpy(graph: CayleyGraph, max_diameter: int = 1000000) -> list[int]:
