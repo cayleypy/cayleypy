@@ -44,8 +44,6 @@ def find_path_bfs_mitm(
     middle_states = []
 
     def _stop_condition(layer2, layer2_hashes):
-        if len(layer2) < 5:
-            print("SC", layer2)
         mask = isin_via_searchsorted(layer2_hashes, bfs_last_layer)
         if not torch.any(mask):
             return False

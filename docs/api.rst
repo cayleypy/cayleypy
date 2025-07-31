@@ -25,6 +25,8 @@ Graphs library
     cayleypy.MatrixGroups
     cayleypy.Puzzles
     cayleypy.GapPuzzles
+    cayleypy.create_graph
+    cayleypy.prepare_graph
 
 Beam search and ML
 ''''''''''''''''''

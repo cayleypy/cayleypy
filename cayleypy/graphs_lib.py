@@ -4,6 +4,7 @@
 
 from itertools import permutations, combinations
 
+from . import CayleyGraph
 from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
 from .permutation_utils import transposition, permutation_from_cycles
 from .puzzles.puzzles import Puzzles
@@ -378,12 +379,10 @@ class PermutationGroups:
         return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
 
-def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
-    """Returns pre-defined graph by codename.
+def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
+    """Returns pre-defined CayleyGraphDef by codename and additional kwargs.
 
-    This function exists for convenience.
-    Do not add new graphs here unless this is necessary!
-    If you add a graph here, it must be one line calling a function defined elsewhere.
+    See source of this function for list of supported graphs.
     """
     if name == "cube_2/2/2_6gensQTM":
         return Puzzles.rubik_cube(2, "fixed_QTM")
@@ -424,6 +423,21 @@ def prepare_graph(name: str, n: int = 0) -> CayleyGraphDef:
         return PermutationGroups.all_cycles(n)
     else:
         raise ValueError(f"Unknown generator set: {name}")
+
+
+def create_graph(**kwargs) -> CayleyGraph:
+    """Creates CayleyGraph from kwargs.
+
+    All passed kwargs will be first passed to `prepare_graph` to construct `CayleyGraphDef` and then to `CayleyGraph`
+    constructor.
+
+    This function allows to create graphs in a uniform way. It is useful when you want to specify graph type and
+    parameters in a config and have the same code handling different configs.
+
+    This is not recommended in most cases. Instead, create `CayleyGraphDef` using one of library classes and then pass it
+    to `CayleyGraph` constructor.
+    """
+    return CayleyGraph(prepare_graph(**kwargs), **kwargs)
 
 
 class MatrixGroups:

@@ -57,6 +57,7 @@ class CayleyGraph:
         batch_size: int = 2**20,
         hash_chunk_size: int = 2**25,
         memory_limit_gb: float = 16,
+        **kwargs,
     ):
         """Initializes CayleyGraph.
 
