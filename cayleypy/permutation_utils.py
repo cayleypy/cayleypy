@@ -49,3 +49,21 @@ def permutation_from_cycles(n: int, cycles: list[list[int]], offset: int = 0) ->
             assert perm[cycle[i]] == cycle[i], "Cycles must not intersect."
             perm[cycle[i]] = cycle[(i + 1) % len(cycle)]
     return perm
+
+
+def permutation_between(a: list[int], b: list[int]) -> list[int]:
+    """Returns permutation p, such that p∘a=b.
+
+    If a and b are permutations, p=b∘a^1, but this also works for cosets.
+    If such permutation does not exist, raises an error.
+    """
+    n = len(a)
+    assert len(b) == n
+    p = []
+    used = set()
+    for i in range(n):
+        pi = next((j for j in range(n) if a[j] == b[i] and j not in used), None)
+        assert pi is not None, f"{b} is not permutation of {a}."
+        p.append(pi)
+        used.add(pi)
+    return p

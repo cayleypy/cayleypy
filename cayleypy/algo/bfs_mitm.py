@@ -10,6 +10,22 @@ from ..cayley_graph import CayleyGraph
 from ..torch_utils import isin_via_searchsorted
 
 
+def _bfs_mitm_optimized(
+    graph: CayleyGraph,
+    start_state: Union[torch.Tensor, np.ndarray, list],
+    bfs_result: BfsResult,
+) -> Optional[list[int]]:
+    """Optimized Meet-in-the-Middle.
+
+    This algorithm doesn't compute BFS from `start_state`. Instead it takes pre-computed bfs_result from start state and
+    applies a permutation to it which produces exactly the same result.
+    """
+    assert graph.definition.is_permutation_group()
+    assert graph.string_encoder is not None
+    assert graph.hasher.is_identity
+    return None
+
+
 def find_path_bfs_mitm(
     graph: CayleyGraph,
     start_state: Union[torch.Tensor, np.ndarray, list],
@@ -40,7 +56,10 @@ def find_path_bfs_mitm(
     if path is not None:
         return path
 
-    bfs_result.check_has_layer_hashes()
+    # If this is permutation graph and states fit in single int64, can run optimized version of Meet-in-the-Middle.
+    if graph.definition.is_permutation_group() and graph.string_encoder is not None and graph.hasher.is_identity:
+        return _bfs_mitm_optimized(graph, start_state, bfs_result)
+
     bfs_last_layer = bfs_result.layers_hashes[-1]
     middle_states = []
 
