@@ -1,6 +1,6 @@
 import gc
 import math
-from typing import Callable, Optional, Union, TypeAlias
+from typing import Callable, Optional, Union
 
 import numpy as np
 import torch
@@ -13,7 +13,7 @@ from .predictor import Predictor
 from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted, TorchHashSet
 
-AnyStateType: TypeAlias = Union[torch.Tensor, np.ndarray, list]
+AnyStateType = Union[torch.Tensor, np.ndarray, list]
 
 
 class CayleyGraph:
