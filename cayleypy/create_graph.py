@@ -3,9 +3,15 @@ from typing import Optional, Union
 import numpy as np
 import torch
 
-from . import CayleyGraphDef, MatrixGenerator
-from .cayley_graph import AnyStateType, CayleyGraph
+from .cayley_graph import CayleyGraph
+from .cayley_graph_def import AnyStateType, CayleyGraphDef, MatrixGenerator
 from .graphs_lib import prepare_graph
+
+
+def _to_matrix_generator(m: Union[MatrixGenerator, list, np.ndarray]) -> MatrixGenerator:
+    if isinstance(m, MatrixGenerator):
+        return m
+    return MatrixGenerator.create(m)
 
 
 def create_graph(
@@ -13,7 +19,7 @@ def create_graph(
     generators_permutations: Union[list[list[int]], torch.Tensor, np.ndarray, None] = None,
     generators_matrices: Optional[list[Union[MatrixGenerator, list, np.ndarray]]] = None,
     generator_names: Optional[list[str]] = None,
-    name: Optional[str] = None,
+    name: str = "",
     central_state: Optional[AnyStateType] = None,
     make_inverse_closed: bool = False,
     **kwargs,
@@ -52,7 +58,7 @@ def create_graph(
         )
     elif generators_matrices is not None:
         assert generators_permutations is None
-        generators = [g if g is MatrixGenerator else MatrixGenerator.create(g) for g in generators_matrices]
+        generators = [_to_matrix_generator(g) for g in generators_matrices]
         graph_def = CayleyGraphDef.for_matrix_group(
             generators=generators, generator_names=generator_names, central_state=central_state, name=name
         )

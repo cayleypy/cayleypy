@@ -7,13 +7,11 @@ import torch
 
 from .beam_search_result import BeamSearchResult
 from .bfs_result import BfsResult
-from .cayley_graph_def import CayleyGraphDef, GeneratorType
+from .cayley_graph_def import AnyStateType, CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
 from .predictor import Predictor
 from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted, TorchHashSet
-
-AnyStateType = Union[torch.Tensor, np.ndarray, list]
 
 
 class CayleyGraph:
