@@ -306,10 +306,14 @@ class CayleyGraphDef:
                 if tuple(inv_perm) not in generators_set:
                     new_generators.append(inv_perm)
                     new_generator_names.append(self.generator_names[i] + "'")
+            new_name = self.name
+            if new_name != "":
+                new_name += "_inverse_closed"
             return CayleyGraphDef.create(
                 generators=self.generators_permutations + new_generators,
                 generator_names=self.generator_names + new_generator_names,
                 central_state=self.central_state,
+                name=new_name,
             )
         else:
             assert False, "Not implemented."
