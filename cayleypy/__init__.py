@@ -1,4 +1,4 @@
-from .algo import bfs_numpy, bfs_bitmask
+from .algo import bfs_numpy, bfs_bitmask, find_path
 from .beam_search_result import BeamSearchResult
 from .bfs_result import BfsResult
 from .cayley_graph import CayleyGraph
