@@ -4,10 +4,11 @@ import time
 from typing import Optional
 
 from .bfs_mitm import find_path_bfs_mitm
-from ..predictor import Predictor
 from ..bfs_result import BfsResult
-from ..cayley_graph import CayleyGraph, AnyStateType
+from ..cayley_graph import CayleyGraph
+from ..cayley_graph_def import AnyStateType
 from ..models.models_lib import PREDICTOR_MODELS
+from ..predictor import Predictor
 
 
 def _precompute_bfs(graph: CayleyGraph, **kwargs) -> BfsResult:
