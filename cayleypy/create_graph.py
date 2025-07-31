@@ -18,14 +18,16 @@ def create_graph(
     make_inverse_closed: bool = False,
     **kwargs,
 ) -> CayleyGraph:
-    """Creates CayleyGraph from kwargs.
+    """Creates CayleyGraph.
 
-    Pass the following to kwargs:
-        * other parameters of the graph (such as "n") that will be passed to ``prepare_graph``, <-- if name.
-        * any arguments that are accepted by ``CayleyGraph`` constructor (e.g. ``verbose=2``).
+    All arguments are optional, but one of these must be specified: ``generators_permutations``,
+    ``generators_matrices``, ``name``.
 
-    All passed kwargs will be first passed to ``prepare_graph`` to construct ``CayleyGraphDef`` and then to
-    ``CayleyGraph`` constructor.
+    Additional arguments may be passed via kwargs:
+
+    * when creating graph by ``name``, other parameters of the graph (such as "n") that will be passed
+      to ``prepare_graph``,
+    * any arguments that are accepted by ``CayleyGraph`` constructor (e.g. ``verbose=2``).r.
 
     This function allows to create graphs in a uniform way. It is useful when you want to specify graph type and
     parameters in a config and have the same code handling different configs.
@@ -33,10 +35,11 @@ def create_graph(
     This is not recommended in most cases. Instead, create ``CayleyGraphDef`` using one of library classes and then pass
     it to ``CayleyGraph`` constructor.
 
-    :param generators_permutations: AAAA
-    :param generators_matrices: AAAA
-    :param generator_names: AAAA
-    :param name: the name of the graph, see ``prepare_graph`` source for supported names,
+    :param generators_permutations: List of generating permutations.
+    :param generators_matrices: List of generating n*n matrices.
+    :param generator_names: Names of the generators.
+    :param name: the name of the graph. If generators are not explicitly specified, this will be used to create graph,
+        see ``prepare_graph`` source for supported names.
     :param central_state: central state of the graph.
     :param make_inverse_closed: if generators are not inverse-closed and ``make_inverse_closed=True``, adds inverse
         generators to make set of generators inverse-closed.
@@ -54,7 +57,7 @@ def create_graph(
             generators=generators, generator_names=generator_names, central_state=central_state, name=name
         )
     else:
-        assert name is not None
+        assert name is not None, "Must specify one of: generators_permutations, generators_matrices or name."
         graph_def = prepare_graph(name, **kwargs)
     if make_inverse_closed:
         graph_def = graph_def.make_inverse_closed()
