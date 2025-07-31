@@ -98,7 +98,7 @@ class BfsResult:
             layers_hashes = []
             for i in range(len(layer_sizes)):
                 key = f"edges_list_hashes__{i}"
-                if not key in f:
+                if key not in f:
                     break
                 layers_hashes.append(f[key][()])
 
