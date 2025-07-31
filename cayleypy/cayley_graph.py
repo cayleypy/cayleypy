@@ -1,6 +1,6 @@
 import gc
 import math
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, TypeAlias
 
 import numpy as np
 import torch
@@ -12,6 +12,8 @@ from .hasher import StateHasher
 from .predictor import Predictor
 from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted, TorchHashSet
+
+AnyStateType: TypeAlias = Union[torch.Tensor, np.ndarray, list]
 
 
 class CayleyGraph:
@@ -125,7 +127,7 @@ class CayleyGraph:
         unique_idx = idx[mask]
         return states[unique_idx], hashes[unique_idx]
 
-    def encode_states(self, states: Union[torch.Tensor, np.ndarray, list]) -> torch.Tensor:
+    def encode_states(self, states: AnyStateType) -> torch.Tensor:
         """Converts states from human-readable to internal representation."""
         states = torch.as_tensor(states, device=self.device)
         states = states.reshape((-1, self.definition.state_size))
@@ -159,7 +161,7 @@ class CayleyGraph:
             src = src.reshape((states_num, n, m))
             dst[:, :] = mx.apply_batch_torch(src).reshape((states_num, n * m))
 
-    def apply_path(self, states: torch.Tensor, generator_ids: list[int]) -> torch.Tensor:
+    def apply_path(self, states: AnyStateType, generator_ids: list[int]) -> torch.Tensor:
         """Applies multiple generators to given state(s) in order.
 
         :param states: one or more states (as torch.Tensor) to which to apply the states.
@@ -173,6 +175,11 @@ class CayleyGraph:
             self._apply_generator_batched(gen_id, states, new_states)
             states = new_states
         return self.decode_states(states)
+
+    def validate_path(self, start_state: AnyStateType, path: list[int]):
+        """Checks that `path` indeed is path from `start_state` to central state."""
+        path_result = self.apply_path(start_state, path).reshape(-1)
+        assert torch.equal(path_result, self.central_state)
 
     def get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates all neighbors of `states` (in internal representation)."""
@@ -447,7 +454,7 @@ class CayleyGraph:
     def beam_search(
         self,
         *,
-        start_state: Union[torch.Tensor, np.ndarray, list],
+        start_state: AnyStateType,
         predictor: Optional[Predictor] = None,
         beam_width=1000,
         max_iterations=1000,
@@ -535,7 +542,7 @@ class CayleyGraph:
         # Path not found.
         return BeamSearchResult(False, 0, None, debug_scores, self.definition)
 
-    def restore_path(self, hashes: list[torch.Tensor], to_state: Union[torch.Tensor, np.ndarray, list]) -> list[int]:
+    def restore_path(self, hashes: list[torch.Tensor], to_state: AnyStateType) -> list[int]:
         """Restores path from layers hashes.
 
         Layers must be such that there is edge from state on previous layer to state on next layer.
@@ -564,9 +571,7 @@ class CayleyGraph:
             cur_state = candidates[gen_id : gen_id + 1, :]
         return path[::-1]
 
-    def find_path_to(
-        self, end_state: Union[torch.Tensor, np.ndarray, list], bfs_result: BfsResult
-    ) -> Optional[list[int]]:
+    def find_path_to(self, end_state: AnyStateType, bfs_result: BfsResult) -> Optional[list[int]]:
         """Finds path from central_state to end_state using pre-computed BfsResult.
 
         :param end_state: Final state of the path.
@@ -582,9 +587,7 @@ class CayleyGraph:
                 return self.restore_path(layers_hashes[:i], end_state)
         return None
 
-    def find_path_from(
-        self, start_state: Union[torch.Tensor, np.ndarray, list], bfs_result: BfsResult
-    ) -> Optional[list[int]]:
+    def find_path_from(self, start_state: AnyStateType, bfs_result: BfsResult) -> Optional[list[int]]:
         """Finds path from start_state to central_state using pre-computed BfsResult.
 
         This is possible only for inverse-closed generators.

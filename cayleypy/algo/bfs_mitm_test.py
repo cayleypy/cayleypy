@@ -1,12 +1,5 @@
-import torch
-
 from cayleypy import PermutationGroups, CayleyGraph
 from cayleypy.algo import find_path_bfs_mitm
-
-
-def _validate_path(graph: CayleyGraph, start_state: list[int], path: list[int]):
-    path_result = graph.apply_path(torch.tensor(start_state, dtype=torch.int64), path).reshape((-1))
-    assert torch.equal(path_result, graph.central_state)
 
 
 def test_find_path_bfs_mitm_lrx10():
@@ -23,4 +16,4 @@ def test_find_path_bfs_mitm_lrx10():
     path = find_path_bfs_mitm(graph, start_state, br13)
     assert path is not None
     assert len(path) == 26
-    _validate_path(graph, start_state, path)
+    graph.validate_path(start_state, path)

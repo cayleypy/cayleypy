@@ -32,6 +32,7 @@ def find_path_bfs_mitm(
     """
     assert bfs_result.graph == graph.definition
     assert graph.definition.generators_inverse_closed
+    bfs_result.check_has_layer_hashes()
     assert bfs_result.layers_hashes[0][0] == graph.central_state_hash, "Must use the same hasher for bfs_result."
 
     # First, check if this state is already in bfs_result.
