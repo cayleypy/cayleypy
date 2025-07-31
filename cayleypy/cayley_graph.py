@@ -194,7 +194,7 @@ class CayleyGraph:
         *,
         start_states: Union[None, torch.Tensor, np.ndarray, list] = None,
         max_layer_size_to_store: Optional[int] = 1000,
-        max_layer_size_to_explore: int = 10**9,
+        max_layer_size_to_explore: int = 10**12,
         max_diameter: int = 1000000,
         return_all_edges: bool = False,
         return_all_hashes: bool = False,
