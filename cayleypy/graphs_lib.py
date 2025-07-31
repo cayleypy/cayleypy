@@ -382,7 +382,7 @@ class PermutationGroups:
 def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
     """Returns pre-defined CayleyGraphDef by codename and additional kwargs.
 
-    See source of this function for list of supported graphs.
+    See the source of this function for list of supported graphs.
     """
     if name == "cube_2/2/2_6gensQTM":
         return Puzzles.rubik_cube(2, "fixed_QTM")
