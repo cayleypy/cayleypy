@@ -1,5 +1,6 @@
-import pytest
 import os
+
+import pytest
 
 from cayleypy import create_graph, PermutationGroups, CayleyGraph
 from cayleypy import find_path
