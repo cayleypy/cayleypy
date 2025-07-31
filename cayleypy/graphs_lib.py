@@ -405,6 +405,10 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
         return Puzzles.starminx_2()
     elif name == "megaminx":
         return Puzzles.megaminx()
+    elif name == "lx":
+        return PermutationGroups.lx(n)
+    elif name.startswith("lx-"):
+        return PermutationGroups.lrx(int(name[3:]))
     elif name == "lrx":
         return PermutationGroups.lrx(n)
     elif name.startswith("lrx-"):
