@@ -30,11 +30,26 @@ def _precompute_bfs(graph: CayleyGraph, **kwargs) -> BfsResult:
 
 
 def find_path(graph: CayleyGraph, start_state: AnyStateType, **kwargs) -> Optional[list[int]]:
-    """kashfkjah
+    """Finds path from ``start_state`` to central state.
 
-    If you want to compute multiple results, pass the same `graph` object so some computatoions can be rused.
+    This function will try to automatically pick the best algorithm. It will return ``None`` if path was not found,
+    which can happen if path does not exist, or if it exists but the algorithm failed to find it.
 
-    Use specialized.
+    The path is returned as list of generator numbers. Use ``graph.definition.path_to_string(path)`` to convert it to
+    string.
+
+    If you want to compute paths from multiple different states for the same graph, use the same instance of ``graph``
+    and pass it here. This will allow doing some computations only once (on the first call) and caching the results,
+    making subsequent path computations faster.
+
+    In practice, this will work only for very small graphs, very short paths, and for graphs for which the library has
+    pre-computed ML models. Also, there is no guarantee that the path fill be the shortest (although this function will
+    try to find short path). Therefore, it's recommended to use specialized algorithms for path finding instead of this
+    function.
+
+    :param graph: Graph in which to find the path.
+    :param start_state: First state of the path.
+    :return: The found path (list of generator ids), or ``None`` if path was not found.
     """
 
     # If we have pre-trained model for beam search, use beam search with that predictor.
@@ -46,6 +61,7 @@ def find_path(graph: CayleyGraph, start_state: AnyStateType, **kwargs) -> Option
             beam_width=kwargs.get("beam_width") or 10**4,
             max_iterations=kwargs.get("max_iterations") or 10**9,
             return_path=True,
+            **kwargs,
         )
         return result.path
 
