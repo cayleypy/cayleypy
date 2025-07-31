@@ -47,6 +47,11 @@ class BfsResult:
             if not torch.all(self.layers[k] == other.layers[k]):
                 return False
 
+        if len(self.layers_hashes) != len(other.layers_hashes):
+            return False
+        for i in range(len(self.layers_hashes)):
+            if not torch.all(self.layers_hashes[i] == other.layers_hashes[i]):
+                return False
         if not self.has_edges_list_hashes():
             if other.has_edges_list_hashes():
                 return False
@@ -70,6 +75,8 @@ class BfsResult:
             for name, layer in self.layers.items():
                 f[f"layer__{name}"] = layer.detach().cpu()
 
+            for i, hashes in enumerate(self.layers_hashes):
+                f[f"edges_list_hashes__{i}"] = hashes.detach().cpu()
             if self.has_edges_list_hashes():
                 f["edges_list_hashes"] = self.edges_list_hashes.detach().cpu()  # type: ignore
             else:
@@ -88,6 +95,13 @@ class BfsResult:
 
             layer_sizes = f["layer_sizes"][()].tolist()
 
+            layers_hashes = []
+            for i in range(len(layer_sizes)):
+                key = f"edges_list_hashes__{i}"
+                if not key in f:
+                    break
+                layers_hashes.append(f[key][()])
+
             if f["edges_list_hashes"].shape == tuple():
                 edges_list_hashes = None
             else:
@@ -98,7 +112,7 @@ class BfsResult:
                 layer_sizes=layer_sizes,
                 layers={x: f[f"layer__{str(x)}"][()] for x in range(len(layer_sizes))},
                 edges_list_hashes=edges_list_hashes,
-                layers_hashes=[],
+                layers_hashes=layers_hashes,
                 graph=CayleyGraphDef.create(
                     generators=f["graph__generators"][()].tolist(),
                     generator_names=[x.decode("utf-8") for x in f["graph__generator_names"][()]],
@@ -136,6 +150,7 @@ class BfsResult:
         return replace(
             self,
             layers={k: v.to(device) for k, v in self.layers.items()},
+            layers_hashes=[h.to(device) for h in self.layers_hashes],
             edges_list_hashes=self.edges_list_hashes.to(device) if self.has_edges_list_hashes() else None,  # type: ignore # pylint: disable=line-too-long
         )
 
