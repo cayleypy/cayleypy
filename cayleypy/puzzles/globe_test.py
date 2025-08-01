@@ -11,6 +11,7 @@ def test_globe_3_4():
     expected_names_1 = ["r0", "r0_inv", "r1", "r1_inv", "r2", "r2_inv", "r3", "r3_inv"]
     expected_names_2 = ["f0", "f1", "f2", "f3", "f4", "f5", "f6", "f7"]
     assert graph.generator_names == expected_names_1 + expected_names_2
+    assert graph.name == "globe_puzzle-3-4"
 
     # fmt: off
     expected_generators = [

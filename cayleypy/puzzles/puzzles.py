@@ -63,7 +63,10 @@ class Puzzles:
         assert right_index <= right_size / 2
         generators, generator_names = hungarian_rings_generators(left_size, left_index, right_size, right_index)
         n = len(generators[0])
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"hungarian_rings-{left_size}-{left_index}-{right_size}-{right_index}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def mini_pyramorphix() -> CayleyGraphDef:

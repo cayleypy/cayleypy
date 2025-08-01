@@ -6,8 +6,8 @@ from itertools import permutations, combinations
 
 from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
 from .permutation_utils import transposition, permutation_from_cycles
-from .puzzles.puzzles import Puzzles
 from .puzzles.hungarian_rings import get_santa_parameters_from_n
+from .puzzles.puzzles import Puzzles
 
 
 def _create_coxeter_generators(n: int) -> list[list[int]]:
@@ -214,7 +214,10 @@ class PermutationGroups:
         elif subset == 7:
             generators = [pancake_generator(n, n), pancake_generator(n - 2, n), pancake_generator(n - 3, n)]
             generator_names = [f"R{n}", f"R{n-2}", f"R{n-3}"]
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"cubic_pancake-{n}-{subset}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def burnt_pancake(n: int) -> CayleyGraphDef:
@@ -234,7 +237,10 @@ class PermutationGroups:
             perm += list(range(n + prefix_len + 1, 2 * n, 1))
             generators.append(perm)
             generator_names.append("R" + str(prefix_len + 1))
-        return CayleyGraphDef.create(generators, central_state=list(range(2 * n)), generator_names=generator_names)
+        name = f"burnt_pancake-{n}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(2 * n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def three_cycles(n: int) -> CayleyGraphDef:
@@ -246,7 +252,10 @@ class PermutationGroups:
             if a < b and a < c:
                 generators.append(permutation_from_cycles(n, [[a, b, c]]))
                 generator_names.append(f"({a} {b} {c})")
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"three_cycles-{n}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def three_cycles_0ij(n: int) -> CayleyGraphDef:
@@ -256,7 +265,10 @@ class PermutationGroups:
         for i, j in permutations(range(1, n), 2):
             generators.append(permutation_from_cycles(n, [[0, i, j]]))
             generator_names.append(f"({0} {i} {j})")
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"three_cycles_0ij-{n}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def derangements(n: int) -> CayleyGraphDef:
@@ -269,7 +281,10 @@ class PermutationGroups:
             if not has_fixed_point:
                 generators.append(list(perm))
                 generator_names.append(f"D{idx}")
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"derangements-{n}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def stars(n: int) -> CayleyGraphDef:
@@ -280,7 +295,10 @@ class PermutationGroups:
         for i in range(1, n):
             generators.append(transposition(n, 0, i))
             generator_names.append(f"S{i}")
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"stars-{n}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def rapaport_m1(n: int) -> CayleyGraphDef:
@@ -312,7 +330,10 @@ class PermutationGroups:
             generators.append(permutation)
             generator_names.append(f"M1_1_{num_pairs}")
 
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"rapaport_m1-{n}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def rapaport_m2(n: int) -> CayleyGraphDef:
@@ -336,7 +357,10 @@ class PermutationGroups:
         generators = [g1, g2, g3]
         generator_names = ["(0,1)", "EvenDisjTrans", "OddDisjTrans"]
 
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"rapaport_m2-{n}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def all_cycles(n: int) -> CayleyGraphDef:
@@ -361,7 +385,10 @@ class PermutationGroups:
                     generators.append(cycle)
                     generator_names.append(f"cycle_{len(generators)}")
 
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"all_cycles-{n}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def wrapped_k_cycles(n: int, k: int) -> CayleyGraphDef:
@@ -375,7 +402,10 @@ class PermutationGroups:
             cycle = [(start + j) % n for j in range(k)]
             generators.append(permutation_from_cycles(n, [cycle]))
             generator_names.append(f"({' '.join(map(str, cycle))})")
-        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
+        name = f"wrapped_k_cycles-{n}-{k}"
+        return CayleyGraphDef.create(
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
 
 def prepare_graph(name: str, n: int = 0, **unused_kwargs) -> CayleyGraphDef:
@@ -446,7 +476,11 @@ class MatrixGroups:
         """
         x = MatrixGenerator.create([[1, 1, 0], [0, 1, 0], [0, 0, 1]], modulo=modulo)
         y = MatrixGenerator.create([[1, 0, 0], [0, 1, 1], [0, 0, 1]], modulo=modulo)
+        name = "heisenberg"
+        if modulo > 0:
+            name += f"%{modulo}"
         return CayleyGraphDef.for_matrix_group(
             generators=[x, x.inv, y, y.inv],
             generator_names=["x", "x'", "y", "y'"],
+            name=name,
         )

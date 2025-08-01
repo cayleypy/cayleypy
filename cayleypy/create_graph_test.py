@@ -25,6 +25,12 @@ def test_create_graph_from_matrices():
 
 def test_create_graph_make_inverse_closed():
     graph = create_graph(name="lx", n=4, make_inverse_closed=True)
-    assert graph.definition.name == "lx-4_inverse_closed"
+    assert graph.definition.name == "lx-4-ic"
     assert graph.definition.n_generators == 3
     assert graph.definition.generators_permutations == [[1, 2, 3, 0], [1, 0, 2, 3], [3, 0, 1, 2]]
+
+
+def test_create_graph_by_name_and_central_state():
+    graph = create_graph(name="lrx", n=8, central_state="00001111")
+    assert graph.definition.generators_permutations == PermutationGroups.lrx(8).generators_permutations
+    assert graph.definition.central_state == [0, 0, 0, 0, 1, 1, 1, 1]

@@ -57,4 +57,5 @@ def globe_puzzle(a: int, b: int) -> CayleyGraphDef:
             generator_names += [key + "_inv"]
 
     central_state = list(range(2 * b * (a + 1)))
-    return CayleyGraphDef.create(generators, generator_names, central_state)
+    name = f"globe_puzzle-{a}-{b}"
+    return CayleyGraphDef.create(generators, generator_names, central_state, name)

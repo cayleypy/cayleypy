@@ -4,7 +4,7 @@ import numpy as np
 import torch
 
 from .cayley_graph import CayleyGraph
-from .cayley_graph_def import AnyStateType, CayleyGraphDef, MatrixGenerator
+from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
 from .graphs_lib import prepare_graph
 
 
@@ -20,7 +20,7 @@ def create_graph(
     generators_matrices: Optional[list[Union[MatrixGenerator, list, np.ndarray]]] = None,
     generator_names: Optional[list[str]] = None,
     name: str = "",
-    central_state: Optional[AnyStateType] = None,
+    central_state=None,
     make_inverse_closed: bool = False,
     **kwargs,
 ) -> CayleyGraph:
@@ -65,6 +65,8 @@ def create_graph(
     else:
         assert name is not None, "Must specify one of: generators_permutations, generators_matrices or name."
         graph_def = prepare_graph(name, **kwargs)
+        if central_state is not None:
+            graph_def = graph_def.with_central_state(central_state)
     if make_inverse_closed:
         graph_def = graph_def.make_inverse_closed()
     return CayleyGraph(graph_def, **kwargs)

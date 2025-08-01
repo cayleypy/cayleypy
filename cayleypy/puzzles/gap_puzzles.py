@@ -72,16 +72,12 @@ class GapPuzzles:
 
     @staticmethod
     def load_puzzle_from_file(file_name: Union[str, Path]) -> CayleyGraphDef:
-        """Reads puzzle from given file in GAP format.
-
-        Automatically adds inverse generators (if they are not already present).
-        """
+        """Reads puzzle from given file in GAP format."""
         file_name = str(file_name)
         assert file_name.endswith(".gap"), "Must be .fap file."
         with open(file_name, "r", encoding="utf-8") as file:
             text = file.read()
-        graph = _parse_gap_file(text)
-        return graph.make_inverse_closed()
+        return _parse_gap_file(text)
 
     @staticmethod
     def get_gaps_dir() -> Path:
@@ -99,15 +95,25 @@ class GapPuzzles:
         return sorted([f.stem for f in gaps_dir.glob("*.gap")])
 
     @staticmethod
-    def puzzle(puzzle_name: str) -> CayleyGraphDef:
-        """Loads puzzle by name."""
+    def puzzle(puzzle_name: str, make_inverse_closed: bool = True) -> CayleyGraphDef:
+        """Loads puzzle by name.
+
+        :param puzzle_name: Puzzle name.
+        :param make_inverse_closed: Whether to make graph inverse-closed (if it was not already).
+        :return: CayleyGraphDef for this puzzle.
+        """
         file_name = str(GapPuzzles.get_gaps_dir() / "defaults" / f"{puzzle_name}.gap")
         try:
-            return GapPuzzles.load_puzzle_from_file(file_name).with_name(puzzle_name)
+            graph_def = GapPuzzles.load_puzzle_from_file(file_name)
         except FileNotFoundError as exc:
             raise ValueError(
                 f"No such puzzle {puzzle_name}. Use GapPuzzles.list_puzzles() to see list of available puzzles."
             ) from exc
+
+        graph_def = graph_def.with_name(f"{puzzle_name}.gap")
+        if not graph_def.generators_inverse_closed and make_inverse_closed:
+            graph_def = graph_def.make_inverse_closed()
+        return graph_def
 
 
 if os.getenv("SPHINX_BUILD") == "1":
