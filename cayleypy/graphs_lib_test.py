@@ -263,7 +263,9 @@ def test_heisenberg():
     graph1 = MatrixGroups.heisenberg()
     assert graph1.name == "heisenberg"
     assert graph1.n_generators == 4
+    assert graph1.generators_inverse_closed
 
     graph2 = MatrixGroups.heisenberg(modulo=10)
     assert graph2.name == "heisenberg%10"
     assert graph2.n_generators == 4
+    assert graph1.generators_inverse_closed
