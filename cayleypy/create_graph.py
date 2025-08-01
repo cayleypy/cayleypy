@@ -63,7 +63,7 @@ def create_graph(
             generators=generators, generator_names=generator_names, central_state=central_state, name=name
         )
     else:
-        assert name is not None, "Must specify one of: generators_permutations, generators_matrices or name."
+        assert name != "", "Must specify one of: generators_permutations, generators_matrices or name."
         graph_def = prepare_graph(name, **kwargs)
         if central_state is not None:
             graph_def = graph_def.with_central_state(central_state)
