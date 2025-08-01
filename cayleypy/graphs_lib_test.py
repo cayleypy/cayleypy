@@ -1,5 +1,6 @@
 import numpy as np
 
+from cayleypy import MatrixGroups
 from cayleypy.graphs_lib import PermutationGroups
 
 
@@ -256,3 +257,13 @@ def test_all_cycles():
 def test_wrapped_k_cycles():
     graph = PermutationGroups.wrapped_k_cycles(5, 3)
     assert graph.generators == [[1, 2, 0, 3, 4], [0, 2, 3, 1, 4], [0, 1, 3, 4, 2], [3, 1, 2, 4, 0], [1, 4, 2, 3, 0]]
+
+
+def test_heisenberg():
+    graph1 = MatrixGroups.heisenberg()
+    assert graph1.name == "heisenberg"
+    assert graph1.n_generators == 4
+
+    graph2 = MatrixGroups.heisenberg(modulo=10)
+    assert graph2.name == "heisenberg%10"
+    assert graph2.n_generators == 4
