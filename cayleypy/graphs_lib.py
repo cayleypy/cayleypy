@@ -320,7 +320,10 @@ class PermutationGroups:
         name = f"involutive-derangements-{n}"
 
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name,
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
