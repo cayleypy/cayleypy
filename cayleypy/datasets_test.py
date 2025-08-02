@@ -174,6 +174,20 @@ def test_stars_cayley_growth():
         _verify_layers_fast(PermutationGroups.stars(n), layer_sizes)
 
 
+def test_derangements_cayley_growth():
+    for key, layer_sizes in load_dataset("derangements_cayley_growth").items():
+        n = int(key)
+        if n >= 4:
+            assert sum(layer_sizes) == math.factorial(n)
+        _verify_layers_fast(PermutationGroups.derangements(n), layer_sizes)
+
+
+def test_involutive_derangements_cayley_growth():
+    for key, layer_sizes in load_dataset("involutive_derangements_cayley_growth").items():
+        n = int(key)
+        _verify_layers_fast(PermutationGroups.involutive_derangements(n), layer_sizes)
+
+
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_hungarian_rings_growth():
     for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
