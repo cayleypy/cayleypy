@@ -213,6 +213,13 @@ def test_derangements():
     assert len(PermutationGroups.derangements(5).generators) == 44
 
 
+def test_involutive_derangements():
+    assert PermutationGroups.involutive_derangements(2).generators == [[1, 0]]
+    assert PermutationGroups.involutive_derangements(4).generators == [[1, 0, 3, 2], [2, 3, 0, 1], [3, 2, 1, 0]]
+    assert len(PermutationGroups.involutive_derangements(6).generators) == 15
+    assert len(PermutationGroups.involutive_derangements(8).generators) == 105
+
+
 def test_rapaport_m1():
     graph_n4 = PermutationGroups.rapaport_m1(4)
     assert graph_n4.generators == [[1, 0, 2, 3], [1, 0, 3, 2], [0, 2, 1, 3]]
