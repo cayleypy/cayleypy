@@ -6,7 +6,7 @@ from ..cayley_graph_def import CayleyGraphDef
 
 @dataclass(frozen=True)
 class BeamSearchResult:
-    """Result of running `CayleyGraph.beam_search`."""
+    """Result of running beam search on a Cayley graph."""
 
     path_found: bool  # Whether full graph was explored.
     path_length: int  # Distance of found path from start state to central state.
