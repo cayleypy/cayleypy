@@ -1,6 +1,7 @@
 from dataclasses import dataclass
 from typing import Optional
-from .cayley_graph_def import CayleyGraphDef
+
+from ..cayley_graph_def import CayleyGraphDef
 
 
 @dataclass(frozen=True)

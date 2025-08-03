@@ -38,11 +38,11 @@ Beam search and ML
 .. autosummary::
     :toctree: generated/
 
-    cayleypy.BeamSearchResult
     cayleypy.Predictor
-    cayleypy.models.ModelConfig
-    cayleypy.algo.RandomWalksGenerator
     cayleypy.algo.BeamSearchAlgorithm
+    cayleypy.algo.BeamSearchResult
+    cayleypy.algo.RandomWalksGenerator
+    cayleypy.models.ModelConfig
 
 Special algorithms
 ''''''''''''''''''

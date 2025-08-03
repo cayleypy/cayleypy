@@ -4,7 +4,7 @@ from typing import TYPE_CHECKING, Optional
 
 import torch
 
-from ..beam_search_result import BeamSearchResult
+from .beam_search_result import BeamSearchResult
 from ..bfs_result import BfsResult
 from ..cayley_graph_def import AnyStateType
 from ..predictor import Predictor

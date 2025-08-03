@@ -5,7 +5,7 @@ import pytest
 import torch
 
 from cayleypy.algo import bfs_numpy
-from .beam_search_result import BeamSearchResult
+from cayleypy.algo.beam_search_result import BeamSearchResult
 from .cayley_graph import CayleyGraph
 from .cayley_graph_def import MatrixGenerator, CayleyGraphDef
 from .datasets import load_dataset
