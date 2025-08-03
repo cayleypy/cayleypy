@@ -82,9 +82,10 @@ class RandomWalksGenerator:
         :return: Tuple of (states, distances)
         """
         # Allocate memory.
-        x_shape = (width * length, self.graph.encoded_state_size)
-        x = torch.zeros(x_shape, device=self.graph.device, dtype=torch.int64)
-        y = torch.zeros(width * length, device=self.graph.device, dtype=torch.int32)
+        graph = self.graph
+        x_shape = (width * length, graph.encoded_state_size)
+        x = torch.zeros(x_shape, device=graph.device, dtype=torch.int64)
+        y = torch.zeros(width * length, device=graph.device, dtype=torch.int32)
 
         # First state in each walk is the start state.
         x[:width, :] = start_state.reshape((-1,))
@@ -93,18 +94,18 @@ class RandomWalksGenerator:
         # Main loop.
         for i_step in range(1, length):
             y[i_step * width : (i_step + 1) * width] = i_step
-            gen_idx = torch.randint(0, self.graph.definition.n_generators, (width,), device=self.graph.device)
+            gen_idx = torch.randint(0, graph.definition.n_generators, (width,), device=graph.device)
             src = x[(i_step - 1) * width : i_step * width, :]
             dst = x[i_step * width : (i_step + 1) * width, :]
-            for j in range(self.graph.definition.n_generators):
+            for j in range(graph.definition.n_generators):
                 # Go to next state for walks where we chose to use j-th generator on this step.
                 mask = gen_idx == j
                 prev_states = src[mask, :]
                 next_states = torch.zeros_like(prev_states)
-                self.graph.apply_generator_batched(j, prev_states, next_states)
+                graph.apply_generator_batched(j, prev_states, next_states)
                 dst[mask, :] = next_states
 
-        return self.graph.decode_states(x), y
+        return graph.decode_states(x), y
 
     def random_walks_bfs(self, width: int, length: int, start_state: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate BFS-based random walks.
@@ -114,14 +115,15 @@ class RandomWalksGenerator:
         :param start_state: Starting state for the BFS
         :return: Tuple of (states, distances)
         """
+        graph = self.graph
         x_hashes = TorchHashSet()
-        x_hashes.add_sorted_hashes(self.graph.hasher.make_hashes(start_state))
+        x_hashes.add_sorted_hashes(graph.hasher.make_hashes(start_state))
         x = [start_state]
-        y = [torch.full((1,), 0, device=self.graph.device, dtype=torch.int32)]
+        y = [torch.full((1,), 0, device=graph.device, dtype=torch.int32)]
 
         for i_step in range(1, length):
-            next_states = self.graph.get_neighbors(x[-1])
-            next_states, next_states_hashes = self.graph.get_unique_states(next_states)
+            next_states = graph.get_neighbors(x[-1])
+            next_states, next_states_hashes = graph.get_unique_states(next_states)
             mask = x_hashes.get_mask_to_remove_seen_hashes(next_states_hashes)
             next_states, next_states_hashes = next_states[mask], next_states_hashes[mask]
             layer_size = len(next_states)
@@ -134,5 +136,5 @@ class RandomWalksGenerator:
                 next_states_hashes = next_states_hashes[random_indices]
             x.append(next_states)
             x_hashes.add_sorted_hashes(next_states_hashes)
-            y.append(torch.full((layer_size,), i_step, device=self.graph.device, dtype=torch.int32))
-        return self.graph.decode_states(torch.vstack(x)), torch.hstack(y)
+            y.append(torch.full((layer_size,), i_step, device=graph.device, dtype=torch.int32))
+        return graph.decode_states(torch.vstack(x)), torch.hstack(y)
