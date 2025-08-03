@@ -51,7 +51,7 @@ class BeamSearchAlgorithm:
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
             central state).
-        :return: BeamSearchResult containing found path length and (optionally) the path itgraph.
+        :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         graph = self.graph
         if predictor is None:
