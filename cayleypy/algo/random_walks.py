@@ -15,19 +15,17 @@ class RandomWalksGenerator:
     """Generator for random walks on Cayley graphs.
 
     This class encapsulates the logic for generating random walks using different modes:
-    - "classic": Simple random walks with independent steps
-    - "bfs": Breadth-first search based random walks with uniqueness constraints
+
+      * "classic": Simple random walks with independent steps.
+      * "bfs": Breadth-first search based random walks with uniqueness constraints.
     """
 
     def __init__(self, graph: "CayleyGraph"):
         """Initialize the random walks generator.
 
-        :param graph: The Cayley graph to generate walks on
+        :param graph: The Cayley graph to generate walks on.
         """
         self.graph = graph
-        self.device = graph.device
-        self.definition = graph.definition
-        self.hasher = graph.hasher
 
     def generate(
         self,
@@ -85,8 +83,8 @@ class RandomWalksGenerator:
         """
         # Allocate memory.
         x_shape = (width * length, self.graph.encoded_state_size)
-        x = torch.zeros(x_shape, device=self.device, dtype=torch.int64)
-        y = torch.zeros(width * length, device=self.device, dtype=torch.int32)
+        x = torch.zeros(x_shape, device=self.graph.device, dtype=torch.int64)
+        y = torch.zeros(width * length, device=self.graph.device, dtype=torch.int32)
 
         # First state in each walk is the start state.
         x[:width, :] = start_state.reshape((-1,))
@@ -95,10 +93,10 @@ class RandomWalksGenerator:
         # Main loop.
         for i_step in range(1, length):
             y[i_step * width : (i_step + 1) * width] = i_step
-            gen_idx = torch.randint(0, self.definition.n_generators, (width,), device=self.device)
+            gen_idx = torch.randint(0, self.graph.definition.n_generators, (width,), device=self.graph.device)
             src = x[(i_step - 1) * width : i_step * width, :]
             dst = x[i_step * width : (i_step + 1) * width, :]
-            for j in range(self.definition.n_generators):
+            for j in range(self.graph.definition.n_generators):
                 # Go to next state for walks where we chose to use j-th generator on this step.
                 mask = gen_idx == j
                 prev_states = src[mask, :]
@@ -117,9 +115,9 @@ class RandomWalksGenerator:
         :return: Tuple of (states, distances)
         """
         x_hashes = TorchHashSet()
-        x_hashes.add_sorted_hashes(self.hasher.make_hashes(start_state))
+        x_hashes.add_sorted_hashes(self.graph.hasher.make_hashes(start_state))
         x = [start_state]
-        y = [torch.full((1,), 0, device=self.device, dtype=torch.int32)]
+        y = [torch.full((1,), 0, device=self.graph.device, dtype=torch.int32)]
 
         for i_step in range(1, length):
             next_states = self.graph.get_neighbors(x[-1])
@@ -136,5 +134,5 @@ class RandomWalksGenerator:
                 next_states_hashes = next_states_hashes[random_indices]
             x.append(next_states)
             x_hashes.add_sorted_hashes(next_states_hashes)
-            y.append(torch.full((layer_size,), i_step, device=self.device, dtype=torch.int32))
+            y.append(torch.full((layer_size,), i_step, device=self.graph.device, dtype=torch.int32))
         return self.graph.decode_states(torch.vstack(x)), torch.hstack(y)

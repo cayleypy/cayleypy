@@ -25,13 +25,9 @@ class BeamSearchAlgorithm:
     def __init__(self, graph: "CayleyGraph"):
         """Initialize the beam search algorithm.
 
-        :param graph: The Cayley graph to search on
+        :param graph: The Cayley graph to search on.
         """
         self.graph = graph
-        self.device = graph.device
-        self.definition = graph.definition
-        self.central_state_hash = graph.central_state_hash
-        self.verbose = graph.verbose
 
     def search(
         self,
@@ -55,23 +51,24 @@ class BeamSearchAlgorithm:
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
             central state).
-        :return: BeamSearchResult containing found path length and (optionally) the path itself.
+        :return: BeamSearchResult containing found path length and (optionally) the path itgraph.
         """
+        graph = self.graph
         if predictor is None:
-            predictor = Predictor(self.graph, "hamming")
+            predictor = Predictor(graph, "hamming")
 
-        start_states = self.graph.encode_states(start_state)
-        layer1, layer1_hashes = self.graph.get_unique_states(start_states)
+        start_states = graph.encode_states(start_state)
+        layer1, layer1_hashes = graph.get_unique_states(start_states)
         all_layers_hashes = [layer1_hashes]
         debug_scores = {}  # type: dict[int, float]
 
-        if self.central_state_hash[0] == layer1_hashes[0]:
+        if graph.central_state_hash[0] == layer1_hashes[0]:
             # Start state is the central state.
-            return BeamSearchResult(True, 0, [], debug_scores, self.definition)
+            return BeamSearchResult(True, 0, [], debug_scores, graph.definition)
 
-        bfs_layers_hashes = [self.central_state_hash]
+        bfs_layers_hashes = [graph.central_state_hash]
         if bfs_result_for_mitm is not None:
-            assert bfs_result_for_mitm.graph == self.definition
+            assert bfs_result_for_mitm.graph == graph.definition
             bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
         # Checks if any of `hashes` are in neighborhood of the central state.
@@ -86,35 +83,35 @@ class BeamSearchAlgorithm:
             if not return_path:
                 return None
             if found_layer_id == 0:
-                return self.graph.restore_path(all_layers_hashes, self.graph.central_state)
+                return graph.restore_path(all_layers_hashes, graph.central_state)
             assert bfs_result_for_mitm is not None
             mask = isin_via_searchsorted(layer2_hashes, bfs_layers_hashes[found_layer_id])
             assert torch.any(mask), "No intersection in Meet-in-the-middle"
-            middle_state = self.graph.decode_states(layer2[mask.nonzero()[0].item()].reshape((1, -1)))
-            path1 = self.graph.restore_path(all_layers_hashes, middle_state)
-            path2 = self.graph.find_path_from(middle_state, bfs_result_for_mitm)
+            middle_state = graph.decode_states(layer2[mask.nonzero()[0].item()].reshape((1, -1)))
+            path1 = graph.restore_path(all_layers_hashes, middle_state)
+            path2 = graph.find_path_from(middle_state, bfs_result_for_mitm)
             assert path2 is not None
             return path1 + path2
 
         for i in range(max_iterations):
             # Create states on the next layer.
-            layer2, layer2_hashes = self.graph.get_unique_states(self.graph.get_neighbors(layer1))
+            layer2, layer2_hashes = graph.get_unique_states(graph.get_neighbors(layer1))
 
             bfs_layer_id = _check_path_found(layer2_hashes)
             if bfs_layer_id != -1:
                 # Path found.
                 path = _restore_path(bfs_layer_id)
-                return BeamSearchResult(True, i + bfs_layer_id + 1, path, debug_scores, self.definition)
+                return BeamSearchResult(True, i + bfs_layer_id + 1, path, debug_scores, graph.definition)
 
             # Pick `beam_width` states with lowest scores.
             if len(layer2) >= beam_width:
-                scores = predictor(self.graph.decode_states(layer2))
+                scores = predictor(graph.decode_states(layer2))
                 idx = torch.argsort(scores)[:beam_width]
                 layer2 = layer2[idx, :]
                 layer2_hashes = layer2_hashes[idx]
                 best_score = float(scores[idx[0]])
                 debug_scores[i] = best_score
-                if self.verbose >= 2:
+                if graph.verbose >= 2:
                     print(f"Iteration {i}, best score {best_score}.")
 
             layer1 = layer2
@@ -123,4 +120,4 @@ class BeamSearchAlgorithm:
                 all_layers_hashes.append(layer1_hashes)
 
         # Path not found.
-        return BeamSearchResult(False, 0, None, debug_scores, self.definition)
+        return BeamSearchResult(False, 0, None, debug_scores, graph.definition)
