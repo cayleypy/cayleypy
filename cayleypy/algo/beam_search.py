@@ -258,37 +258,37 @@ class BeamSearchAlgorithm:
                 array_new_states = array_new_states.unsqueeze(0)
             elif array_new_states.dim() > 2:
                 array_new_states = array_new_states.flatten(end_dim=1)
-            t_moves += (time.time() - t1)
+            t_moves += time.time() - t1
 
             # Take only unique states
             t1 = time.time()
             array_new_states, _ = graph.get_unique_states(array_new_states)
-            t_unique_els += (time.time() - t1)
+            t_unique_els += time.time() - t1
 
             # Check if destination state found
             vec_tmp = torch.all(array_new_states == destination_states_encoded, dim=1)
             flag_found_destination = torch.any(vec_tmp).item()
             if flag_found_destination:
                 if verbose >= 1:
-                    print(f'Found destination state at step {i_step}, ways: {vec_tmp.sum().item()}')
+                    print(f"Found destination state at step {i_step}, ways: {vec_tmp.sum().item()}")
                 return BeamSearchResult(True, i_step, None, debug_scores, graph.definition)
 
             # Non-backtracking: forbid visiting states visited before
             if history_depth > 0:
                 t1 = time.time()
                 vec_hashes_new = graph.hasher.make_hashes(array_new_states)
-                t_hash += (time.time() - t1)
+                t_hash += time.time() - t1
 
                 t1 = time.time()
                 mask_new = ~torch.isin(vec_hashes_new, vec_hashes_current.view(-1), assume_unique=False)
-                t_isin += (time.time() - t1)
+                t_isin += time.time() - t1
                 mask_new_sum = mask_new.sum().item()
 
                 if mask_new_sum > 0:
                     array_new_states = array_new_states[mask_new, :]
                 else:
                     if verbose >= 1:
-                        print(f'Cannot find new states at step {i_step}')
+                        print(f"Cannot find new states at step {i_step}")
                     return BeamSearchResult(False, i_step, None, debug_scores, graph.definition)
 
                 # Update hash storage
@@ -313,7 +313,7 @@ class BeamSearchAlgorithm:
                 debug_scores[i_step] = best_score
 
                 if verbose >= 2:
-                    print(f'Step {i_step}, best score: {best_score:.2f}')
+                    print(f"Step {i_step}, best score: {best_score:.2f}")
             else:
                 array_beam_states = array_new_states
 
@@ -322,15 +322,17 @@ class BeamSearchAlgorithm:
             # Verbose output
             if verbose >= 10 and (i_step - 1) % 10 == 0:
                 t_full_step = time.time() - t_full_step
-                print(f'Step {i_step}, beam size: {array_beam_states.shape[0]}')
+                print(f"Step {i_step}, beam size: {array_beam_states.shape[0]}")
 
             if verbose >= 100 and (i_step - 1) % 15 == 0:
                 t_full_step = time.time() - t_full_step
-                print(f'Time: {time.time() - t0:.1f}s, t_moves: {t_moves:.3f}s, t_hash: {t_hash:.3f}s, '
-                      f't_isin: {t_isin:.3f}s, t_unique_els: {t_unique_els:.3f}s, t_full_step: {t_full_step:.3f}s')
+                print(
+                    f"Time: {time.time() - t0:.1f}s, t_moves: {t_moves:.3f}s, t_hash: {t_hash:.3f}s, "
+                    f"t_isin: {t_isin:.3f}s, t_unique_els: {t_unique_els:.3f}s, t_full_step: {t_full_step:.3f}s"
+                )
 
         # Path not found
         if verbose >= 1:
-            print(f'Path not found after {max_steps} steps')
+            print(f"Path not found after {max_steps} steps")
 
         return BeamSearchResult(False, max_steps, None, debug_scores, graph.definition)
