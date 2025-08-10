@@ -489,7 +489,7 @@ def test_beam_search_not_found():
     n = 50
     graph = CayleyGraph(PermutationGroups.lrx(n))
     start_state = np.random.permutation(n)
-    bs_result = graph.beam_search(start_state=start_state, beam_width=10, max_iterations=10)
+    bs_result = graph.beam_search(start_state=start_state, beam_width=10, max_steps=10)
     assert not bs_result.path_found
 
 

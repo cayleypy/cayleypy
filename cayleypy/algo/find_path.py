@@ -60,7 +60,7 @@ def find_path(graph: CayleyGraph, start_state: AnyStateType, **kwargs) -> Option
             start_state=start_state,
             predictor=predictor,
             beam_width=kwargs.get("beam_width") or 10**4,
-            max_iterations=kwargs.get("max_iterations") or 10**9,
+            max_steps=kwargs.get("max_steps") or 10**9,
             return_path=True,
             **kwargs,
         )
