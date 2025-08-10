@@ -172,7 +172,7 @@ class BeamSearchAlgorithm:
                 idx = torch.argsort(scores)[:beam_width]
                 layer2 = layer2[idx, :]
                 layer2_hashes = layer2_hashes[idx]
-                best_score = float(scores[idx[0]])
+                best_score = float(scores[idx[0]].detach())
                 debug_scores[i] = best_score
                 if graph.verbose >= 2:
                     print(f"Iteration {i}, best score {best_score}.")
