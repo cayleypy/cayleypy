@@ -400,9 +400,6 @@ def test_random_walks_bfs_matrix_groups():
     assert y.shape == (4635,)
 
 
-
-
-
 def test_path_to_from():
     n = 8
     graph = CayleyGraph(PermutationGroups.lrx(n))
