@@ -52,9 +52,9 @@ class BeamSearchAlgorithm:
           * "simple" - classic beam search algorithm that finds paths from start state to central state.
             Uses meet-in-the-middle optimization if `bfs_result_for_mitm` is provided.
             Supports path restoration if `return_path=True`.
-          * "advanced" - enhanced beam search with non-backtracking capabilities.
-            Supports configurable history depth to avoid revisiting states.
-            Uses PyTorch for efficient batch processing and supports various prediction models.
+                     * "advanced" - enhanced beam search with non-backtracking capabilities.
+             Supports configurable history depth to avoid revisiting states.
+             Uses PyTorch for efficient batch processing.
 
         :param start_state: State from which to start search.
         :param destination_state: Target state to find. Defaults to central state for "simple" mode.
@@ -75,7 +75,7 @@ class BeamSearchAlgorithm:
                 start_state=start_state,
                 predictor=predictor,
                 beam_width=beam_width,
-                max_iterations=max_steps,
+                max_steps=max_steps,
                 return_path=return_path,
                 bfs_result_for_mitm=bfs_result_for_mitm,
             )
@@ -98,7 +98,7 @@ class BeamSearchAlgorithm:
         start_state: AnyStateType,
         predictor: Optional[Predictor] = None,
         beam_width=1000,
-        max_iterations=1000,
+        max_steps=1000,
         return_path=False,
         bfs_result_for_mitm: Optional[BfsResult] = None,
     ) -> BeamSearchResult:
@@ -108,7 +108,7 @@ class BeamSearchAlgorithm:
         :param predictor: A heuristic that estimates scores for states (lower score = closer to center).
           Defaults to Hamming distance heuristic.
         :param beam_width: Width of the beam (how many "best" states we consider at each step).
-        :param max_iterations: Maximum number of iterations before giving up.
+        :param max_steps: Maximum number of iterations before giving up.
         :param return_path: Whether to return path (consumes much more memory if True).
         :param bfs_result_for_mitm: BfsResult with pre-computed neighborhood of central state to compute for
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
@@ -149,14 +149,14 @@ class BeamSearchAlgorithm:
                 return graph.restore_path(all_layers_hashes, graph.central_state)
             assert bfs_result_for_mitm is not None
             mask = isin_via_searchsorted(layer2_hashes, bfs_layers_hashes[found_layer_id])
-            assert torch.any(mask), "No intersection in Meet-in-the-middle"
+            assert torch.any(mask), "No intersection in Meet-in-the-middle."
             middle_state = graph.decode_states(layer2[mask.nonzero()[0].item()].reshape((1, -1)))
             path1 = graph.restore_path(all_layers_hashes, middle_state)
             path2 = graph.find_path_from(middle_state, bfs_result_for_mitm)
             assert path2 is not None
             return path1 + path2
 
-        for i in range(max_iterations):
+        for i in range(max_steps):
             # Create states on the next layer.
             layer2, layer2_hashes = graph.get_unique_states(graph.get_neighbors(layer1))
 
@@ -200,42 +200,41 @@ class BeamSearchAlgorithm:
 
         This method implements an improved beam search algorithm that supports:
         - Non-backtracking constraints (avoiding revisiting states)
-        - Various prediction models (torch models, sklearn models, heuristics)
         - Batch processing for efficiency
         - Configurable history depth for state banning
 
-        :param start_state: State from which to start search
-        :param destination_state: Target state to find. Defaults to central state
-        :param beam_width: Width of the beam (how many best states to consider)
-        :param max_steps: Maximum number of search steps
-        :param history_depth: How many previous levels to remember and ban from revisiting
-        :param predictor: Predictor object for scoring states. If None, uses Hamming distance
-        :param batch_size: Batch size for model predictions
-        :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling)
-        :return: BeamSearchResult with search results
+        :param start_state: State from which to start search.
+        :param destination_state: Target state to find. Defaults to central state.
+        :param beam_width: Width of the beam (how many best states to consider).
+        :param max_steps: Maximum number of search steps.
+        :param history_depth: How many previous levels to remember and ban from revisiting.
+        :param predictor: Predictor object for scoring states. If None, uses Hamming distance.
+        :param batch_size: Batch size for model predictions.
+        :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
+        :return: BeamSearchResult with search results.
         """
         graph = self.graph
 
-        # Use central state as destination if not specified
+        # Use central state as destination if not specified.
         if destination_state is None:
             destination_state = graph.central_state
 
-        # Encode states
+        # Encode states.
         start_states_encoded = graph.encode_states(start_state)
         destination_states_encoded = graph.encode_states(destination_state)
 
-        # Initialize predictor if not provided
+        # Initialize predictor if not provided.
         if predictor is None:
             predictor = Predictor(graph, "hamming")
 
-        # Check if start state is already the destination
+        # Check if start state is already the destination.
         if torch.all(start_states_encoded == destination_states_encoded):
             return BeamSearchResult(True, 0, [], {}, graph.definition)
 
-        # Initialize beam states
+        # Initialize beam states.
         array_beam_states = start_states_encoded.view(1, -1).clone()
 
-        # Initialize hash storage for non-backtracking
+        # Initialize hash storage for non-backtracking.
         if history_depth > 0:
             initial_hashes = graph.hasher.make_hashes(start_states_encoded)
             vec_hashes_current = initial_hashes.expand(
@@ -250,30 +249,30 @@ class BeamSearchAlgorithm:
             t_moves = t_hash = t_isin = t_unique_els = 0.0
             t_full_step = time.time()
 
-            # Create new states by applying all generators
+            # Create new states by applying all generators.
             t1 = time.time()
             array_new_states = graph.get_neighbors(array_beam_states)
-            # Ensure it's 2D: (n_states, state_size)
+            # Ensure it's 2D: (n_states, state_size).
             if array_new_states.dim() == 1:
                 array_new_states = array_new_states.unsqueeze(0)
             elif array_new_states.dim() > 2:
                 array_new_states = array_new_states.flatten(end_dim=1)
             t_moves += time.time() - t1
 
-            # Take only unique states
+            # Take only unique states.
             t1 = time.time()
             array_new_states, _ = graph.get_unique_states(array_new_states)
             t_unique_els += time.time() - t1
 
-            # Check if destination state found
+            # Check if destination state is found.
             vec_tmp = torch.all(array_new_states == destination_states_encoded, dim=1)
             flag_found_destination = torch.any(vec_tmp).item()
             if flag_found_destination:
                 if verbose >= 1:
-                    print(f"Found destination state at step {i_step}, ways: {vec_tmp.sum().item()}")
+                    print(f"Found destination state at step {i_step}, ways: {vec_tmp.sum().item()}.")
                 return BeamSearchResult(True, i_step, None, debug_scores, graph.definition)
 
-            # Non-backtracking: forbid visiting states visited before
+            # Non-backtracking: forbid visiting states visited before.
             if history_depth > 0:
                 t1 = time.time()
                 vec_hashes_new = graph.hasher.make_hashes(array_new_states)
@@ -288,21 +287,21 @@ class BeamSearchAlgorithm:
                     array_new_states = array_new_states[mask_new, :]
                 else:
                     if verbose >= 1:
-                        print(f"Cannot find new states at step {i_step}")
+                        print(f"Cannot find new states at step {i_step}.")
                     return BeamSearchResult(False, i_step, None, debug_scores, graph.definition)
 
-                # Update hash storage
+                # Update hash storage.
                 i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
                 i_tmp = len(vec_hashes_new)
                 vec_hashes_current[:i_tmp, i_cyclic_index_for_hash_storage] = vec_hashes_new
 
-            # Estimate states and select top beam_width ones
+            # Estimate states and select top beam_width ones.
             t_predict = time.time()
             if array_new_states.shape[0] > beam_width:
-                # Score states using predictor
+                # Score states using predictor.
                 scores = predictor(graph.decode_states(array_new_states))
 
-                # Select best states
+                # Select best states.
                 if isinstance(scores, torch.Tensor):
                     idx = torch.argsort(scores)[:beam_width]
                 else:
@@ -313,16 +312,16 @@ class BeamSearchAlgorithm:
                 debug_scores[i_step] = best_score
 
                 if verbose >= 2:
-                    print(f"Step {i_step}, best score: {best_score:.2f}")
+                    print(f"Step {i_step}, best score: {best_score:.2f}.")
             else:
                 array_beam_states = array_new_states
 
             t_predict = time.time() - t_predict
 
-            # Verbose output
+            # Verbose output.
             if verbose >= 10 and (i_step - 1) % 10 == 0:
                 t_full_step = time.time() - t_full_step
-                print(f"Step {i_step}, beam size: {array_beam_states.shape[0]}")
+                print(f"Step {i_step}, beam size: {array_beam_states.shape[0]}.")
 
             if verbose >= 100 and (i_step - 1) % 15 == 0:
                 t_full_step = time.time() - t_full_step
@@ -331,8 +330,8 @@ class BeamSearchAlgorithm:
                     f"t_isin: {t_isin:.3f}s, t_unique_els: {t_unique_els:.3f}s, t_full_step: {t_full_step:.3f}s"
                 )
 
-        # Path not found
+        # Path not found.
         if verbose >= 1:
-            print(f"Path not found after {max_steps} steps")
+            print(f"Path not found after {max_steps} steps.")
 
         return BeamSearchResult(False, max_steps, None, debug_scores, graph.definition)
