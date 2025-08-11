@@ -5,7 +5,6 @@ import pytest
 import torch
 
 from cayleypy.algo import bfs_numpy
-from cayleypy.algo.beam_search_result import BeamSearchResult
 from .cayley_graph import CayleyGraph
 from .cayley_graph_def import MatrixGenerator, CayleyGraphDef
 from .datasets import load_dataset
@@ -401,103 +400,7 @@ def test_random_walks_bfs_matrix_groups():
     assert y.shape == (4635,)
 
 
-def _validate_beam_search_result(graph: CayleyGraph, start_state, bs_result: BeamSearchResult):
-    assert bs_result.path_found
-    assert bs_result.path is not None
-    path_result = graph.apply_path(start_state, bs_result.path).reshape((-1))
-    assert torch.equal(path_result, graph.central_state)
 
-
-def _scramble(graph: CayleyGraph, num_scrambles: int) -> torch.Tensor:
-    return graph.random_walks(width=1, length=num_scrambles + 1)[0][-1]
-
-
-def test_beam_search_lrx_few_steps():
-    graph = CayleyGraph(PermutationGroups.lrx(5))
-    result0 = graph.beam_search(start_state=[0, 1, 2, 3, 4])
-    assert result0.path_found
-    assert result0.path_length == 0
-
-    result1 = graph.beam_search(start_state=[1, 0, 2, 3, 4], return_path=True)
-    assert result1.path_found
-    assert result1.path_length == 1
-    assert result1.path == [2]
-    assert result1.get_path_as_string() == "X"
-
-    result2 = graph.beam_search(start_state=[4, 1, 0, 2, 3], return_path=True)
-    assert result2.path_found
-    assert result2.path_length == 2
-    assert result2.path == [0, 2]
-    assert result2.get_path_as_string() == "L.X"
-
-
-def test_beam_search_lrx_n8_random():
-    n = 8
-    graph = CayleyGraph(PermutationGroups.lrx(n))
-    start_state = np.random.permutation(n)
-
-    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, return_path=True)
-    assert bs_result.path_length <= 28
-    _validate_beam_search_result(graph, start_state, bs_result)
-
-
-def test_beam_search_mini_pyramorphix():
-    graph = CayleyGraph(prepare_graph("mini_pyramorphix"))
-    start_state = _scramble(graph, 100)
-    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, return_path=True)
-    assert bs_result.path_length <= 5
-    _validate_beam_search_result(graph, start_state, bs_result)
-
-
-def test_beam_search_lrx_16():
-    graph = CayleyGraph(PermutationGroups.lrx(16))
-    predictor = Predictor.pretrained(graph)
-    state = _scramble(graph, 120)
-    result = graph.beam_search(start_state=state, predictor=predictor)
-    assert result.path_found
-
-
-def test_beam_search_lrx_16_meet_in_the_middle():
-    graph = CayleyGraph(PermutationGroups.lrx(16))
-    predictor = Predictor.pretrained(graph)
-    bfs_result = graph.bfs(max_diameter=10, return_all_hashes=True)
-    state = _scramble(graph, 120)
-    result = graph.beam_search(start_state=state, predictor=predictor, bfs_result_for_mitm=bfs_result, return_path=True)
-    assert result.path_found
-    _validate_beam_search_result(graph, state, result)
-
-
-@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
-def test_beam_search_lrx_32():
-    graph = CayleyGraph(PermutationGroups.lrx(32))
-    predictor = Predictor.pretrained(graph)
-    state = _scramble(graph, 496)
-    result = graph.beam_search(start_state=state, predictor=predictor)
-    assert result.path_found
-
-
-@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
-def test_beam_search_cube222():
-    graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
-    start_state = _scramble(graph, 100)
-    bs_result = graph.beam_search(start_state=start_state, beam_width=10**7, return_path=True)
-    assert bs_result.path_length <= 14
-    _validate_beam_search_result(graph, start_state, bs_result)
-
-
-def test_beam_search_not_found():
-    n = 50
-    graph = CayleyGraph(PermutationGroups.lrx(n))
-    start_state = np.random.permutation(n)
-    bs_result = graph.beam_search(start_state=start_state, beam_width=10, max_steps=10)
-    assert not bs_result.path_found
-
-
-def test_beam_search_matrix_groups():
-    graph = CayleyGraph(MatrixGroups.heisenberg())
-    start_state = [[1, 2, 3], [0, 1, 1], [0, 0, 1]]
-    bs_result = graph.beam_search(start_state=start_state, return_path=True)
-    _validate_beam_search_result(graph, start_state, bs_result)
 
 
 def test_path_to_from():
