@@ -86,10 +86,10 @@ class RandomWalksGenerator:
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate classic random walks.
 
-        :param width: Number of random walks to generate
-        :param length: Length of each random walk
-        :param start_state: Starting state for all walks
-        :return: Tuple of (states, distances)
+        :param width: Number of random walks to generate.
+        :param length: Length of each random walk.
+        :param start_state: Starting state for all walks.
+        :return: Tuple of (states, distances).
         """
         # Allocate memory.
         graph = self.graph
@@ -120,10 +120,10 @@ class RandomWalksGenerator:
     def random_walks_bfs(self, width: int, length: int, start_state: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
         """Generate BFS-based random walks.
 
-        :param width: Maximum number of states per layer
-        :param length: Maximum number of layers
-        :param start_state: Starting state for the BFS
-        :return: Tuple of (states, distances)
+        :param width: Maximum number of states per layer.
+        :param length: Maximum number of layers.
+        :param start_state: Starting state for the BFS.
+        :return: Tuple of (states, distances).
         """
         graph = self.graph
         x_hashes = TorchHashSet()
@@ -159,75 +159,75 @@ class RandomWalksGenerator:
         The procedure is similar to beam search, except there is no goal function.
         All trajectories know about each other and avoid visiting states visited by any trajectory.
 
-        :param width: Number of random walks to generate in parallel
-        :param length: Length of each random walk
-        :param start_state: Starting state for all walks (encoded)
-        :param history_depth: How many previous levels to remember and ban from revisiting
-        :return: Tuple of (states, distances)
+        :param width: Number of random walks to generate in parallel.
+        :param length: Length of each random walk.
+        :param start_state: Starting state for all walks (encoded).
+        :param history_depth: How many previous levels to remember and ban from revisiting.
+        :return: Tuple of (states, distances).
         """
         graph = self.graph
 
-        # Initialize current states - duplicate start_state width times
+        # Initialize current states - duplicate start_state width times.
         array_current_states = start_state.view(1, -1).expand(width, -1).clone()
 
-        # Allocate output arrays
+        # Allocate output arrays.
         states = torch.zeros(width * length, graph.encoded_state_size, device=graph.device, dtype=torch.int64)
         y = torch.zeros(width * length, device=graph.device, dtype=torch.int32)
 
-        # Store initial states
+        # Store initial states.
         states[:width, :] = array_current_states
         y[:width] = 0
 
-        # Initialize hash storage for non-backtracking
+        # Initialize hash storage for non-backtracking.
         if history_depth > 0:
-            # Use graph's hasher for consistency
+            # Use graph's hasher for consistency.
             initial_hashes = graph.hasher.make_hashes(start_state)
             vec_hashes_current = initial_hashes.expand(width * graph.definition.n_generators, history_depth).clone()
             i_cyclic_index_for_hash_storage = 0
 
         i_step_corrected = 0
         for i_step in range(1, length):
-            # 1. Create new states by applying all generators to all current states
+            # 1. Create new states by applying all generators to all current states.
             array_new_states = graph.get_neighbors(array_current_states)
-            # Ensure it's 2D: (n_states, state_size)
+            # Ensure it's 2D: (n_states, state_size).
             if array_new_states.dim() == 1:
                 array_new_states = array_new_states.unsqueeze(0)
             elif array_new_states.dim() > 2:
                 array_new_states = array_new_states.flatten(end_dim=1)
 
-            # 2. Non-backtracking: select states not seen before
+            # 2. Non-backtracking: select states not seen before.
             if history_depth > 0:
-                # Compute hashes of new states
+                # Compute hashes of new states.
                 vec_hashes_new = graph.hasher.make_hashes(array_new_states)
 
-                # Select only states not seen before
+                # Select only states not seen before.
                 mask_new = ~torch.isin(vec_hashes_new, vec_hashes_current.view(-1), assume_unique=False)
                 mask_new_sum = mask_new.sum().item()
 
                 if mask_new_sum >= width:
-                    # Select only new states - not visited before
+                    # Select only new states - not visited before.
                     array_new_states = array_new_states[mask_new, :]
                     i_step_corrected += 1
                 else:
-                    # Exceptional case: can't find enough new states
-                    # Take as many new states as possible and repeat if needed
+                    # Exceptional case: can't find enough new states.
+                    # Take as many new states as possible and repeat if needed.
                     if mask_new_sum > 0:
                         repeat_factor = int(np.ceil(width / mask_new_sum))
                         array_new_states = array_new_states[mask_new, :].repeat(repeat_factor, 1)[:width, :]
                         i_step_corrected += 1
                     else:
-                        # No new states found, stay in place
+                        # No new states found, stay in place.
                         array_new_states = array_current_states
 
-            # 3. Select desired number of states randomly
+            # 3. Select desired number of states randomly.
             perm = torch.randperm(array_new_states.size(0), device=graph.device)
             array_current_states = array_new_states[perm][:width]
 
-            # 4. Store results
+            # 4. Store results.
             y[i_step * width : (i_step + 1) * width] = i_step_corrected
             states[i_step * width : (i_step + 1) * width, :] = array_current_states
 
-            # 5. Update hash storage
+            # 5. Update hash storage.
             if history_depth > 0:
                 i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
                 vec_hashes_current[:, i_cyclic_index_for_hash_storage] = vec_hashes_new
