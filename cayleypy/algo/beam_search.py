@@ -52,9 +52,9 @@ class BeamSearchAlgorithm:
           * "simple" - classic beam search algorithm that finds paths from start state to central state.
             Uses meet-in-the-middle optimization if `bfs_result_for_mitm` is provided.
             Supports path restoration if `return_path=True`.
-                     * "advanced" - enhanced beam search with non-backtracking capabilities.
-             Supports configurable history depth to avoid revisiting states.
-             Uses PyTorch for efficient batch processing.
+          * "advanced" - enhanced beam search with non-backtracking capabilities.
+            Supports configurable history depth to avoid revisiting states.
+            Uses PyTorch for efficient batch processing.
 
         :param start_state: State from which to start search.
         :param destination_state: Target state to find. Defaults to central state for "simple" mode.
