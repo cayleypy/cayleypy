@@ -132,6 +132,12 @@ def test_coxeter_cayley_growth():
         assert layer_sizes == layer_sizes[::-1]  # Growth function is a palindrome.
 
 
+def test_larx_cayley_growth():
+    for key, layer_sizes in load_dataset("larx_cayley_growth").items():
+        n = int(key)
+        _verify_layers_fast(PermutationGroups.larx(n), layer_sizes)
+
+
 # This test checks that the hash function is good when states are bit-encoded (and there are no collisions).
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_coxeter_cayley_growth_upto_200000():
