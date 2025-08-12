@@ -467,6 +467,7 @@ class PermutationGroups:
             generators, central_state=list(range(n)), generator_names=generator_names, name=name
         )
 
+
 def prepare_graph(name: str, n: int = 0, **unused_kwargs) -> CayleyGraphDef:
     """Returns pre-defined CayleyGraphDef by codename and additional kwargs.
 
