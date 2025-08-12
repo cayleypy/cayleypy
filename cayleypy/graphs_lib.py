@@ -446,7 +446,7 @@ class PermutationGroups:
         return CayleyGraphDef.create(
             generators, central_state=list(range(n)), generator_names=generator_names, name=name
         )
-    
+
     @staticmethod
     def larx(n: int) -> CayleyGraphDef:
         """
@@ -454,7 +454,6 @@ class PermutationGroups:
         Creates two generators: one with 0,1 transposition and one with cyclic shift.
         """
         assert n >= 2, "Need n >= 2"
-        
         generators = []
         generator_names = []
         perm1 = [1, 0] + list(range(2, n))
