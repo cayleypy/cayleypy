@@ -2,6 +2,7 @@ import numpy as np
 
 from cayleypy import MatrixGroups
 from cayleypy.graphs_lib import PermutationGroups
+from cayleypy.cayley_graph_def import MatrixGenerator
 
 
 def test_lrx():
@@ -276,3 +277,64 @@ def test_heisenberg():
     assert graph2.name == "heisenberg%10"
     assert graph2.n_generators == 4
     assert graph1.generators_inverse_closed
+
+
+def test_sl_fund_roots():
+    graph = MatrixGroups.special_linear_fundamental_roots(2)
+    assert graph.n_generators == 4
+    assert graph.generators_inverse_closed
+    assert graph.generators == [
+        MatrixGenerator.create([[1, 1], [0, 1]]),
+        MatrixGenerator.create([[1, -1], [0, 1]]),
+        MatrixGenerator.create([[1, 0], [1, 1]]),
+        MatrixGenerator.create([[1, 0], [-1, 1]]),
+    ]
+
+    graph = MatrixGroups.special_linear_fundamental_roots(3)
+    assert graph.n_generators == 8
+    assert graph.generators_inverse_closed
+    assert graph.generators == [
+        MatrixGenerator.create([[1, 1, 0], [0, 1, 0], [0, 0, 1]]),
+        MatrixGenerator.create([[1, -1, 0], [0, 1, 0], [0, 0, 1]]),
+        MatrixGenerator.create([[1, 0, 0], [1, 1, 0], [0, 0, 1]]),
+        MatrixGenerator.create([[1, 0, 0], [-1, 1, 0], [0, 0, 1]]),
+        MatrixGenerator.create([[1, 0, 0], [0, 1, 1], [0, 0, 1]]),
+        MatrixGenerator.create([[1, 0, 0], [0, 1, -1], [0, 0, 1]]),
+        MatrixGenerator.create([[1, 0, 0], [0, 1, 0], [0, 1, 1]]),
+        MatrixGenerator.create([[1, 0, 0], [0, 1, 0], [0, -1, 1]]),
+    ]
+
+
+def test_sl_root_weyl():
+    graph = MatrixGroups.special_linear_root_weyl(2)
+    assert graph.n_generators == 4
+    assert graph.generators_inverse_closed
+    assert all(np.linalg.det(a.matrix) == 1 for a in graph.generators)
+    assert graph.generators == [
+        MatrixGenerator.create([[1, 1], [0, 1]]),
+        MatrixGenerator.create([[1, -1], [0, 1]]),
+        MatrixGenerator.create([[0, 1], [-1, 0]]),
+        MatrixGenerator.create([[0, -1], [1, 0]]),
+    ]
+
+    graph = MatrixGroups.special_linear_root_weyl(3)
+    assert graph.n_generators == 4
+    assert graph.generators_inverse_closed
+    assert all(np.linalg.det(a.matrix) == 1 for a in graph.generators)
+    assert graph.generators == [
+        MatrixGenerator.create([[1, 1, 0], [0, 1, 0], [0, 0, 1]]),
+        MatrixGenerator.create([[1, -1, 0], [0, 1, 0], [0, 0, 1]]),
+        MatrixGenerator.create([[0, 1, 0], [0, 0, 1], [1, 0, 0]]),
+        MatrixGenerator.create([[0, 0, 1], [1, 0, 0], [0, 1, 0]]),
+    ]
+
+    graph = MatrixGroups.special_linear_root_weyl(4)
+    assert graph.n_generators == 4
+    assert graph.generators_inverse_closed
+    assert all(np.linalg.det(a.matrix) == 1 for a in graph.generators)
+    assert graph.generators == [
+        MatrixGenerator.create([[1, 1, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
+        MatrixGenerator.create([[1, -1, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
+        MatrixGenerator.create([[0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1], [-1, 0, 0, 0]]),
+        MatrixGenerator.create([[0, 0, 0, -1], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]),
+    ]

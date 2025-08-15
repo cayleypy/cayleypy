@@ -207,6 +207,24 @@ def test_heisenberg_growth():
         _verify_layers_fast(MatrixGroups.heisenberg(n), layer_sizes)
 
 
+def test_sl_fund_roots_growth():
+    for n in [2, 3]:
+        for key, layer_sizes in load_dataset(f"sl_{n}_fund_roots_growth").items():
+            m = int(key)
+            if m in [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]:
+                assert sum(layer_sizes) == math.prod(m**n - m**i for i in range(n)) / (m - 1)
+            _verify_layers_fast(MatrixGroups.special_linear_fundamental_roots(n, modulo=m), layer_sizes)
+
+
+def test_sl_root_weyl_growth():
+    for n in [2, 3]:
+        for key, layer_sizes in load_dataset(f"sl_{n}_root_weyl_growth").items():
+            m = int(key)
+            if m in [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]:
+                assert sum(layer_sizes) == math.prod(m**n - m**i for i in range(n)) / (m - 1)
+            _verify_layers_fast(MatrixGroups.special_linear_root_weyl(n, modulo=m), layer_sizes)
+
+
 def test_puzzles_growth():
     data = load_dataset("puzzles_growth")
     _verify_layers_fast(Puzzles.rubik_cube(3, metric="HTM"), data["cube_333_htm"])
