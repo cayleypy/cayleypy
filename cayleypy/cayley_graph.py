@@ -1,5 +1,6 @@
 import gc
 import math
+from functools import cached_property
 from typing import Callable, Optional, Union
 
 import numpy as np
@@ -10,8 +11,6 @@ from .algo.random_walks import RandomWalksGenerator
 from .bfs_result import BfsResult
 from .cayley_graph_def import AnyStateType, CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
-
-
 from .string_encoder import StringEncoder
 from .torch_utils import isin_via_searchsorted
 
