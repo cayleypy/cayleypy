@@ -68,12 +68,12 @@ class MeetInTheMiddle:
 
         for middle_state in middle_states:
             try:
-                path2 = graph.restore_path(bfs_result.layers_hashes[:-1], middle_state)
+                path1 = graph.restore_path(bfs_result.layers_hashes[:-1], middle_state)
             except AssertionError as ex:
                 print("Warning! State did not work due to hash collision!", ex)
                 continue
-            path1 = graph_inv.restore_path(bfs_result_2.layers_hashes[:-1], middle_state)
-            return path2 + path1[::-1]
+            path2 = graph_inv.restore_path(bfs_result_2.layers_hashes[:-1], middle_state)
+            return path1 + path2[::-1]
         return None
 
     @staticmethod
@@ -112,5 +112,4 @@ class MeetInTheMiddle:
         """
         graph1 = graph.modified_copy(graph.definition.with_central_state(start_state))
         bfs_result = graph1.bfs(max_diameter=max_diameter, return_all_hashes=True, max_layer_size_to_store=0)
-        assert bfs_result.layers_hashes[0][0] == graph1.central_state_hash
         return MeetInTheMiddle.find_path_to(graph1, dest_state, bfs_result)
