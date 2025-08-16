@@ -256,7 +256,7 @@ def test_beam_search_advanced_cube222():
     """Test advanced beam search on 2x2x2 cube."""
     graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
     start_state = _scramble(graph, 100)
-    bs_result = graph.beam_search(start_state=start_state, beam_mode="advanced", beam_width=10**7, history_depth=3)
+    bs_result = graph.beam_search(start_state=start_state, beam_mode="advanced", beam_width=10**4, history_depth=3)
     assert bs_result.path_found
 
 

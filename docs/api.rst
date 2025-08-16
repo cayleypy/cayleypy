@@ -53,4 +53,4 @@ Special algorithms
 
     cayleypy.algo.bfs_bitmask
     cayleypy.algo.bfs_numpy
-    cayleypy.algo.find_path_bfs_mitm
+    cayleypy.algo.MeetInTheMiddle
