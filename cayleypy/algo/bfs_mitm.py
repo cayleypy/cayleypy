@@ -1,6 +1,6 @@
 """Breadth-first-search with meet-in-the-middle."""
 
-from typing import Union, Optional, AnyStr
+from typing import Union, Optional
 
 import numpy as np
 import torch
