@@ -4,7 +4,6 @@ from typing import Callable, Optional, Union
 
 import numpy as np
 import torch
-from propcache import cached_property
 
 from .algo.beam_search import BeamSearchAlgorithm
 from .algo.random_walks import RandomWalksGenerator
