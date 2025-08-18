@@ -11,13 +11,17 @@ from .cayley_graph_def import CayleyGraphDef
 class CayleyPath:
     """Path in a Cayley graph."""
 
-    start_state: torch.Tensor  # First state of the path.
-    edges: list[int]  # Edges, represented by generator IDs.
+    start_state: torch.Tensor
+    """First state of the path."""
+
+    edges: list[int]
+    """Edges, represented by generator IDs."""
+
     graph: CayleyGraphDef
 
     @cached_property
     def all_states(self) -> list[torch.Tensor]:
-        """Returns all states on the path."""
+        """All states on the path."""
         ans = [self.start_state]
         graph = CayleyGraph(self.graph)
         for gen_id in self.edges:
@@ -26,6 +30,7 @@ class CayleyPath:
 
     @cached_property
     def end_state(self):
+        """Last state of the path."""
         return self.all_states[-1]
 
     def __repr__(self) -> str:
