@@ -121,15 +121,19 @@ class MeetInTheMiddle:
         graph: CayleyGraph,
         start_states: AnyStateType,
         dest_states: AnyStateType,
-        max_diameter: int = 1000,
+        max_diameter: int = 10**9,
     ) -> Optional[CayleyPath]:
         """Finds shortest path between two sets of states using MITM algorithm.
 
-        Finds such x from `start_states` and y in `dest_states` such that shortest path from x to y is shortest
-        among all such paths and returns such path.
+        Finds such x in ``start_states`` and y in ``dest_states`` that the shortest path from x to y is the shortest
+        among all such paths and returns that path.
 
-        The difference from `find_path_between` is that this version of algorithm computes BFS layers from both sides
-        synchronously. Also, it supports finding paths between sets of sets.
+        The difference from ``find_path_between`` is that this version of algorithm computes BFS layers from both sides
+        synchronously. Also, it supports finding paths between sets of states.
+
+        Will find the shortest path if and only if there exists a path between given sets of length
+        ``<= 2*max_diameter``. If the shortest path is longer, or if sets are not connected in the graph, will return
+        ``None``.
 
         :param graph: Graph in which path needs to be found.
         :param start_states: Set of initial states
