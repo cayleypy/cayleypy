@@ -45,7 +45,7 @@ def test_find_path_bfs_mitm_cube222():
     assert len(path) == 11
     graph.validate_path(start_state, path)
 
-    path2 = MeetInTheMiddle.find_path_between_v2(graph, start_state, graph.central_state).edges
+    path2 = MeetInTheMiddle.find_path_between(graph, start_state, graph.central_state).edges
     assert len(path2) == 11
     graph.validate_path(start_state, path2)
 
@@ -66,7 +66,7 @@ def test_mitm_lx10():
     assert len(path) == 36
     assert torch.equal(graph.apply_path(graph.central_state, path)[0], dest_state)
 
-    path2 = MeetInTheMiddle.find_path_between_v2(graph, graph.central_state, dest_state).edges
+    path2 = MeetInTheMiddle.find_path_between(graph, graph.central_state, dest_state).edges
     assert len(path2) == 36
     assert path2 == path
 
@@ -78,22 +78,19 @@ def test_mitm_find_path_between_lx10():
 
     assert MeetInTheMiddle.find_path_between(graph, perm1, perm2, 4) is None
     path = MeetInTheMiddle.find_path_between(graph, perm1, perm2, 5)
-    assert path == [1, 0, 0, 0, 0, 0, 1, 0, 1, 0]
-
-    path2 = MeetInTheMiddle.find_path_between_v2(graph, perm1, perm2).edges
-    assert path2 == path
+    assert path.edges == [1, 0, 0, 0, 0, 0, 1, 0, 1, 0]
 
 
 def _state_to_tuple(state):
     return tuple(int(x) for x in state)
 
 
-def test_find_path_between_v2_lrx10():
+def test_find_path_between_sets_lrx10():
     n = 10
     graph = CayleyGraph(PermutationGroups.lrx(n))
     states1 = [_state_to_tuple(np.random.permutation(n)) for _ in range(10)]
     states2 = [_state_to_tuple(np.random.permutation(n)) for _ in range(10)]
-    path = MeetInTheMiddle.find_path_between_v2(graph, states1, states2)
+    path = MeetInTheMiddle.find_path_between(graph, states1, states2)
 
     assert _state_to_tuple(path.start_state) in states1
     assert _state_to_tuple(path.end_state) in states2

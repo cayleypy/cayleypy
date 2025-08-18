@@ -97,28 +97,6 @@ class MeetInTheMiddle:
     @staticmethod
     def find_path_between(
         graph: CayleyGraph,
-        start_state: AnyStateType,
-        dest_state: AnyStateType,
-        max_diameter: int = 10,
-    ):
-        """Finds shortest path between two states using MITM algorithm.
-
-        If shortest path has length ``<= 2*max_diameter``, this algorithm is guaranteed to find the shortest
-        path. Otherwise, it returns None.
-
-        :param graph: Graph in which path needs to be found.
-        :param start_state: First state of the path.
-        :param dest_state: Last state of the path.
-        :param max_diameter: depth of BFS.
-        :return: The found path (list of generator ids), or ``None`` if path was not found.
-        """
-        graph1 = graph.modified_copy(graph.definition.with_central_state(start_state))
-        bfs_result = graph1.bfs(max_diameter=max_diameter, return_all_hashes=True, max_layer_size_to_store=0)
-        return MeetInTheMiddle.find_path_to(graph1, dest_state, bfs_result)
-
-    @staticmethod
-    def find_path_between_v2(
-        graph: CayleyGraph,
         start_states: AnyStateType,
         dest_states: AnyStateType,
         max_diameter: int = 10**9,
@@ -128,16 +106,18 @@ class MeetInTheMiddle:
         Finds such x in ``start_states`` and y in ``dest_states`` that the shortest path from x to y is the shortest
         among all such paths and returns that path.
 
-        The difference from ``find_path_between`` is that this version of algorithm computes BFS layers from both sides
-        synchronously. Also, it supports finding paths between sets of states.
+        If the shortest path exists and has length ``<= 2*max_diameter``, this algorithm is guaranteed to find the
+        shortest path. Otherwise, it returns ``None``.
 
-        Will find the shortest path if and only if there exists a path between given sets of length
-        ``<= 2*max_diameter``. If the shortest path is longer, or if sets are not connected in the graph, will return
-        ``None``.
+        The difference from ``find_path_from`` and ``find_path_to`` is that this version of algorithm computes BFS
+        layers from both sides synchronously. Also, it supports finding paths between sets of states.
+
+        Note that this algorithm can also be used to find the shortest path between 2 states, you just need to pass two
+        single states instead of sets of states
 
         :param graph: Graph in which path needs to be found.
-        :param start_states: Set of initial states
-        :param dest_states: Set of destination states.
+        :param start_states: Set of initial states (as list or 2D tensor).
+        :param dest_states: Set of destination states (as list or 2D tensor).
         :param max_diameter: depth of BFS.
         :return: The found path, or ``None`` if path was not found.
         """

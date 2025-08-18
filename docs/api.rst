@@ -14,6 +14,7 @@ Core classes and functions
 
     cayleypy.CayleyGraphDef
     cayleypy.CayleyGraph
+    cayleypy.CayleyPath
     cayleypy.BfsResult
     cayleypy.find_path
 
