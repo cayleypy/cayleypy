@@ -146,7 +146,7 @@ class MeetInTheMiddle:
         if mid_state is not None:
             return CayleyPath(mid_state, [], graph.definition)
 
-        for j in range(max_diameter):
+        for _ in range(max_diameter):
             bfs1.step()
             bfs2.step()
 
