@@ -149,7 +149,6 @@ class MeetInTheMiddle:
         for j in range(max_diameter):
             bfs1.step()
             bfs2.step()
-            print(f"Step{j} hashes1={bfs1.hashes[-1]} hashes2={bfs2.hashes[-1]}")
 
             mid_state, path2 = None, None
             for i in [2, 1]:
@@ -161,7 +160,7 @@ class MeetInTheMiddle:
             if mid_state is not None:
                 assert path2 is not None
                 path1 = graph.restore_path(bfs1.hashes[:-1], mid_state)
-                start_state = graph_inv.apply_path(mid_state, path1[::-1])
+                start_state = graph_inv.apply_path(mid_state, path1[::-1])[0]
                 return CayleyPath(start_state, path1 + path2[::-1], graph.definition)
 
         return None

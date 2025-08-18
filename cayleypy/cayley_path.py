@@ -21,11 +21,12 @@ class CayleyPath:
         ans = [self.start_state]
         graph = CayleyGraph(self.graph)
         for gen_id in self.edges:
-            prev_state = ans[-1]
-            next_state = torch.zeros_like(prev_state)
-            graph.apply_generator_batched(gen_id, prev_state, next_state)
-            ans.append(next_state)
+            ans.append(graph.apply_path(ans[-1], [gen_id])[0])
         return ans
+
+    @cached_property
+    def end_state(self):
+        return self.all_states[-1]
 
     def __repr__(self) -> str:
         return self.graph.path_to_string(self.edges)
