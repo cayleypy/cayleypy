@@ -375,14 +375,12 @@ class CayleyGraph:
         """Restores path from layers hashes.
 
         Layers must be such that there is edge from state on previous layer to state on next layer.
-        First layer in `hashes` must have exactly one state, this is the start of the path.
         The end of the path is to_state.
         Last layer in `hashes` must contain a state from which there is a transition to `to_state`.
         `to_state` must be in "decoded" format.
         Length of returned path is equal to number of layers.
         """
         inv_graph = self.with_inverted_generators
-        assert len(hashes[0]) == 1
         path = []  # type: list[int]
         cur_state = self.decode_states(self.encode_states(to_state))
 

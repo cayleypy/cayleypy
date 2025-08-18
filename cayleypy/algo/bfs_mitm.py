@@ -5,9 +5,11 @@ from typing import Union, Optional
 import numpy as np
 import torch
 
+from . import InteractiveBfs
 from ..bfs_result import BfsResult
 from ..cayley_graph import CayleyGraph
 from ..cayley_graph_def import AnyStateType
+from ..cayley_path import CayleyPath
 from ..torch_utils import isin_via_searchsorted
 
 
@@ -113,3 +115,53 @@ class MeetInTheMiddle:
         graph1 = graph.modified_copy(graph.definition.with_central_state(start_state))
         bfs_result = graph1.bfs(max_diameter=max_diameter, return_all_hashes=True, max_layer_size_to_store=0)
         return MeetInTheMiddle.find_path_to(graph1, dest_state, bfs_result)
+
+    @staticmethod
+    def find_path_between_v2(
+        graph: CayleyGraph,
+        start_states: AnyStateType,
+        dest_states: AnyStateType,
+        max_diameter: int = 1000,
+    ) -> Optional[CayleyPath]:
+        """Finds shortest path between two sets of states using MITM algorithm.
+
+        Finds such x from `start_states` and y in `dest_states` such that shortest path from x to y is shortest
+        among all such paths and returns such path.
+
+        The difference from `find_path_between` is that this version of algorithm computes BFS layers from both sides
+        synchronously. Also, it supports finding paths between sets of sets.
+
+        :param graph: Graph in which path needs to be found.
+        :param start_states: Set of initial states
+        :param dest_states: Set of destination states.
+        :param max_diameter: depth of BFS.
+        :return: The found path, or ``None`` if path was not found.
+        """
+        bfs1 = InteractiveBfs(graph, start_states)
+        graph_inv = graph.with_inverted_generators
+        bfs2 = InteractiveBfs(graph_inv, dest_states)
+
+        # Check if sets intersect.
+        mid_state = bfs1.find_on_last_layer(bfs2.hashes[-1])
+        if mid_state is not None:
+            return CayleyPath(mid_state, [], graph.definition)
+
+        for j in range(max_diameter):
+            bfs1.step()
+            bfs2.step()
+            print(f"Step{j} hashes1={bfs1.hashes[-1]} hashes2={bfs2.hashes[-1]}")
+
+            mid_state, path2 = None, None
+            for i in [2, 1]:
+                # Check intersection of last layer of bfs1 with last 2 layers of bfs2.
+                mid_state = bfs1.find_on_last_layer(bfs2.hashes[-i])
+                if mid_state is not None:
+                    path2 = graph_inv.restore_path(bfs2.hashes[:-i], mid_state)
+                    break
+            if mid_state is not None:
+                assert path2 is not None
+                path1 = graph.restore_path(bfs1.hashes[:-1], mid_state)
+                start_state = graph_inv.apply_path(mid_state, path1[::-1])
+                return CayleyPath(start_state, path1 + path2[::-1], graph.definition)
+
+        return None
