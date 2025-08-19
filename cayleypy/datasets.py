@@ -88,6 +88,10 @@ def _compute_all_transpositions_cayley_growth(n_str: str) -> list[int]:
     return [_stirling(n, n + 1 - k) for k in range(1, n + 1)]
 
 
+def _compute_transposons_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.transposons(int(n))).bfs().layer_sizes
+
+
 def _compute_pancake_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.pancake(int(n))).bfs().layer_sizes
 
@@ -185,6 +189,7 @@ def generate_datasets():
     _update_dataset("all_transpositions_cayley_growth", keys, _compute_all_transpositions_cayley_growth)
     _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     keys = [str(n) for n in range(2, 11)]
+    _update_dataset("transposons_cayley_growth", keys, _compute_transposons_cayley_growth)
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
     _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)

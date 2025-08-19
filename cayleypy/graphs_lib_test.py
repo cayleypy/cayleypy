@@ -34,6 +34,38 @@ def test_all_transpositions():
     assert graph.n_generators == (20 * 19) // 2
 
 
+def test_transposons():
+    graph = PermutationGroups.transposons(4)
+    print(graph.generators)
+    assert np.array_equal(
+        graph.generators,
+        [
+            [1, 0, 2, 3],
+            [1, 2, 0, 3],
+            [1, 2, 3, 0],
+            [2, 0, 1, 3],
+            [2, 3, 0, 1],
+            [3, 0, 1, 2],
+            [0, 2, 1, 3],
+            [0, 2, 3, 1],
+            [0, 3, 1, 2],
+            [0, 1, 3, 2],
+        ],
+    )
+    assert graph.generator_names == [
+        "T[0..0,1]",
+        "T[0..0,2]",
+        "T[0..0,3]",
+        "T[0..1,2]",
+        "T[0..1,3]",
+        "T[0..2,3]",
+        "T[1..1,2]",
+        "T[1..1,3]",
+        "T[1..2,3]",
+        "T[2..2,3]",
+    ]
+
+
 def test_pancake():
     graph = PermutationGroups.pancake(6)
     assert graph.n_generators == 5
