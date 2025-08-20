@@ -37,7 +37,10 @@ def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str
         if key not in data:
             data[key] = json.dumps(eval_func(key))
     rows = list(data.items())
-    rows.sort(key=lambda x: (len(x[0]), x[0]))
+    if "coset" in dataset_name:
+        rows.sort(key=lambda x: (len(x[0]), x[0]))
+    else:
+        rows.sort(key=lambda x: tuple(map(int, x[0].split(","))))
     with open(file_name, "w", encoding="utf-8", newline="") as csvfile:
         writer = csv.writer(csvfile)
         for row in rows:
@@ -142,8 +145,9 @@ def _compute_all_cycles_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.all_cycles(int(n))).bfs().layer_sizes
 
 
-def _compute_heisenberg_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("heisenberg", n=int(n))).bfs().layer_sizes
+def _compute_heisenberg_growth(key: str) -> list[int]:
+    n, modulo = map(int, key.split(","))
+    return CayleyGraph(MatrixGroups.heisenberg(n=n, modulo=modulo)).bfs().layer_sizes
 
 
 def _compute_sl_fund_roots_growth(n: str, m: str) -> list[int]:
@@ -204,7 +208,7 @@ def generate_datasets():
         for parameters in group:
             keys.append(",".join([str(x) for x in parameters]))
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
-    keys = [str(n) for n in range(2, 51)]
+    keys = [f"{n},{modulo}" for n in range(3, 11) for modulo in range(2, 51) if modulo ** (2 * n - 3) <= 2e6]
     _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)
     keys = [str(n) for n in range(2, 8)]
     _update_dataset("all_cycles_cayley_growth", keys, _compute_all_cycles_cayley_growth)

@@ -112,6 +112,7 @@ def test_signed_reversals_cayley_growth():
 
 
 # Number of elements in coset graph for LRX and binary strings is binomial coefficient.
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_lrx_coset_growth():
     for central_state, layer_sizes in load_dataset("lrx_coset_growth").items():
         n = len(central_state)
@@ -122,6 +123,7 @@ def test_lrx_coset_growth():
 
 
 # Number of elements in coset graph for TopSpin and binary strings is binomial coefficient, for n>=6.
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_top_spin_coset_growth():
     for central_state, layer_sizes in load_dataset("top_spin_coset_growth").items():
         n = len(central_state)
@@ -208,11 +210,12 @@ def test_hungarian_rings_growth():
         _verify_layers_fast(Puzzles.hungarian_rings(*parameters), layer_sizes)
 
 
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_heisenberg_growth():
     for key, layer_sizes in load_dataset("heisenberg_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == n**3
-        _verify_layers_fast(MatrixGroups.heisenberg(n), layer_sizes)
+        n, modulo = map(int, key.split(","))
+        assert sum(layer_sizes) == modulo ** (2 * n - 3)
+        _verify_layers_fast(MatrixGroups.heisenberg(n=n, modulo=modulo), layer_sizes)
 
 
 def test_sl_fund_roots_growth():
