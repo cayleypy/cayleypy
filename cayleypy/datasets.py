@@ -8,7 +8,7 @@ import math
 from typing import Any, Callable
 
 from .cayley_graph import CayleyGraph
-from .graphs_lib import prepare_graph, PermutationGroups
+from .graphs_lib import prepare_graph, PermutationGroups, MatrixGroups
 from .puzzles.hungarian_rings import get_group as get_hr_group
 from .puzzles.puzzles import Puzzles
 
@@ -37,8 +37,11 @@ def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str
         if key not in data:
             data[key] = json.dumps(eval_func(key))
     rows = list(data.items())
-    rows.sort(key=lambda x: (len(x[0]), x[0]))
-    with open(file_name, "w", encoding="utf-8") as csvfile:
+    if "coset" in dataset_name:
+        rows.sort(key=lambda x: (len(x[0]), x[0]))
+    else:
+        rows.sort(key=lambda x: tuple(map(int, x[0].split(","))))
+    with open(file_name, "w", encoding="utf-8", newline="") as csvfile:
         writer = csv.writer(csvfile)
         for row in rows:
             writer.writerow(row)
@@ -86,6 +89,10 @@ def _compute_all_transpositions_cayley_growth(n_str: str) -> list[int]:
     # Growth function is given by Stirling numbers, see https://oeis.org/A094638.
     n = int(n_str)
     return [_stirling(n, n + 1 - k) for k in range(1, n + 1)]
+
+
+def _compute_transposons_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.transposons(int(n))).bfs().layer_sizes
 
 
 def _compute_pancake_cayley_growth(n: str) -> list[int]:
@@ -138,8 +145,17 @@ def _compute_all_cycles_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.all_cycles(int(n))).bfs().layer_sizes
 
 
-def _compute_heisenberg_growth(n: str) -> list[int]:
-    return CayleyGraph(prepare_graph("heisenberg", n=int(n))).bfs().layer_sizes
+def _compute_heisenberg_growth(key: str) -> list[int]:
+    n, modulo = map(int, key.split(","))
+    return CayleyGraph(MatrixGroups.heisenberg(n=n, modulo=modulo)).bfs().layer_sizes
+
+
+def _compute_sl_fund_roots_growth(n: str, m: str) -> list[int]:
+    return CayleyGraph(MatrixGroups.special_linear_fundamental_roots(int(n), modulo=int(m))).bfs().layer_sizes
+
+
+def _compute_sl_root_weyl_growth(n: str, m: str) -> list[int]:
+    return CayleyGraph(MatrixGroups.special_linear_root_weyl(int(n), modulo=int(m))).bfs().layer_sizes
 
 
 def _compute_rapaport_m1_cayley_growth(n: str) -> list[int]:
@@ -181,6 +197,7 @@ def generate_datasets():
     _update_dataset("all_transpositions_cayley_growth", keys, _compute_all_transpositions_cayley_growth)
     _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     keys = [str(n) for n in range(2, 11)]
+    _update_dataset("transposons_cayley_growth", keys, _compute_transposons_cayley_growth)
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
     _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
@@ -195,7 +212,7 @@ def generate_datasets():
         for parameters in group:
             keys.append(",".join([str(x) for x in parameters]))
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
-    keys = [str(n) for n in range(2, 51)]
+    keys = [f"{n},{modulo}" for n in range(3, 11) for modulo in range(2, 51) if modulo ** (2 * n - 3) <= 2e6]
     _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)
     keys = [str(n) for n in range(2, 8)]
     _update_dataset("all_cycles_cayley_growth", keys, _compute_all_cycles_cayley_growth)
@@ -205,3 +222,11 @@ def generate_datasets():
     _update_dataset("stars_cayley_growth", keys, _compute_stars_cayley_growth)
     keys = [str(n) for n in range(2, 8)]
     _update_dataset("larx_cayley_growth", keys, _compute_larx_cayley_growth)
+    keys = [str(n) for n in range(2, 11)]
+    _update_dataset("sl_2_fund_roots_growth", keys, lambda m: _compute_sl_fund_roots_growth(2, m))
+    keys = [str(n) for n in range(2, 6)]
+    _update_dataset("sl_3_fund_roots_growth", keys, lambda m: _compute_sl_fund_roots_growth(3, m))
+    keys = [str(n) for n in range(2, 11)]
+    _update_dataset("sl_2_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(2, m))
+    keys = [str(n) for n in range(2, 6)]
+    _update_dataset("sl_3_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(3, m))

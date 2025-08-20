@@ -14,6 +14,7 @@ Core classes and functions
 
     cayleypy.CayleyGraphDef
     cayleypy.CayleyGraph
+    cayleypy.CayleyPath
     cayleypy.BfsResult
     cayleypy.find_path
 
@@ -53,4 +54,5 @@ Special algorithms
 
     cayleypy.algo.bfs_bitmask
     cayleypy.algo.bfs_numpy
-    cayleypy.algo.find_path_bfs_mitm
+    cayleypy.algo.InteractiveBfs
+    cayleypy.algo.MeetInTheMiddle

@@ -1,10 +1,12 @@
 from dataclasses import dataclass, replace
 from functools import cached_property
 from typing import Optional, Union, Any
+
+import h5py
 import numpy as np
 import torch
 from scipy.sparse import coo_array
-import h5py
+
 from cayleypy.permutation_utils import apply_permutation
 from .cayley_graph_def import CayleyGraphDef
 
@@ -17,9 +19,14 @@ class BfsResult:
     they are visited by BFS.
     """
 
-    bfs_completed: bool  # Whether full graph was explored.
-    layer_sizes: list[int]  # i-th element is number of states at distance i from start.
-    layers: dict[int, torch.Tensor]  # Explicitly stored states for each layer.
+    bfs_completed: bool
+    """Whether full graph was explored."""
+
+    layer_sizes: list[int]
+    """i-th element is number of states at distance i from start."""
+
+    layers: dict[int, torch.Tensor]
+    """Explicitly stored states for each layer."""
 
     # Hashes of all vertices (if requested). Empty if not requested
     # Order is the same as order of states in layers.
@@ -29,8 +36,8 @@ class BfsResult:
     # Tensor of shape (num_edges, 2) where vertices are represented by their hashes.
     edges_list_hashes: Optional[torch.Tensor]
 
-    # Definition of the CayleyGraph on which BFS was run. Needed if we want to restore edge names.
     graph: "CayleyGraphDef"
+    """Definition of the CayleyGraph on which BFS was run. Needed if we want to restore edge names."""
 
     def __eq__(self, other: Any) -> bool:
 

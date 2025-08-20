@@ -3,7 +3,7 @@
 import time
 from typing import Optional
 
-from .bfs_mitm import find_path_bfs_mitm
+from .bfs_mitm import MeetInTheMiddle
 from ..bfs_result import BfsResult
 from ..cayley_graph import CayleyGraph
 from ..cayley_graph_def import AnyStateType
@@ -69,8 +69,13 @@ def find_path(graph: CayleyGraph, start_state: AnyStateType, **kwargs) -> Option
     # Try finding exact solution using pre-computed cached BFS result.
     # This will work for small graphs or short paths.
     # If this fails, we return None (for now). In future more path finding algorithms might be added.
-    bfs_result = _precompute_bfs(graph, **kwargs)
     if graph.definition.generators_inverse_closed:
-        return find_path_bfs_mitm(graph, start_state, bfs_result)
+        bfs_result = _precompute_bfs(graph, **kwargs)
+        return MeetInTheMiddle.find_path_from(graph, start_state, bfs_result)
     else:
-        return graph.find_path_from(start_state, bfs_result)
+        graph_inv = graph.with_inverted_generators
+        bfs_result = _precompute_bfs(graph_inv, **kwargs)
+        path = MeetInTheMiddle.find_path_to(graph_inv, start_state, bfs_result)
+        if path is None:
+            return None
+        return path[::-1]

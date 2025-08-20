@@ -73,6 +73,14 @@ def test_all_transpositions_cayley_growth():
         assert layer_sizes[-1] == math.factorial(n - 1)  # Size of last layer is (n-1)!.
 
 
+def test_transposons_cayley_growth():
+    oeis_a065603 = [None, 0, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 8, 8, 9]
+    for key, layer_sizes in load_dataset("transposons_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        assert len(layer_sizes) - 1 == oeis_a065603[n]
+
+
 def test_pancake_cayley_growth():
     # See https://oeis.org/A058986
     oeis_a058986 = [None, 0, 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 22]
@@ -104,6 +112,7 @@ def test_signed_reversals_cayley_growth():
 
 
 # Number of elements in coset graph for LRX and binary strings is binomial coefficient.
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_lrx_coset_growth():
     for central_state, layer_sizes in load_dataset("lrx_coset_growth").items():
         n = len(central_state)
@@ -114,6 +123,7 @@ def test_lrx_coset_growth():
 
 
 # Number of elements in coset graph for TopSpin and binary strings is binomial coefficient, for n>=6.
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_top_spin_coset_growth():
     for central_state, layer_sizes in load_dataset("top_spin_coset_growth").items():
         n = len(central_state)
@@ -206,11 +216,30 @@ def test_hungarian_rings_growth():
         _verify_layers_fast(Puzzles.hungarian_rings(*parameters), layer_sizes)
 
 
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
 def test_heisenberg_growth():
     for key, layer_sizes in load_dataset("heisenberg_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == n**3
-        _verify_layers_fast(MatrixGroups.heisenberg(n), layer_sizes)
+        n, modulo = map(int, key.split(","))
+        assert sum(layer_sizes) == modulo ** (2 * n - 3)
+        _verify_layers_fast(MatrixGroups.heisenberg(n=n, modulo=modulo), layer_sizes)
+
+
+def test_sl_fund_roots_growth():
+    for n in [2, 3]:
+        for key, layer_sizes in load_dataset(f"sl_{n}_fund_roots_growth").items():
+            m = int(key)
+            if m in [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]:
+                assert sum(layer_sizes) == math.prod(m**n - m**i for i in range(n)) / (m - 1)
+            _verify_layers_fast(MatrixGroups.special_linear_fundamental_roots(n, modulo=m), layer_sizes)
+
+
+def test_sl_root_weyl_growth():
+    for n in [2, 3]:
+        for key, layer_sizes in load_dataset(f"sl_{n}_root_weyl_growth").items():
+            m = int(key)
+            if m in [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]:
+                assert sum(layer_sizes) == math.prod(m**n - m**i for i in range(n)) / (m - 1)
+            _verify_layers_fast(MatrixGroups.special_linear_root_weyl(n, modulo=m), layer_sizes)
 
 
 def test_puzzles_growth():
