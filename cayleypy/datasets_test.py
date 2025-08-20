@@ -202,9 +202,9 @@ def test_hungarian_rings_growth():
 
 def test_heisenberg_growth():
     for key, layer_sizes in load_dataset("heisenberg_growth").items():
-        n = int(key)
-        assert sum(layer_sizes) == n**3
-        _verify_layers_fast(MatrixGroups.heisenberg(n), layer_sizes)
+        n, modulo = map(int, key.split(","))
+        assert sum(layer_sizes) == modulo**3
+        _verify_layers_fast(MatrixGroups.heisenberg(n=n, modulo=modulo), layer_sizes)
 
 
 def test_sl_fund_roots_growth():

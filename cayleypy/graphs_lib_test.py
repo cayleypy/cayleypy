@@ -269,14 +269,22 @@ def test_wrapped_k_cycles():
 
 def test_heisenberg():
     graph1 = MatrixGroups.heisenberg()
-    assert graph1.name == "heisenberg"
+    assert graph1.name == "heisenberg-ic"
     assert graph1.n_generators == 4
+    assert graph1.generator_names == ["x", "y", "x'", "y'"]
     assert graph1.generators_inverse_closed
 
     graph2 = MatrixGroups.heisenberg(modulo=10)
-    assert graph2.name == "heisenberg%10"
+    assert graph2.name == "heisenberg%10-ic"
     assert graph2.n_generators == 4
-    assert graph1.generators_inverse_closed
+    assert graph2.generator_names == ["x", "y", "x'", "y'"]
+    assert graph2.generators_inverse_closed
+
+    graph3 = MatrixGroups.heisenberg(add_inverses=False)
+    assert graph3.name == "heisenberg"
+    assert graph3.n_generators == 2
+    assert graph3.generator_names == ["x", "y"]
+    assert not graph3.generators_inverse_closed
 
 
 def test_sl_fund_roots():
