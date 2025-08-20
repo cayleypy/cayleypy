@@ -114,6 +114,14 @@ your code using Black. There are few convenient ways to do that:
     then use Ctrl+Shift+I to format code. 
     If you are  asked to configure default formatter, pick the Black formatter.
 
+### Style
+
+* In general, this repository follows [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html). All
+    contrbutors should read it.
+* When writing comments, [use punctuation](https://google.github.io/styleguide/pyguide.html#386-punctuation-spelling-and-grammar).
+    In particular, always put a period (".") in the end of sentences.
+* We have pylint checks to enforce some style rules. You should fix pylint warnings instead of disabling the check. 
+
 ## How to add a new Cayley graph
 
 Cayley graphs must be defined by a function that returns `CayleyGraphDef`. 

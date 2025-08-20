@@ -299,26 +299,43 @@ class CayleyGraphDef:
         """
         if self.generators_inverse_closed:
             return self
+
+        new_name = self.name
+        if new_name != "":
+            new_name += "-ic"
+        new_generator_names = []  # type: list[str]
+
         if self.generators_type == GeneratorType.PERMUTATION:
             generators_set = {tuple(self.generators_permutations[i]) for i in range(self.n_generators)}
-            new_generators = []
-            new_generator_names = []  # type: list[str]
+            new_generators_permutations = []
             for i in range(self.n_generators):
                 inv_perm = inverse_permutation(self.generators_permutations[i])
                 if tuple(inv_perm) not in generators_set:
-                    new_generators.append(inv_perm)
+                    new_generators_permutations.append(inv_perm)
                     new_generator_names.append(self.generator_names[i] + "'")
-            new_name = self.name
-            if new_name != "":
-                new_name += "-ic"
             return CayleyGraphDef.create(
-                generators=self.generators_permutations + new_generators,
+                generators=self.generators_permutations + new_generators_permutations,
                 generator_names=self.generator_names + new_generator_names,
                 central_state=self.central_state,
                 name=new_name,
             )
         else:
-            assert False, "Not implemented."
+            assert self.generators_type == GeneratorType.MATRIX
+            new_generators_matrices = []
+            for i in range(self.n_generators):
+                has_inverse = any(
+                    self.generators_matrices[i].is_inverse_to(self.generators_matrices[j])
+                    for j in range(self.n_generators)
+                )
+                if not has_inverse:
+                    new_generators_matrices.append(self.generators_matrices[i].inv)
+                    new_generator_names.append(self.generator_names[i] + "'")
+            return CayleyGraphDef.for_matrix_group(
+                generators=self.generators_matrices + new_generators_matrices,
+                generator_names=self.generator_names + new_generator_names,
+                central_state=self.central_state,
+                name=new_name,
+            )
 
     def path_to_string(self, path: list[int], delimiter=".") -> str:
         return delimiter.join(self.generator_names[i] for i in path)
