@@ -64,7 +64,6 @@ docs = [
 
 [tool.setuptools]
 include-package-data = true
-packages = ["cayleypy"]
 
 [tool.setuptools.package-data]
 "cayleypy" = ["data/*.csv", "puzzles/gap_files/**"]
