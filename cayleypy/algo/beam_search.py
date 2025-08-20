@@ -308,7 +308,9 @@ class BeamSearchAlgorithm:
                     idx = torch.tensor(np.argsort(scores)[:beam_width], device=graph.device)
 
                 array_beam_states = array_new_states[idx, :]
-                best_score = float(scores[idx[0]].detach() if isinstance(scores, torch.Tensor) else scores[idx[0].item()])
+                best_score = float(
+                    scores[idx[0]].detach() if isinstance(scores, torch.Tensor) else scores[idx[0].item()]
+                )
                 debug_scores[i_step] = best_score
 
                 if verbose >= 2:
