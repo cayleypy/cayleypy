@@ -269,22 +269,34 @@ def test_wrapped_k_cycles():
 
 def test_heisenberg():
     graph1 = MatrixGroups.heisenberg()
-    assert graph1.name == "heisenberg-ic"
+    assert graph1.name == "heisenberg-3-ic"
     assert graph1.n_generators == 4
     assert graph1.generator_names == ["x", "y", "x'", "y'"]
     assert graph1.generators_inverse_closed
 
     graph2 = MatrixGroups.heisenberg(modulo=10)
-    assert graph2.name == "heisenberg%10-ic"
+    assert graph2.name == "heisenberg-3%10-ic"
     assert graph2.n_generators == 4
     assert graph2.generator_names == ["x", "y", "x'", "y'"]
     assert graph2.generators_inverse_closed
 
     graph3 = MatrixGroups.heisenberg(add_inverses=False)
-    assert graph3.name == "heisenberg"
+    assert graph3.name == "heisenberg-3"
     assert graph3.n_generators == 2
     assert graph3.generator_names == ["x", "y"]
+    assert np.array_equal(graph3.generators_matrices[0].matrix, [[1, 1, 0], [0, 1, 0], [0, 0, 1]])
+    assert np.array_equal(graph3.generators_matrices[1].matrix, [[1, 0, 0], [0, 1, 1], [0, 0, 1]])
     assert not graph3.generators_inverse_closed
+
+    graph4 = MatrixGroups.heisenberg(n=5, modulo=100)
+    assert graph4.name == "heisenberg-5%100-ic"
+    assert graph4.n_generators == 12
+    assert graph4.generator_names == ["x1", "x2", "x3", "y1", "y2", "y3", "x1'", "x2'", "x3'", "y1'", "y2'", "y3'"]
+    assert np.array_equal(
+        graph4.generators_matrices[0].matrix,
+        [[1, 1, 0, 0, 0], [0, 1, 0, 0, 0], [0, 0, 1, 0, 0], [0, 0, 0, 1, 0], [0, 0, 0, 0, 1]],
+    )
+    assert graph4.generators_inverse_closed
 
 
 def test_sl_fund_roots():
