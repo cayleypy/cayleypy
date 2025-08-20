@@ -73,6 +73,14 @@ def test_all_transpositions_cayley_growth():
         assert layer_sizes[-1] == math.factorial(n - 1)  # Size of last layer is (n-1)!.
 
 
+def test_transposons_cayley_growth():
+    oeis_a065603 = [None, 0, 1, 2, 3, 3, 4, 4, 5, 5, 6, 6, 7, 8, 8, 9]
+    for key, layer_sizes in load_dataset("transposons_cayley_growth").items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        assert len(layer_sizes) - 1 == oeis_a065603[n]
+
+
 def test_pancake_cayley_growth():
     # See https://oeis.org/A058986
     oeis_a058986 = [None, 0, 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 22]
