@@ -29,4 +29,4 @@ def test_interactive_bfs_coxeter_8():
 
 def test_interactive_bfs_heisenberg():
     g = CayleyGraph(MatrixGroups.heisenberg(modulo=10))
-    assert _growth_using_interactive_bfs(g) == load_dataset("heisenberg_growth")["10"]
+    assert _growth_using_interactive_bfs(g) == load_dataset("heisenberg_growth")["3,10"]
