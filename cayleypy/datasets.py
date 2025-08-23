@@ -175,6 +175,10 @@ def _compute_stars_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.stars(int(n))).bfs().layer_sizes
 
 
+def _compute_increasing_k_cycles_cayley_growth(key: str) -> list[int]:
+    n, k = map(int, key.split(","))
+    return CayleyGraph(PermutationGroups.increasing_k_cycles(n, k)).bfs().layer_sizes
+
 def generate_datasets():
     """Generates datasets for small n, keeping existing values."""
     keys = []
@@ -224,3 +228,5 @@ def generate_datasets():
     _update_dataset("sl_2_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(2, m))
     keys = [str(n) for n in range(2, 6)]
     _update_dataset("sl_3_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(3, m))
+    keys = [f"{n},{k}" for n in range(3, 10) for k in range(2, min(n, 5) + 1)]
+    _update_dataset("increasing_k_cycles_cayley_growth", keys, _compute_increasing_k_cycles_cayley_growth)

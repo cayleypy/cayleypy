@@ -3,6 +3,8 @@ import numpy as np
 from cayleypy import MatrixGroups
 from cayleypy.graphs_lib import PermutationGroups
 from cayleypy.cayley_graph_def import MatrixGenerator
+from cayleypy.permutation_utils import permutation_from_cycles
+from math import comb
 
 
 def test_lrx():
@@ -390,3 +392,26 @@ def test_sl_root_weyl():
         MatrixGenerator.create([[0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1], [-1, 0, 0, 0]]),
         MatrixGenerator.create([[0, 0, 0, -1], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]),
     ]
+
+def test_increasing_k_cycles_basic():
+    n, k = 5, 3
+    g = PermutationGroups.increasing_k_cycles(n, k)
+    assert g.n_generators == comb(n, k)
+    expected_1 = permutation_from_cycles(n, [[0, 1, 2]])
+    expected_2 = permutation_from_cycles(n, [[1, 3, 4]])
+    assert any(np.array_equal(gen, expected_1) for gen in g.generators)
+    assert any(np.array_equal(gen, expected_2) for gen in g.generators)
+
+def test_increasing_k_cycles_basic():
+    n, k = 5, 3
+    g = PermutationGroups.increasing_k_cycles(n, k)
+    expected_generators = 2 * comb(n, k)
+    assert g.n_generators == expected_generators
+    expected_1 = permutation_from_cycles(n, [[0, 1, 2]])
+    expected_2 = permutation_from_cycles(n, [[1, 3, 4]])
+    assert any(np.array_equal(gen, expected_1) for gen in g.generators)
+    assert any(np.array_equal(gen, expected_2) for gen in g.generators)
+
+    n, k = 4, 2
+    g = PermutationGroups.increasing_k_cycles(n, k)
+    assert g.n_generators == comb(n, k)
