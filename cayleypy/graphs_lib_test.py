@@ -1,10 +1,11 @@
+from math import comb
+
 import numpy as np
 
 from cayleypy import MatrixGroups
 from cayleypy.graphs_lib import PermutationGroups
 from cayleypy.cayley_graph_def import MatrixGenerator
 from cayleypy.permutation_utils import permutation_from_cycles
-from math import comb
 
 
 def test_lrx():
@@ -402,16 +403,29 @@ def test_increasing_k_cycles_basic():
     assert any(np.array_equal(gen, expected_1) for gen in g.generators)
     assert any(np.array_equal(gen, expected_2) for gen in g.generators)
 
-def test_increasing_k_cycles_basic():
-    n, k = 5, 3
-    g = PermutationGroups.increasing_k_cycles(n, k)
-    expected_generators = 2 * comb(n, k)
-    assert g.n_generators == expected_generators
-    expected_1 = permutation_from_cycles(n, [[0, 1, 2]])
-    expected_2 = permutation_from_cycles(n, [[1, 3, 4]])
-    assert any(np.array_equal(gen, expected_1) for gen in g.generators)
-    assert any(np.array_equal(gen, expected_2) for gen in g.generators)
+    unexpected_inv = permutation_from_cycles(n, [[0, 2, 1]])
+    assert not any(np.array_equal(gen, unexpected_inv) for gen in g.generators)
 
     n, k = 4, 2
     g = PermutationGroups.increasing_k_cycles(n, k)
     assert g.n_generators == comb(n, k)
+
+def test_consecutive_k_cycles_basic_counts():
+    g = PermutationGroups.consecutive_k_cycles(5, 2)
+    assert g.n_generators == (5 - 2 + 1)
+
+    g3 = PermutationGroups.consecutive_k_cycles(6, 3)
+    assert g3.n_generators == (6 - 3 + 1)
+
+
+def test_consecutive_k_cycles_contains_expected_generators():
+    n, k = 6, 3
+    g = PermutationGroups.consecutive_k_cycles(n, k)
+    fwd = permutation_from_cycles(n, [[0, 1, 2]])
+    assert any(np.array_equal(x, fwd) for x in g.generators)
+    fwd2 = permutation_from_cycles(n, [[2, 3, 4]])
+    assert any(np.array_equal(x, fwd2) for x in g.generators)
+
+    inv = permutation_from_cycles(n, [[0, 2, 1]])
+    assert not any(np.array_equal(x, inv) for x in g.generators)
+    assert g.name == "consecutive_k_cycles-6-3"
