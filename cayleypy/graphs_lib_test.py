@@ -401,6 +401,7 @@ def test_sl_root_weyl():
         MatrixGenerator.create([[0, 0, 0, -1], [1, 0, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0]]),
     ]
 
+
 def test_increasing_k_cycles_basic():
     n, k = 5, 3
     g = PermutationGroups.increasing_k_cycles(n, k)
@@ -416,6 +417,7 @@ def test_increasing_k_cycles_basic():
     n, k = 4, 2
     g = PermutationGroups.increasing_k_cycles(n, k)
     assert g.n_generators == comb(n, k)
+
 
 def test_consecutive_k_cycles_basic_counts():
     g = PermutationGroups.consecutive_k_cycles(5, 2)

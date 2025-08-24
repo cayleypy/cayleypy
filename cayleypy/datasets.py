@@ -175,6 +175,10 @@ def _compute_stars_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.stars(int(n))).bfs().layer_sizes
 
 
+def _compute_larx_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.larx(int(n))).bfs().layer_sizes
+
+
 def _compute_increasing_k_cycles_cayley_growth(key: str) -> list[int]:
     n, k = map(int, key.split(","))
     return CayleyGraph(PermutationGroups.increasing_k_cycles(n, k)).bfs().layer_sizes

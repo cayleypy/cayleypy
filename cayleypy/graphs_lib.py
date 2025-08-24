@@ -461,7 +461,7 @@ class PermutationGroups:
         return CayleyGraphDef.create(
             generators, central_state=list(range(n)), generator_names=generator_names, name=name
         )
-      
+
     @staticmethod
     def larx(n: int) -> CayleyGraphDef:
         """

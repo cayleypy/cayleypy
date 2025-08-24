@@ -322,7 +322,7 @@ def test_increasing_k_cycles_cayley_growth():
 
         graph_def = PermutationGroups.increasing_k_cycles(n, k)
         first_layers = CayleyGraph(graph_def).bfs(max_layer_size_to_explore=2000).layer_sizes
-        assert first_layers == layer_sizes[:len(first_layers)]
+        assert first_layers == layer_sizes[: len(first_layers)]
 
 
 def test_consecutive_k_cycles_cayley_growth():
@@ -338,4 +338,4 @@ def test_consecutive_k_cycles_cayley_growth():
                 assert sum(layer_sizes) == math.factorial(n) // 2
         graph_def = PermutationGroups.consecutive_k_cycles(n, k)
         first_layers = CayleyGraph(graph_def).bfs(max_layer_size_to_explore=2000).layer_sizes
-        assert first_layers == layer_sizes[:len(first_layers)]
+        assert first_layers == layer_sizes[: len(first_layers)]
