@@ -302,6 +302,13 @@ def test_wrapped_k_cycles():
     assert graph.generators == [[1, 2, 0, 3, 4], [0, 2, 3, 1, 4], [0, 1, 3, 4, 2], [3, 1, 2, 4, 0], [1, 4, 2, 3, 0]]
 
 
+def test_larx():
+    graph1 = PermutationGroups.larx(3)
+    assert graph1.generators == [[1, 0, 2], [0, 2, 1]]
+    graph2 = PermutationGroups.larx(4)
+    assert graph2.generators == [[1, 0, 2, 3], [0, 2, 3, 1]]
+
+
 def test_heisenberg():
     graph1 = MatrixGroups.heisenberg()
     assert graph1.name == "heisenberg-3-ic"
