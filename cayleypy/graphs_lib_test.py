@@ -3,8 +3,8 @@ from math import comb
 import numpy as np
 
 from cayleypy import MatrixGroups
-from cayleypy.graphs_lib import PermutationGroups
 from cayleypy.cayley_graph_def import MatrixGenerator
+from cayleypy.graphs_lib import PermutationGroups
 from cayleypy.permutation_utils import permutation_from_cycles
 
 
@@ -403,16 +403,19 @@ def test_sl_root_weyl():
 
 
 def test_increasing_k_cycles_basic():
+    g = PermutationGroups.increasing_k_cycles(3, 2)
+    assert g.generators_permutations == [[1, 0, 2], [2, 1, 0], [0, 2, 1]]
+
     n, k = 5, 3
     g = PermutationGroups.increasing_k_cycles(n, k)
     assert g.n_generators == comb(n, k)
     expected_1 = permutation_from_cycles(n, [[0, 1, 2]])
     expected_2 = permutation_from_cycles(n, [[1, 3, 4]])
-    assert any(np.array_equal(gen, expected_1) for gen in g.generators)
-    assert any(np.array_equal(gen, expected_2) for gen in g.generators)
+    assert expected_1 in g.generators_permutations
+    assert expected_2 in g.generators_permutations
 
     unexpected_inv = permutation_from_cycles(n, [[0, 2, 1]])
-    assert not any(np.array_equal(gen, unexpected_inv) for gen in g.generators)
+    assert unexpected_inv not in g.generators_permutations
 
     n, k = 4, 2
     g = PermutationGroups.increasing_k_cycles(n, k)
@@ -428,13 +431,16 @@ def test_consecutive_k_cycles_basic_counts():
 
 
 def test_consecutive_k_cycles_contains_expected_generators():
+    g = PermutationGroups.consecutive_k_cycles(3, 2)
+    assert g.generators_permutations == [[1, 0, 2], [0, 2, 1]]
+
     n, k = 6, 3
     g = PermutationGroups.consecutive_k_cycles(n, k)
     fwd = permutation_from_cycles(n, [[0, 1, 2]])
-    assert any(np.array_equal(x, fwd) for x in g.generators)
+    assert fwd in g.generators_permutations
     fwd2 = permutation_from_cycles(n, [[2, 3, 4]])
-    assert any(np.array_equal(x, fwd2) for x in g.generators)
+    assert fwd2 in g.generators_permutations
 
     inv = permutation_from_cycles(n, [[0, 2, 1]])
-    assert not any(np.array_equal(x, inv) for x in g.generators)
+    assert inv not in g.generators_permutations
     assert g.name == "consecutive_k_cycles-6-3"
