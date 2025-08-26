@@ -1,0 +1,89 @@
+# /home/username/.bun/bin/bun /home/username/Desktop/cayley/cubing.js/src/bin/puzzle-geometry-bin.ts --ksolve --moves 2F,3F,2D,3D,2BL,3BL,2BR,3BR pyraminx
+# PuzzleGeometry 0.1 Copyright 2018 Tomas Rokicki.
+# 
+Name PuzzleGeometryPuzzle
+
+Set EDGES 6 2
+# 1 2BR 2D
+# 2 2F 2D
+# 3 2BL 2BR
+# 4 2BR 2F
+# 5 2BL 2D
+# 6 2BL 2F
+Set CORNERS 4 3
+# 1 2D
+# 2 2F
+# 3 2BL
+# 4 2BR
+Set CORNERS2 4 3
+# 1 3D
+# 2 3F
+# 3 3BL
+# 4 3BR
+
+Solved
+EDGES
+1 2 3 4 5 6
+CORNERS
+1 2 3 4
+CORNERS2
+1 2 3 4
+End
+
+Move 2BL
+EDGES
+1 2 5 4 6 3
+CORNERS
+1 2 3 4
+0 0 2 0
+End
+
+Move 3BL
+CORNERS2
+1 2 3 4
+0 0 2 0
+End
+
+Move 2BR
+EDGES
+3 2 4 1 5 6
+0 0 1 1 0 0
+CORNERS
+1 2 3 4
+0 0 0 2
+End
+
+Move 3BR
+CORNERS2
+1 2 3 4
+0 0 0 2
+End
+
+Move 2F
+EDGES
+1 4 3 6 5 2
+0 1 0 1 0 0
+CORNERS
+1 2 3 4
+0 2 0 0
+End
+
+Move 3F
+CORNERS2
+1 2 3 4
+0 2 0 0
+End
+
+Move 2D
+EDGES
+2 5 3 4 1 6
+CORNERS
+1 2 3 4
+2 0 0 0
+End
+
+Move 3D
+CORNERS2
+1 2 3 4
+2 0 0 0
+End
