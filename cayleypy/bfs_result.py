@@ -114,10 +114,16 @@ class BfsResult:
             else:
                 edges_list_hashes = f["edges_list_hashes"][()]
 
+            layers_keys = {}
+            for k in f.keys():
+                if k.startswith("layer__"):
+                    layer_n = int(k.strip("layer__"))
+                    layers_keys[layer_n] = k
+
             loaded_result = BfsResult(
                 bfs_completed=bool(f["bfs_completed"][()]),
                 layer_sizes=layer_sizes,
-                layers={x: f[f"layer__{str(x)}"][()] for x in range(len(layer_sizes))},
+                layers={k: f[layer_key][()] for k, layer_key in layers_keys.items()},
                 edges_list_hashes=edges_list_hashes,
                 layers_hashes=layers_hashes,
                 graph=CayleyGraphDef.create(
