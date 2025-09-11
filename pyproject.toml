@@ -86,6 +86,9 @@ ignore_missing_imports = true
 [[tool.mypy.overrides]]
 module = ["kagglehub.*"]
 ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = ["sympy.*"]
+ignore_missing_imports = true
 
 [tool.pylint."FORMAT"]
 max-line-length = 120

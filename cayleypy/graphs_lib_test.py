@@ -504,3 +504,66 @@ def test_consecutive_k_cycles_contains_expected_generators():
     inv = permutation_from_cycles(n, [[0, 2, 1]])
     assert inv not in g.generators_permutations
     assert g.name == "consecutive_k_cycles-6-3"
+
+
+def test_conjugacy_class():
+    n = 4
+    classes = {(2, 2): None, (3,): None}
+    graph = PermutationGroups.conjugacy_classes(n, classes=classes)
+    assert np.array_equal(
+        graph.generators,
+        [
+            [1, 0, 3, 2],
+            [2, 3, 0, 1],
+            [3, 2, 1, 0],
+            [0, 2, 3, 1],
+            [0, 3, 1, 2],
+            [1, 2, 0, 3],
+            [2, 0, 1, 3],
+            [1, 3, 2, 0],
+            [3, 0, 2, 1],
+            [2, 1, 3, 0],
+            [3, 1, 0, 2],
+        ],
+    )
+    assert graph.generator_names == [
+        "(2,2)_1",
+        "(2,2)_2",
+        "(2,2)_3",
+        "(3,1)_1",
+        "(3,1)_2",
+        "(3,1)_3",
+        "(3,1)_4",
+        "(3,1)_5",
+        "(3,1)_6",
+        "(3,1)_7",
+        "(3,1)_8",
+    ]
+    assert graph.name == "conjugacy_class-4-2,2-3,1"
+
+    n = 5
+    classes = {(2, 2): 5, (3,): 7}
+    graph = PermutationGroups.conjugacy_classes(n, classes=classes)
+    assert graph.generator_names == [
+        "(2,2,1)_1",
+        "(2,2,1)_2",
+        "(2,2,1)_3",
+        "(2,2,1)_4",
+        "(2,2,1)_5",
+        "(3,1,1)_1",
+        "(3,1,1)_2",
+        "(3,1,1)_3",
+        "(3,1,1)_4",
+        "(3,1,1)_5",
+        "(3,1,1)_6",
+        "(3,1,1)_7",
+    ]
+    assert graph.name == "conjugacy_class-5-2,2,1_5-3,1,1_7"
+
+
+def test_rand_generators():
+    n = 6
+    k = 4
+    graph = PermutationGroups.rand_generators(n, k)
+    assert len(graph.generator_names) == k
+    assert graph.name == "rand_generators-6-4"
