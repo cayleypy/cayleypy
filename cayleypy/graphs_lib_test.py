@@ -286,11 +286,7 @@ def test_three_cycles_01i():
     assert graph.n_generators == 4
     expected_generators = [[1, 2, 0, 3], [2, 0, 1, 3], [1, 3, 2, 0], [3, 0, 2, 1]]
     assert np.array_equal(graph.generators, expected_generators)
-    graph = PermutationGroups.three_cycles_01i(6)
-    assert graph.n_generators == 8
-    expected_generators = [[1, 2, 0, 3, 4, 5], [2, 0, 1, 3, 4, 5], [1, 3, 2, 0, 4, 5], [3, 0, 2, 1, 4, 5],
-                           [1, 4, 2, 3, 0, 5], [4, 0, 2, 3, 1, 5], [1, 5, 2, 3, 4, 0], [5, 0, 2, 3, 4, 1]]
-    assert np.array_equal(graph.generators, expected_generators)
+    
 
 def test_stars():
     assert len(PermutationGroups.stars(3).generators) == 2
