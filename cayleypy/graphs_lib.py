@@ -5,7 +5,7 @@ from itertools import permutations, combinations
 import numpy as np
 
 from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
-from .permutation_utils import transposition, permutation_from_cycles
+from .permutation_utils import transposition, permutation_from_cycles, inverse_permutation
 from .puzzles.hungarian_rings import get_santa_parameters_from_n
 from .puzzles.puzzles import Puzzles
 
