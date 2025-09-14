@@ -285,8 +285,17 @@ def test_three_cycles_0ij():
 def test_three_cycles_01i():
     graph = PermutationGroups.three_cycles_01i(4)
     assert graph.n_generators == 4
+    assert graph.generators_inverse_closed
     expected_generators = [[1, 2, 0, 3], [2, 0, 1, 3], [1, 3, 2, 0], [3, 0, 2, 1]]
     assert np.array_equal(graph.generators, expected_generators)
+    assert graph.generator_names == ["(0 1 2)", "(1 0 2)", "(0 1 3)", "(1 0 3)"]
+
+    graph = PermutationGroups.three_cycles_01i(4, add_inverses=False)
+    assert graph.n_generators == 2
+    assert not graph.generators_inverse_closed
+    expected_generators = [[1, 2, 0, 3], [1, 3, 2, 0]]
+    assert np.array_equal(graph.generators, expected_generators)
+    assert graph.generator_names == ["(0 1 2)", "(0 1 3)"]
 
 
 def test_stars():
