@@ -600,6 +600,70 @@ class PermutationGroups:
             name=name,
         )
 
+    def Sheveleva2(n: int, k: int) -> CayleyGraphDef:
+        
+        assert k >= 1 and k <= n-3, "k must be >= 1 and <= n-3"    
+        p1 = [i for i in range(n)]
+        for i in range(0,(n//2)*2):
+            if i % 2 == 0:
+                p1[i] = i + 1
+            else:
+                p1[i] = i - 1
+        p2 = [i for i in range(n)]
+        for i in range(0,((n-1)//2)*2):
+            if (i+1) % 2 == 1:
+                p2[i+1] = i + 2
+            else:
+                p2[i+1] = i 
+        if k % 2 == 1:
+            if k == n-3:
+                p1[k-1] = k
+                p1[k] = k + 1
+                p1[k+1] = k + 2
+                p1[k+2] = k - 1
+                p2[k] = k
+                p2[k+1] = k + 1
+                p2[k+2] = k + 2
+            else:
+                p1[k-1] = k
+                p1[k] = k + 1
+                p1[k+1] = k + 2
+                p1[k+2] = k - 1
+                p2[k] = k
+                p2[k+1] = k + 3
+                p2[k+2] = k + 2
+                p2[k+3] = k + 1
+        else:
+            if k == n-3:
+                p2[k-1] = k
+                p2[k] = k + 1
+                p2[k+1] = k + 2
+                p2[k+2] = k - 1
+                p1[k] = k
+                p1[k+1] = k + 1
+                p1[k+2] = k + 2
+            else:
+                p2[k-1] = k
+                p2[k] = k + 1
+                p2[k+1] = k + 2
+                p2[k+2] = k - 1
+                p1[k] = k
+                p1[k+1] = k + 3
+                p1[k+2] = k + 2
+                p1[k+3] = k + 1
+        if k % 2 == 1:
+            generators = [p2, p1]
+        else:
+            generators = [p1, p2]
+        generator_names = ["A", "S"]
+        name = f"as-{n}"
+        return CayleyGraphDef.create(
+          generators,
+          central_state = list(range(n)),
+          generator_names=generator_names,
+          name=name
+        )
+
 
 def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
     """Returns pre-defined CayleyGraphDef by codename and additional kwargs.
