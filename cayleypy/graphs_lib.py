@@ -656,7 +656,7 @@ class PermutationGroups:
         else:
             generators = [p1, p2]
         generator_names = ["A", "S"]
-        name = f"as-{n}"
+        name = f"Sheveleva2 n{n} k{k}"
         return CayleyGraphDef.create(
           generators,
           central_state = list(range(n)),
