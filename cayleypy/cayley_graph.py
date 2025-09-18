@@ -93,7 +93,9 @@ class CayleyGraph:
 
         if definition.is_permutation_group():
             self.permutations_torch = torch.tensor(
-                definition.generators_permutations, dtype=torch.int64, device=self.device
+                definition.generators_permutations,
+                dtype=torch.int64,
+                device=self.device,
             )
 
             # Prepare encoder in case we want to encode states using few bits per element.
@@ -187,9 +189,12 @@ class CayleyGraph:
 
     def get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates all neighbors of `states` (in internal representation)."""
+        """Internal in ---> internal out"""
         states_num = states.shape[0]
         neighbors = torch.zeros(
-            (states_num * self.definition.n_generators, states.shape[1]), dtype=torch.int64, device=self.device
+            (states_num * self.definition.n_generators, states.shape[1]),
+            dtype=torch.int64,
+            device=self.device,
         )
         for i in range(self.definition.n_generators):
             dst = neighbors[i * states_num : (i + 1) * states_num, :]
@@ -198,7 +203,46 @@ class CayleyGraph:
 
     def get_neighbors_decoded(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates neighbors in decoded (external) representation."""
+        """External int ---> external out"""
         return self.decode_states(self.get_neighbors(self.encode_states(states)))
+
+    def get_constrained_neighbors(self, states, constraint_map):
+        states_num = states.shape[0]
+        max_out = states_num * self.definition.n_generators
+
+        neighbors = torch.zeros(
+            (max_out, states.shape[1]),
+            dtype=torch.int64,
+            device=self.device,
+        )
+
+        if constraint_map:  # You don't even need it if no constraints provided
+            decoded_states = self.decode_states(states)
+        filled_index = 0
+
+        for i in range(self.definition.n_generators):
+            constraint_fn = constraint_map.get(i)
+            if constraint_fn is None:
+                dst = neighbors[filled_index : filled_index + states_num, :]
+                self.apply_generator_batched(i, states, dst)
+                filled_index += states_num
+            else:
+                mask = constraint_fn(decoded_states)
+                valid_indices = ~mask
+                if not valid_indices.any():
+                    continue
+                valid_encoded_states = states[valid_indices]
+                batch = valid_encoded_states.shape[0]
+                dst = neighbors[filled_index : filled_index + batch, :]
+                self.apply_generator_batched(i, valid_encoded_states, dst)
+                filled_index += batch
+
+        return neighbors[:filled_index]
+
+    def get_constrained_neighbors_decoded(self, states: torch.Tensor, constraint_map) -> torch.Tensor:
+        """Calculates neighbors in decoded (external) representation."""
+        """External int ---> external out"""
+        return self.decode_states(self.get_constrained_neighbors(self.encode_states(states), constraint_map))
 
     def bfs(
         self,
@@ -431,7 +475,9 @@ class CayleyGraph:
 
     def to_networkx_graph(self):
         return self.bfs(
-            max_layer_size_to_store=10**18, return_all_edges=True, return_all_hashes=True
+            max_layer_size_to_store=10**18,
+            return_all_edges=True,
+            return_all_hashes=True,
         ).to_networkx_graph()
 
     def free_memory(self):

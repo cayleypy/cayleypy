@@ -44,6 +44,7 @@ class BeamSearchAlgorithm:
         return_path: bool = False,
         bfs_result_for_mitm: Optional[BfsResult] = None,
         verbose: int = 0,
+        constraint_map=None,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to destination state using Beam Search algorithm.
 
@@ -70,6 +71,8 @@ class BeamSearchAlgorithm:
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
+        if constraint_map is None:
+            constraint_map = dict()
         if beam_mode == "simple":
             return self.search_simple(
                 start_state=start_state,
@@ -78,6 +81,7 @@ class BeamSearchAlgorithm:
                 max_steps=max_steps,
                 return_path=return_path,
                 bfs_result_for_mitm=bfs_result_for_mitm,
+                constraint_map=constraint_map,
             )
         elif beam_mode == "advanced":
             return self.search_advanced(
@@ -88,6 +92,7 @@ class BeamSearchAlgorithm:
                 history_depth=history_depth,
                 predictor=predictor,
                 verbose=verbose,
+                constraint_map=constraint_map,
             )
         else:
             raise ValueError("Unknown beam_mode:", beam_mode)
@@ -101,6 +106,7 @@ class BeamSearchAlgorithm:
         max_steps=1000,
         return_path=False,
         bfs_result_for_mitm: Optional[BfsResult] = None,
+        constraint_map=None,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
 
@@ -116,6 +122,8 @@ class BeamSearchAlgorithm:
             central state).
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
+        if constraint_map is None:
+            constraint_map = dict()
         graph = self.graph
         if predictor is None:
             predictor = Predictor(graph, "hamming")
@@ -158,7 +166,7 @@ class BeamSearchAlgorithm:
 
         for i in range(max_steps):
             # Create states on the next layer.
-            layer2, layer2_hashes = graph.get_unique_states(graph.get_neighbors(layer1))
+            layer2, layer2_hashes = graph.get_unique_states(graph.get_constrained_neighbors(layer1, constraint_map))
 
             bfs_layer_id = _check_path_found(layer2_hashes)
             if bfs_layer_id != -1:
@@ -195,6 +203,7 @@ class BeamSearchAlgorithm:
         history_depth: int = 0,
         predictor: Optional[Predictor] = None,
         verbose: int = 0,
+        constraint_map=None,
     ) -> BeamSearchResult:
         """Advanced beam search using PyTorch with non-backtracking capabilities.
 
@@ -213,8 +222,10 @@ class BeamSearchAlgorithm:
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
         :return: BeamSearchResult with search results.
         """
-        graph = self.graph
+        if constraint_map is None:
+            constraint_map = dict()
 
+        graph = self.graph
         # Use central state as destination if not specified.
         if destination_state is None:
             destination_state = graph.central_state
@@ -251,7 +262,7 @@ class BeamSearchAlgorithm:
 
             # Create new states by applying all generators.
             t1 = time.time()
-            array_new_states = graph.get_neighbors(array_beam_states)
+            array_new_states = graph.get_constrained_neighbors(array_beam_states, constraint_map)
             # Ensure it's 2D: (n_states, state_size).
             if array_new_states.dim() == 1:
                 array_new_states = array_new_states.unsqueeze(0)
