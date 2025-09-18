@@ -189,7 +189,6 @@ class CayleyGraph:
 
     def get_neighbors(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates all neighbors of `states` (in internal representation)."""
-        """Internal in ---> internal out"""
         states_num = states.shape[0]
         neighbors = torch.zeros(
             (states_num * self.definition.n_generators, states.shape[1]),
@@ -203,10 +202,15 @@ class CayleyGraph:
 
     def get_neighbors_decoded(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates neighbors in decoded (external) representation."""
-        """External int ---> external out"""
         return self.decode_states(self.get_neighbors(self.encode_states(states)))
 
     def get_constrained_neighbors(self, states, constraint_map):
+        """
+        Calculates all neighbors of `states` in internal representation while filtering 
+        on constraint_map. Example usage:
+            graph.get_constrained_neighbors(states, { 2: lambda S: S[:,0] < S[:,1] })
+        This means that if first and second elements are ordered then generator 2 will not be applied
+        """
         states_num = states.shape[0]
         max_out = states_num * self.definition.n_generators
 
@@ -216,7 +220,7 @@ class CayleyGraph:
             device=self.device,
         )
 
-        if constraint_map:  # You don't even need it if no constraints provided
+        if constraint_map:  
             decoded_states = self.decode_states(states)
         filled_index = 0
 
@@ -240,8 +244,7 @@ class CayleyGraph:
         return neighbors[:filled_index]
 
     def get_constrained_neighbors_decoded(self, states: torch.Tensor, constraint_map) -> torch.Tensor:
-        """Calculates neighbors in decoded (external) representation."""
-        """External int ---> external out"""
+        """Calculates neighbors in decoded (external) representation while applying constraint map."""
         return self.decode_states(self.get_constrained_neighbors(self.encode_states(states), constraint_map))
 
     def bfs(

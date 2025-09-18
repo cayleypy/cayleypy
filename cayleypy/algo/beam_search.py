@@ -69,6 +69,7 @@ class BeamSearchAlgorithm:
         :param bfs_result_for_mitm: For "simple" mode, BfsResult with pre-computed neighborhood of central state
             for meet-in-the-middle optimization. Defaults to None.
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
+        :param constraint_map: Map from generator index to a predicate function to exclude certain states.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         if constraint_map is None:
@@ -120,6 +121,7 @@ class BeamSearchAlgorithm:
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
             central state).
+        :param constraint_map: Map from generator index to a predicate function to exclude certain states.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         if constraint_map is None:
@@ -220,6 +222,7 @@ class BeamSearchAlgorithm:
         :param predictor: Predictor object for scoring states. If None, uses Hamming distance.
         :param batch_size: Batch size for model predictions.
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
+        :param constraint_map: Map from generator index to a predicate function to exclude certain states.
         :return: BeamSearchResult with search results.
         """
         if constraint_map is None:
