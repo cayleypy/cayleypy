@@ -378,9 +378,9 @@ def test_wrapped_k_cycles():
     assert graph.generators == [[1, 2, 0, 3, 4], [0, 2, 3, 1, 4], [0, 1, 3, 4, 2], [3, 1, 2, 4, 0], [1, 4, 2, 3, 0]]
 
 def test_Sheveleva2():
-    graph = PermutationGroups.Sheveleva2(5, 2)
+    graph = PermutationGroups.sheveleva2(5, 2)
     assert graph.generators == [[1, 0, 2, 3, 4], [0, 2, 3, 4, 1]]
-    graph2 = PermutationGroups.Sheveleva2(8, 4)
+    graph2 = PermutationGroups.sheveleva2(8, 4)
     assert graph2.generators == [[1, 0, 3, 2, 4, 7, 6, 5], [0, 2, 1, 4, 5, 6, 3, 7]]
     
 def test_larx():
