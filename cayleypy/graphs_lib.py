@@ -600,24 +600,27 @@ class PermutationGroups:
             name=name,
         )
 
+    @staticmethod
     def sheveleva2(n: int, k: int) -> CayleyGraphDef:
         """
-        Sheveleva generators - consists only of 2 elements, and they have two parameters n, k,
-        where n - length of permutations, k - additional parameter – position of the square.
+        "Sheveleva2" generators consist of only 2 elements and have two parameters: n and k.
+        - n: length of permutations.
+        - k: additional parameter, "square position".
+        One generator (A) is always an involution. The other (S) is a product
+        of transpositions and one 4-cycle.
+        The construction is as follows:
+        1. Starting with 0, transpositions (i, i+1) are created.
+        2. These transpositions are assigned to generators one by one. The first transposition (0,1)
+        is assigned to one generator, the second (1,2) to another, the third (2,3) to the first again, and so on.
+        3. When the process reaches index k, a 4-cycle (k-1, k, k+1, k+2) is created, which
+        is added to the current generator.
+        4. After this, the alternate creation and assignment continues. transpositions (i, i+1).
+        5. The process stops when n is reached.
+        6. The final generators are obtained by multiplying all the permutations assigned to them.
         """
         assert k >= 1 and k <= n-3, "k must be >= 1 and <= n-3"    
-        p1 = [i for i in range(n)]
-        for i in range(0,(n//2)*2):
-            if i % 2 == 0:
-                p1[i] = i + 1
-            else:
-                p1[i] = i - 1
-        p2 = [i for i in range(n)]
-        for i in range(0,((n-1)//2)*2):
-            if (i+1) % 2 == 1:
-                p2[i+1] = i + 2
-            else:
-                p2[i+1] = i 
+        p1 = permutation_from_cycles(n, [[i, i+1] for i in range(0,n-1,2)])
+        p2 = permutation_from_cycles(n, [[i, i+1] for i in range(1,n-1,2)])
         if k % 2 == 1:
             if k == n-3:
                 p1[k-1] = k
@@ -659,7 +662,7 @@ class PermutationGroups:
         else:
             generators = [p1, p2]
         generator_names = ["A", "S"]
-        name = f"Sheveleva2 n{n} k{k}"
+        name = f"sheveleva2-n{n}-k{k}"
         return CayleyGraphDef.create(
           generators,
           central_state = list(range(n)),
