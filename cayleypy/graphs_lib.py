@@ -600,8 +600,11 @@ class PermutationGroups:
             name=name,
         )
 
-    def Sheveleva2(n: int, k: int) -> CayleyGraphDef:
-        
+    def sheveleva2(n: int, k: int) -> CayleyGraphDef:
+        """
+        Sheveleva generators - consists only of 2 elements, and they have two parameters n, k,
+        where n - length of permutations, k - additional parameter – position of the square.
+        """
         assert k >= 1 and k <= n-3, "k must be >= 1 and <= n-3"    
         p1 = [i for i in range(n)]
         for i in range(0,(n//2)*2):
