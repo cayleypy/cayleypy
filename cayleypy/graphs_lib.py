@@ -602,7 +602,7 @@ class PermutationGroups:
         6. The final generators are obtained by multiplying all the permutations assigned to them.
         """
         assert 1 <= k <= n - 3, "k must be >= 1 and <= n - 3"
-        
+
         p1 = permutation_from_cycles(n, [[i, i + 1] for i in range(0, n - 1, 2)])
         p2 = permutation_from_cycles(n, [[i, i + 1] for i in range(1, n - 1, 2)])
         if k % 2 == 1:
@@ -648,7 +648,7 @@ class PermutationGroups:
         generator_names = ["A", "S"]
         name = f"sheveleva2-n{n}-k{k}"
         return CayleyGraphDef.create(
-            generators, central_state = list(range(n)), generator_names=generator_names, name=name
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
         )
 
     @staticmethod
