@@ -1,4 +1,4 @@
-# CaleyPy
+# CayleyPy
 
 AI-based libarary to work with googol-size graphs.
 Supporting:  Cayley graphs, Schreier coset graphs, more to be added.
@@ -60,6 +60,19 @@ See the following Kaggle notebooks for examples of library usage:
   * [Benchmarks versions of BFS in CayleyPy](https://www.kaggle.com/code/fedimser/benchmark-versions-of-bfs-in-cayleypy).
   * [Becnhmark BFS on GPU](https://www.kaggle.com/code/fedimser/benchmark-bfs-in-cayleypy-on-gpu-p100).
 
+## Installation
+
+We recommend installing the latest version from GitHub:
+
+```
+pip install git+https://github.com/cayleypy/cayleypy
+```
+
+You may also install using pip, although this might be missing recently added features:
+
+```
+pip install cayleypy
+```
 
 ## Documentation
 
