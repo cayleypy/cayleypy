@@ -384,7 +384,7 @@ def test_larx():
     graph2 = PermutationGroups.larx(4)
     assert graph2.generators == [[1, 0, 2, 3], [0, 2, 3, 1]]
 
-def test_Sheveleva2():
+def test_sheveleva2():
     graph = PermutationGroups.sheveleva2(5, 2)
     assert graph.generators == [[1, 0, 2, 3, 4], [0, 2, 3, 4, 1]]
     graph2 = PermutationGroups.sheveleva2(8, 4)
