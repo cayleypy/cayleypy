@@ -806,6 +806,7 @@ class PermutationGroups:
             name=name,
         )
 
+
 def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
     """Returns pre-defined CayleyGraphDef by codename and additional kwargs.
 
