@@ -590,3 +590,26 @@ def test_rand_generators():
     graph = PermutationGroups.rand_generators(n, k)
     assert len(graph.generator_names) == k
     assert graph.name == "rand_generators-6-4"
+
+
+def test_prefix_cycles():
+    n = 6
+    g = PermutationGroups.prefix_cycles(n)
+    assert np.array_equal(
+        g.generators,
+        [
+            [1, 0, 2, 3, 4, 5],
+            [1, 2, 0, 3, 4, 5],
+            [1, 2, 3, 0, 4, 5],
+            [1, 2, 3, 4, 0, 5],
+            [1, 2, 3, 4, 5, 0],
+        ],
+    )
+    assert g.generator_names == [
+        "(0,1)",
+        "(0,1,2)",
+        "(0,1,2,3)",
+        "(0,1,2,3,4)",
+        "(0,1,2,3,4,5)",
+    ]
+    assert g.name == "prefix_cycles-6"

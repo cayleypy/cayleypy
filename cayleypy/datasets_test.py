@@ -346,3 +346,12 @@ def test_consecutive_k_cycles_cayley_growth():
         graph_def = PermutationGroups.consecutive_k_cycles(n, k)
         first_layers = CayleyGraph(graph_def).bfs(max_layer_size_to_explore=2000).layer_sizes
         assert first_layers == layer_sizes[: len(first_layers)]
+
+
+def test_prefix_cycles_cayley_growth():
+    data = load_dataset("prefix_cycles_cayley_growth")
+    for key, layer_sizes in data.items():
+        n = int(key)
+        assert sum(layer_sizes) == math.factorial(n)
+        if n <= 6:
+            _verify_layers_fast(PermutationGroups.prefix_cycles(n), layer_sizes)
