@@ -679,10 +679,10 @@ class PermutationGroups:
         ]
         if type == 1:
             assert k + d < n, "k+d must be < n"
-            generators.append( permutation_from_cycles(n, [[k, k + d]]))
+            generators.append(permutation_from_cycles(n, [[k, k + d]]))
         elif type == 2:
             assert k + 3 < n, "k+3 must be < n"
-            generators.append( permutation_from_cycles(n, [[k, k + 3], [k + 1, k + 2]]))
+            generators.append(permutation_from_cycles(n, [[k, k + 3], [k + 1, k + 2]]))
         generator_names = ["I", "K", "S"]
         name = f"koltsov3-n{n}-k{k}"
         return CayleyGraphDef.create(
