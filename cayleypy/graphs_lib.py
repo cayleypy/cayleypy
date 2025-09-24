@@ -657,34 +657,37 @@ class PermutationGroups:
     @staticmethod
     def koltsov3(n: int, type: int = 2, k: int = 1, d: int = 1):
         """
-            The set of generators ”Koltsov3” consists of 3 involutions.
-            There are several varieties, depending on the "type".
-            1. One generator starts with two involutions both of which are products of (i, i+1),
-                but one is for all even i ("I" generator), whereas the other one is for odd i ("K" generator).
-            2. The third involution ”S” (swap) which is a short product of transpositions that differs depending
-                on the parameter ”type”. For type 1, ”S” is just 1 transposition (k, k + d).
-                It also dependig on the parameter d. For type 2 it is a product of 2 transpositions:
-                (k, k + 3) and (k + 1, k + 2).
+        The set of generators ”Koltsov3” consists of 3 involutions.
+        There are several varieties, depending on the "type".
+        1. One generator starts with two involutions both of which are products of (i, i+1),
+            but one is for all even i ("I" generator), whereas the other one is for odd i ("K" generator).
+        2. The third involution ”S” (swap) which is a short product of transpositions that differs depending
+            on the parameter ”type”. For type 1, ”S” is just 1 transposition (k, k + d).
+            It also dependig on the parameter d. For type 2 it is a product of 2 transpositions:
+            (k, k + 3) and (k + 1, k + 2).
 
-            :param n: length of permutations.
-            :param type: type of S generator.
-            :param k: additional parameter for S generator.
-            :param d: additional parameter for type 1.
+        :param n: length of permutations.
+        :param type: type of S generator.
+        :param k: additional parameter for S generator.
+        :param d: additional parameter for type 1.
         """
         assert k < n, "k must be < n"
         assert type == 1 or type == 2, "Wrong type of S generator"
-        generators = [permutation_from_cycles(n, [[i, i + 1] for i in range(0, n - 1, 2)]),
-              permutation_from_cycles(n, [[i, i + 1] for i in range(1, n - 1, 2)]),]
+        generators = [
+            permutation_from_cycles(n, [[i, i + 1] for i in range(0, n - 1, 2)]),
+            permutation_from_cycles(n, [[i, i + 1] for i in range(1, n - 1, 2)]),
+        ]
         if type == 1:
             assert k + d < n, "k+d must be < n"
-            generators.append( permutation_from_cycles(n, [[k, k + d]]) )
+            generators.append( permutation_from_cycles(n, [[k, k + d]]))
         elif type == 2:
             assert k + 3 < n, "k+3 must be < n"
-            generators.append( permutation_from_cycles(n, [[k, k + 3], [k + 1, k + 2]]) )
-        generator_names = ['I', 'K', 'S']
+            generators.append( permutation_from_cycles(n, [[k, k + 3], [k + 1, k + 2]]))
+        generator_names = ["I", "K", "S"]
         name = f"koltsov3-n{n}-k{k}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name)
+            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+        )
 
     @staticmethod
     def consecutive_k_cycles(n: int, k: int) -> CayleyGraphDef:
