@@ -656,16 +656,19 @@ class PermutationGroups:
 
     @staticmethod
     def koltsov3(n: int, perm_type: int = 2, k: int = 1, d: int = 1):
-        """
-        The set of generators ”Koltsov3” consists of 3 involutions.
+        """The set of generators ”Koltsov3” consists of 3 involutions.
+        
         There are several varieties, depending on the "type".
-        1. One generator starts with two involutions both of which are products of (i, i+1),
-            but one is for all even i ("I" generator), whereas the other one is for odd i ("K" generator).
-        2. The third involution ”S” (swap) which is a short product of transpositions that differs depending
-            on the parameter ”type”. For type 1, ”S” is just 1 transposition (k, k + d).
-            It also dependig on the parameter d. For type 2 it is a product of 2 transpositions:
-            (k, k + 3) and (k + 1, k + 2).
-
+        
+        1.  One generator starts with two involutions both of which are products
+            of (i, i+1), but one is for all even i ("I" generator), whereas the
+            other one is for odd i ("K" generator).
+        2.  The third involution ”S” (swap) which is a short product of
+            transpositions that differs depending on the parameter ”type”.
+            For type 1, ”S” is just 1 transposition (k, k + d).
+            It also dependig on the parameter d. For type 2 it is a product
+            of 2 transpositions: (k, k + 3) and (k + 1, k + 2).
+        
         :param n: length of permutations.
         :param perm_type: type of S generator.
         :param k: additional parameter for S generator.
