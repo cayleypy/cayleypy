@@ -441,7 +441,6 @@ class PermutationGroups:
         generators = []
         generator_names = []
 
-        # Generator 1: Transpositions: (0,1), (0,1)(2,3), (0,1)(2,3)(4,5),...
         for num_pairs in range(1, (n // 2) + 1):
             cycles = []
             for idx in range(num_pairs):
@@ -451,7 +450,6 @@ class PermutationGroups:
             generators.append(permutation)
             generator_names.append(f"M1_0_{num_pairs}")
 
-        # Generator 2: Transpositions: (1,2), (1,2)(3,4), (1,2)(3,4)(5,6),...
         for num_pairs in range(1, ((n - 1) // 2) + 1):
             cycles = []
             permutation = list(range(n))
@@ -473,7 +471,6 @@ class PermutationGroups:
 
         Reference: E. Rapaport-Strasser. Cayley color groups and hamilton lines. Scr. Math, 24:51–58, 1959.
         """
-        # Generator 1: Transposition (0,1)
         g1 = transposition(n, 0, 1)
 
         # Generator 2: Product of transpositions (0,1)(2,3)...
