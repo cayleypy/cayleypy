@@ -655,7 +655,7 @@ class PermutationGroups:
         )
 
     @staticmethod
-    def koltsov3(n: int, type: int = 2, k: int = 1, d: int = 1):
+    def koltsov3(n: int, perm_type: int = 2, k: int = 1, d: int = 1):
         """
         The set of generators ”Koltsov3” consists of 3 involutions.
         There are several varieties, depending on the "type".
@@ -667,20 +667,20 @@ class PermutationGroups:
             (k, k + 3) and (k + 1, k + 2).
 
         :param n: length of permutations.
-        :param type: type of S generator.
+        :param perm_type: type of S generator.
         :param k: additional parameter for S generator.
         :param d: additional parameter for type 1.
         """
         assert k < n, "k must be < n"
-        assert type == 1 or type == 2, "Wrong type of S generator"
+        assert perm_type in (1, 2), "Wrong type of S generator"
         generators = [
             permutation_from_cycles(n, [[i, i + 1] for i in range(0, n - 1, 2)]),
             permutation_from_cycles(n, [[i, i + 1] for i in range(1, n - 1, 2)]),
         ]
-        if type == 1:
+        if perm_type == 1:
             assert k + d < n, "k+d must be < n"
             generators.append(permutation_from_cycles(n, [[k, k + d]]))
-        elif type == 2:
+        elif perm_type == 2:
             assert k + 3 < n, "k+3 must be < n"
             generators.append(permutation_from_cycles(n, [[k, k + 3], [k + 1, k + 2]]))
         generator_names = ["I", "K", "S"]
