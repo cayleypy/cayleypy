@@ -667,16 +667,20 @@ class PermutationGroups:
                 (k, k + 3) and (k + 1, k + 2).
 
             :param n: length of permutations.
+            :param type: type of S generator.
             :param k: additional parameter for S generator.
             :param d: additional parameter for type 1.
         """
-
+        assert k < n, "k must be < n"
+        assert type == 1 or type == 2, "Wrong type of S generator"
         generators = [permutation_from_cycles(n, [[i, i + 1] for i in range(0, n - 1, 2)]),
               permutation_from_cycles(n, [[i, i + 1] for i in range(1, n - 1, 2)]),]
         if type == 1:
-            generators.append( permutation_from_cycles(n, [[k, k + d] ]) )
+            assert k + d < n, "k+d must be < n"
+            generators.append( permutation_from_cycles(n, [[k, k + d]]) )
         elif type == 2:
-            generators.append( permutation_from_cycles(n, [[k, k + 3], [k + 1, k + 2] ]) )
+            assert k + 3 < n, "k+3 must be < n"
+            generators.append( permutation_from_cycles(n, [[k, k + 3], [k + 1, k + 2]]) )
         generator_names = ['I', 'K', 'S']
         name = f"koltsov3-n{n}-k{k}"
         return CayleyGraphDef.create(
