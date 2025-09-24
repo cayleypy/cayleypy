@@ -396,9 +396,11 @@ def test_koltsov3():
     graph = PermutationGroups.koltsov3(6, 2)
     assert graph.generators == [[1, 0, 3, 2, 5, 4], [0, 2, 1, 4, 3, 5], [0, 4, 3, 2, 1, 5]]
     graph2 = PermutationGroups.koltsov3(10, 2, 3, 1)
-    assert graph2.generators == [[1, 0, 3, 2, 5, 4, 7, 6, 9, 8],
-                                 [0, 2, 1, 4, 3, 6, 5, 8, 7, 9],
-                                 [0, 1, 2, 6, 5, 4, 3, 7, 8, 9]]
+    assert graph2.generators == [
+        [1, 0, 3, 2, 5, 4, 7, 6, 9, 8],
+        [0, 2, 1, 4, 3, 6, 5, 8, 7, 9],
+        [0, 1, 2, 6, 5, 4, 3, 7, 8, 9]
+    ]
 
 
 def test_heisenberg():
