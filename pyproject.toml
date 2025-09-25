@@ -92,6 +92,7 @@ ignore_missing_imports = true
 
 [tool.pylint."FORMAT"]
 max-line-length = 120
+max-module-lines = 2000
 [tool.pylint."MESSAGES CONTROL"]
 disable = [
     "consider-using-enumerate",
