@@ -401,6 +401,8 @@ def test_koltsov3():
         [0, 2, 1, 4, 3, 6, 5, 8, 7, 9],
         [0, 1, 2, 6, 5, 4, 3, 7, 8, 9],
     ]
+    assert graph2.generator_names == ["I", "K", "S"]
+    assert graph2.name == "koltsov3-n10-k3"
 
 
 def test_heisenberg():
