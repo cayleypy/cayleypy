@@ -1,6 +1,6 @@
 # CayleyPy
 
-AI-based libarary to work with googol-size graphs.
+AI-based library to work with googol-size graphs.
 Supporting:  Cayley graphs, Schreier coset graphs, more to be added.
 
 
