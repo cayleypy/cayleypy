@@ -90,9 +90,49 @@ def test_block_interchange_cayley_growth():
 
 def test_pancake_cayley_growth():
     # See https://oeis.org/A058986
-    oeis_a058986 = [None, 0, 1, 3, 4, 5, 7, 8, 9, 10, 11, 13, 14, 15, 16, 17, 18, 19, 20, 22]
+    oeis_a058986 = [
+        None,
+        0,
+        1,
+        3,
+        4,
+        5,
+        7,
+        8,
+        9,
+        10,
+        11,
+        13,
+        14,
+        15,
+        16,
+        17,
+        18,
+        19,
+        20,
+        22,
+    ]
     # See https://oeis.org/A067607
-    oeis_a067607 = [None, 1, 1, 1, 3, 20, 2, 35, 455, 5804, 73232, 6, 167, 2001, 24974, 339220, 4646117, 65758725]
+    oeis_a067607 = [
+        None,
+        1,
+        1,
+        1,
+        3,
+        20,
+        2,
+        35,
+        455,
+        5804,
+        73232,
+        6,
+        167,
+        2001,
+        24974,
+        339220,
+        4646117,
+        65758725,
+    ]
     for key, layer_sizes in load_dataset("pancake_cayley_growth").items():
         n = int(key)
         assert sum(layer_sizes) == math.factorial(n)
@@ -109,6 +149,20 @@ def test_full_reversals_cayley_growth():
         assert len(layer_sizes) == n  # Graph diameter is n-1.
         if n >= 3:
             assert layer_sizes[-1] == 2  # Size of last layer is 2.
+
+
+def test_lsl_cycles_cayley_growth():
+    dataset = load_dataset("lsl_cycles_cayley_growth")
+    for key, layer_sizes in dataset.items():
+        n = int(key)
+
+        assert sum(layer_sizes) == math.factorial(n), f"Sum of layers for n={n} is incorrect"
+
+        assert len(layer_sizes) >= 2, f"Layer count too small for n={n}"
+
+        assert layer_sizes[0] == 1, f"First layer size for n={n} should be 1"
+
+        assert layer_sizes[-1] > 0, f"Last layer size for n={n} should be positive"
 
 
 def test_signed_reversals_cayley_growth():
