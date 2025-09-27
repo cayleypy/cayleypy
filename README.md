@@ -1,21 +1,21 @@
 # CayleyPy
 
-AI-based libarary to work with googol-size graphs.
-Supporting:  Cayley graphs, Schreier coset graphs, more to be added.
+AI-based libarary for working with googol-size graphs.
+Supports:  Cayley graphs, Schreier coset graphs, with more to be added.
 
 
 ## Overview
 
-Exteremely large graphs (e.g. googol size) cannot be approached in a usual way,
-it is impossible neither to create, neither to store them by standard methods.
+Extremely large graphs (e.g. googol size) cannot be approached in a usual way,
+it is impossible to create or store them by standard methods.
 
 Typically such graphs arise as state-transition graphs.
-For chess, Go or any other games - nodes of the graphs are positions, edges correspond to moves between them.
-For Rubik's cube - nodes are configurations, edges corresponds to configurations different by single moves. 
+For chess, Go or any other games - nodes of the graphs represent positions, edges correspond to moves between them.
+For Rubik's cube - nodes are configurations, edges correspond to configurations different by single moves. 
 
-The most simple and clear examples of such graphs - are [Caley graphs](https://en.wikipedia.org/wiki/Cayley_graph) in mathematics.
+The simplest and clearest examples of such graphs are [Caley graphs](https://en.wikipedia.org/wiki/Cayley_graph) in mathematics.
 (and [Schreier coset graphs](https://en.wikipedia.org/wiki/Schreier_coset_graph) ). 
-Initial developments will focus on these graphs, supporting other types later. 
+Initial developments focuses on these graphs, supporting other types later. 
 
 We plan to support:
 
@@ -25,15 +25,15 @@ We plan to support:
 * Efficient BFS for small subgraphs
 * Efficient random walks generation
 * Efficient Beam Search 
-* Hamiltionan paths finding
-* Efficient computing on CPU, GPU, TPU (with JAX), usable on Kaggle.
+* Hamiltionan path finding
+* Efficient computing on CPU, GPU, and TPU (with JAX), usable on Kaggle.
 * Etc. 
 
 Mathematical applications: 
 * Estimation of diameters and growths
-* Approximation of the word metrics and diffusion distnace
+* Approximation of word metrics and diffusion distnace
 * Estimation of the mixing time for random walks of different types 
-* BFS from given state (growth function, adjacency matrix, last layers).
+* BFS from a given state (growth function, adjacency matrix, last layers).
 * Library of graphs and generators (LRX, TopSpin, Rubik Cubes, wreath, globe etc.,
   see [here](https://www.kaggle.com/code/ivankolt/generation-of-incidence-mtx-pancake)).
 * Library of datasets with solutions to some problems (e.g. growth functions like
@@ -56,9 +56,9 @@ See the following Kaggle notebooks for examples of library usage:
 * Growth function computations:
   * [For LX](https://www.kaggle.com/code/fedimser/growth-function-for-lx-cayley-graph).
   * [For TopSpin cosets](https://www.kaggle.com/code/fedimser/growth-functions-for-topspin-cosets).
-* Becnhmarks:
+* Benchmarks:
   * [Benchmarks versions of BFS in CayleyPy](https://www.kaggle.com/code/fedimser/benchmark-versions-of-bfs-in-cayleypy).
-  * [Becnhmark BFS on GPU](https://www.kaggle.com/code/fedimser/benchmark-bfs-in-cayleypy-on-gpu-p100).
+  * [Benchmarks BFS on GPU](https://www.kaggle.com/code/fedimser/benchmark-bfs-in-cayleypy-on-gpu-p100).
 
 ## Installation
 
@@ -68,7 +68,7 @@ We recommend installing the latest version from GitHub:
 pip install git+https://github.com/cayleypy/cayleypy
 ```
 
-You may also install using pip, although this might be missing recently added features:
+You may also install using pip, although this may be missing recently added features:
 
 ```
 pip install cayleypy
