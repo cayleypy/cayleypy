@@ -1,3 +1,7 @@
+# We shall probably split this file into multiple submodules.
+# For now the following line will prevent pylint from complaining.
+# pylint: disable=too-many-lines
+
 """Library of pre-defined graphs."""
 
 from itertools import permutations, combinations
