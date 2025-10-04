@@ -6,4 +6,4 @@ in Cayley graphs using both supervised learning and reinforcement learning appro
 
 from .trainer import Trainer
 
-__all__ = ['Trainer']
+__all__ = ["Trainer"]
