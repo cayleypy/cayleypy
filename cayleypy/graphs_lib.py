@@ -109,7 +109,11 @@ class PermutationGroups:
                 perm += list(range(n + j + 1, n + n))
                 generators.append(perm)
                 generator_names.append(f"R[{i}..{j}]")
-        return CayleyGraphDef.create(generators, central_state=list(range(2 * n)), generator_names=generator_names)
+        return CayleyGraphDef.create(
+            generators,
+            central_state=list(range(2 * n)),
+            generator_names=generator_names,
+        )
 
     @staticmethod
     def lrx(n: int, k: int = 1) -> CayleyGraphDef:
@@ -120,7 +124,11 @@ class PermutationGroups:
             By default, k=1, which means X is transposition of first 2 elements.
         """
         assert n >= 3
-        generators = [list(range(1, n)) + [0], [n - 1] + list(range(0, n - 1)), transposition(n, 0, k)]
+        generators = [
+            list(range(1, n)) + [0],
+            [n - 1] + list(range(0, n - 1)),
+            transposition(n, 0, k),
+        ]
         generator_names = ["L", "R", "X"]
         name = f"lrx-{n}"
         if k != 1:
@@ -146,7 +154,10 @@ class PermutationGroups:
         generators = [list(range(1, n)) + [0], transposition(n, 0, 1)]
         generator_names = ["L", "X"]
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=f"lx-{n}"
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=f"lx-{n}",
         )
 
     @staticmethod
@@ -177,7 +188,10 @@ class PermutationGroups:
         central_state = list(range(n))
         name = f"coxeter-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=central_state, generator_names=generator_names, name=name
+            generators,
+            central_state=central_state,
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -192,7 +206,10 @@ class PermutationGroups:
         central_state = list(range(n))
         name = f"cyclic_coxeter-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=central_state, generator_names=generator_names, name=name
+            generators,
+            central_state=central_state,
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -211,7 +228,10 @@ class PermutationGroups:
             generator_names.append("R" + str(prefix_len - 1))
         name = f"pancake-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -234,33 +254,72 @@ class PermutationGroups:
             return list(range(k - 1, -1, -1)) + list(range(k, n, 1))
 
         assert n >= 2
-        assert subset in [1, 2, 3, 4, 5, 6, 7], "subset parameter must be one of {1,2,3,4,5,6,7}"
+        assert subset in [
+            1,
+            2,
+            3,
+            4,
+            5,
+            6,
+            7,
+        ], "subset parameter must be one of {1,2,3,4,5,6,7}"
         generators = []
         generator_names = []
         if subset == 1:
-            generators = [pancake_generator(n, n), pancake_generator(n - 1, n), pancake_generator(2, n)]
+            generators = [
+                pancake_generator(n, n),
+                pancake_generator(n - 1, n),
+                pancake_generator(2, n),
+            ]
             generator_names = [f"R{n}", f"R{n-1}", "R2"]
         elif subset == 2:
-            generators = [pancake_generator(n, n), pancake_generator(n - 1, n), pancake_generator(3, n)]
+            generators = [
+                pancake_generator(n, n),
+                pancake_generator(n - 1, n),
+                pancake_generator(3, n),
+            ]
             generator_names = [f"R{n}", f"R{n-1}", "R3"]
         elif subset == 3:
-            generators = [pancake_generator(n, n), pancake_generator(n - 1, n), pancake_generator(n - 2, n)]
+            generators = [
+                pancake_generator(n, n),
+                pancake_generator(n - 1, n),
+                pancake_generator(n - 2, n),
+            ]
             generator_names = [f"R{n}", f"R{n-1}", f"R{n-2}"]
         elif subset == 4:
-            generators = [pancake_generator(n, n), pancake_generator(n - 1, n), pancake_generator(n - 3, n)]
+            generators = [
+                pancake_generator(n, n),
+                pancake_generator(n - 1, n),
+                pancake_generator(n - 3, n),
+            ]
             generator_names = [f"R{n}", f"R{n-1}", f"R{n-3}"]
         elif subset == 5:
-            generators = [pancake_generator(n, n), pancake_generator(n - 2, n), pancake_generator(2, n)]
+            generators = [
+                pancake_generator(n, n),
+                pancake_generator(n - 2, n),
+                pancake_generator(2, n),
+            ]
             generator_names = [f"R{n}", f"R{n-2}", "R2"]
         elif subset == 6:
-            generators = [pancake_generator(n, n), pancake_generator(n - 2, n), pancake_generator(3, n)]
+            generators = [
+                pancake_generator(n, n),
+                pancake_generator(n - 2, n),
+                pancake_generator(3, n),
+            ]
             generator_names = [f"R{n}", f"R{n-2}", "R3"]
         elif subset == 7:
-            generators = [pancake_generator(n, n), pancake_generator(n - 2, n), pancake_generator(n - 3, n)]
+            generators = [
+                pancake_generator(n, n),
+                pancake_generator(n - 2, n),
+                pancake_generator(n - 3, n),
+            ]
             generator_names = [f"R{n}", f"R{n-2}", f"R{n-3}"]
         name = f"cubic_pancake-{n}-{subset}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -283,7 +342,10 @@ class PermutationGroups:
             generator_names.append("R" + str(prefix_len + 1))
         name = f"burnt_pancake-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(2 * n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(2 * n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -298,7 +360,10 @@ class PermutationGroups:
                 generator_names.append(f"({a} {b} {c})")
         name = f"three_cycles-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -311,7 +376,10 @@ class PermutationGroups:
             generator_names.append(f"({0} {i} {j})")
         name = f"three_cycles_0ij-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -335,7 +403,10 @@ class PermutationGroups:
         if add_inverses:
             name += "-ic"  # Inverse closed.
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -351,7 +422,10 @@ class PermutationGroups:
                 generator_names.append(f"D{idx}")
         name = f"derangements-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -405,7 +479,10 @@ class PermutationGroups:
             generator_names.append(f"S{i}")
         name = f"stars-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -464,7 +541,10 @@ class PermutationGroups:
 
         name = f"rapaport_m1-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -491,7 +571,10 @@ class PermutationGroups:
 
         name = f"rapaport_m2-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -519,8 +602,47 @@ class PermutationGroups:
 
         name = f"all_cycles-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
+
+    @staticmethod
+    def lsl_cycles(
+        n: int,
+        add_inverses: bool = True,
+    ) -> CayleyGraphDef:
+        """
+        Cayley graph for S_n (n ≥ 3), generated by:
+        - L = longest cycle (left shift),
+        - S = sub-longest cycle (fixes 0, cycles 1..n-1).
+
+        If ``add_inverses=True`` (default), inverse generators are added automatically.
+        """
+        assert n >= 3
+
+        # Longest (left shift): [1, 2, ..., n-1, 0]
+        longest_cycle = list(range(1, n)) + [0]
+
+        # Sub-longest: 0 fixed, [1 -> 2 -> ... -> n-1 -> 1]
+        sub_longest_cycle = [0] + list(range(2, n)) + [1]
+
+        generators = [longest_cycle, sub_longest_cycle]
+        generator_names = ["L", "S"]
+
+        name = f"lsl_cycles-{n}"
+        graph_def = CayleyGraphDef.create(
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
+        )
+
+        if add_inverses:
+            graph_def = graph_def.make_inverse_closed()
+
+        return graph_def
 
     @staticmethod
     def wrapped_k_cycles(n: int, k: int) -> CayleyGraphDef:
@@ -536,7 +658,10 @@ class PermutationGroups:
             generator_names.append(f"({' '.join(map(str, cycle))})")
         name = f"wrapped_k_cycles-{n}-{k}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -556,7 +681,10 @@ class PermutationGroups:
         generator_names.append(f"({' '.join(map(str, perm2))})")
         name = f"larx-{n}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -651,7 +779,10 @@ class PermutationGroups:
         generator_names = ["A", "S"]
         name = f"sheveleva2-n{n}-k{k}"
         return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names, name=name
+            generators,
+            central_state=list(range(n)),
+            generator_names=generator_names,
+            name=name,
         )
 
     @staticmethod
@@ -897,6 +1028,8 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
         return Puzzles.megaminx()
     elif name == "lx":
         return PermutationGroups.lx(n)
+    elif name == "lsl_cycles":
+        return PermutationGroups.lsl_cycles(n)
     elif name.startswith("lx-"):
         return PermutationGroups.lrx(int(name[3:]))
     elif name == "lrx":
@@ -1012,10 +1145,12 @@ class MatrixGroups:
         generator_names = []
         for k in range(n - 1):
             e = MatrixGenerator.create(
-                [[1 if j == i or (i == k and j == k + 1) else 0 for j in range(n)] for i in range(n)], modulo=modulo
+                [[1 if j == i or (i == k and j == k + 1) else 0 for j in range(n)] for i in range(n)],
+                modulo=modulo,
             )
             f = MatrixGenerator.create(
-                [[1 if j == i or (i == k + 1 and j == k) else 0 for j in range(n)] for i in range(n)], modulo=modulo
+                [[1 if j == i or (i == k + 1 and j == k) else 0 for j in range(n)] for i in range(n)],
+                modulo=modulo,
             )
             generators.extend([e, e.inv, f, f.inv])
             generator_names.extend([f"e{k + 1}", f"e{k + 1}'", f"f{k + 1}", f"f{k + 1}'"])
