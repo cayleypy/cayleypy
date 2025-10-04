@@ -40,7 +40,8 @@ torch = [
 lint = [
     "black",
     "mypy==1.15.0",
-    "pylint"
+    "pylint",
+    "types-tqdm"
 ]
 test = [
     "pytest",
