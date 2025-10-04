@@ -53,7 +53,7 @@ class TestTrainer:
         """Test that Trainer initializes correctly."""
         assert trainer.model == simple_model
         assert trainer.graph == mock_graph
-        assert trainer.CFG == config
+        assert trainer.cfg == config
         assert trainer.device == mock_graph.device
         assert isinstance(trainer.nn_success_rates, dict)
 
@@ -75,20 +75,20 @@ class TestTrainer:
 
         # Mock tqdm progress bar to be iterable
         mock_pbar = Mock()
-        mock_pbar.__iter__ = Mock(return_value=iter(range(trainer.CFG["num_epochs_supervised"])))
+        mock_pbar.__iter__ = Mock(return_value=iter(range(trainer.cfg["num_epochs_supervised"])))
         mock_tqdm.return_value = mock_pbar
 
         # Call train_supervised
-        trainer.train_supervised(trainer.model, mock_graph, trainer.optimizer, trainer.loss_fn, trainer.CFG)
+        trainer.train_supervised(trainer.model, mock_graph, trainer.optimizer, trainer.loss_fn, trainer.cfg)
 
         # Verify random_walks was called with correct parameters
-        expected_calls = trainer.CFG["num_epochs_supervised"]
+        expected_calls = trainer.cfg["num_epochs_supervised"]
         assert mock_graph.random_walks.call_count == expected_calls
 
         # Check that all calls had the correct parameters
         for call in mock_graph.random_walks.call_args_list:
-            assert call.kwargs["width"] == trainer.CFG["random_walks_width"]
-            assert call.kwargs["length"] == trainer.CFG["random_walks_length"]
+            assert call.kwargs["width"] == trainer.cfg["random_walks_width"]
+            assert call.kwargs["length"] == trainer.cfg["random_walks_length"]
             assert call.kwargs["mode"] == "nbt"
             assert call.kwargs["nbt_history_depth"] == 6
 
@@ -108,16 +108,16 @@ class TestTrainer:
 
         # Mock tqdm progress bar to be iterable
         mock_pbar = Mock()
-        mock_pbar.__iter__ = Mock(return_value=iter(range(trainer.CFG["num_epochs_rl"])))
+        mock_pbar.__iter__ = Mock(return_value=iter(range(trainer.cfg["num_epochs_rl"])))
         mock_tqdm.return_value = mock_pbar
 
         # Call train_rl
-        trainer.train_rl(trainer.model, mock_graph, trainer.optimizer, trainer.loss_fn, trainer.CFG, k_steps=2)
+        trainer.train_rl(trainer.model, mock_graph, trainer.optimizer, trainer.loss_fn, trainer.cfg, k_steps=2)
 
         # Verify random_walks was called
         mock_graph.random_walks.assert_called_once_with(
-            width=trainer.CFG["random_walks_width"],
-            length=trainer.CFG["random_walks_length"],
+            width=trainer.cfg["random_walks_width"],
+            length=trainer.cfg["random_walks_length"],
             mode="nbt",
             nbt_history_depth=6,
         )
@@ -131,7 +131,7 @@ class TestTrainer:
         """Test evaluation method."""
         validation_states = [torch.tensor([0, 1, 2, 3]), torch.tensor([1, 0, 2, 3])]
 
-        trainer.evaluate(trainer.model, mock_graph, validation_states, trainer.CFG)
+        trainer.evaluate(trainer.model, mock_graph, validation_states, trainer.cfg)
 
         # Verify beam_search was called for each validation state
         assert mock_graph.beam_search.call_count == len(validation_states)
@@ -147,7 +147,7 @@ class TestTrainer:
         validation_states = [torch.tensor([0, 1, 2, 3])]
 
         # Test with RL enabled
-        trainer.CFG["num_epochs_rl"] = 1
+        trainer.cfg["num_epochs_rl"] = 1
         trainer.train(validation_states)
 
         # Verify all methods were called
@@ -163,7 +163,7 @@ class TestTrainer:
         validation_states = [torch.tensor([0, 1, 2, 3])]
 
         # Test with RL disabled
-        trainer.CFG["num_epochs_rl"] = 0
+        trainer.cfg["num_epochs_rl"] = 0
         trainer.train(validation_states)
 
         # Verify supervised training and evaluation were called
@@ -217,10 +217,10 @@ class TestTrainer:
         loss_fn = nn.MSELoss()
         trainer = Trainer(simple_model, mock_graph, optimizer, loss_fn, config)
 
-        assert trainer.CFG == config
-        assert trainer.CFG["num_epochs_supervised"] == 5
-        assert trainer.CFG["num_epochs_rl"] == 3
-        assert trainer.CFG["batch_size"] == 64
+        assert trainer.cfg == config
+        assert trainer.cfg["num_epochs_supervised"] == 5
+        assert trainer.cfg["num_epochs_rl"] == 3
+        assert trainer.cfg["batch_size"] == 64
 
     def test_trainer_device_handling(self, simple_model, mock_graph, config):
         """Test that Trainer properly handles device assignment."""
