@@ -467,6 +467,19 @@ def test_sheveleva2():
     assert graph2.generators == [[1, 0, 3, 2, 4, 7, 6, 5], [0, 2, 1, 4, 5, 6, 3, 7]]
 
 
+def test_koltsov3():
+    graph = PermutationGroups.koltsov3(6, 2)
+    assert graph.generators == [[1, 0, 3, 2, 5, 4], [0, 2, 1, 4, 3, 5], [0, 4, 3, 2, 1, 5]]
+    graph2 = PermutationGroups.koltsov3(10, 2, 3, 1)
+    assert graph2.generators == [
+        [1, 0, 3, 2, 5, 4, 7, 6, 9, 8],
+        [0, 2, 1, 4, 3, 6, 5, 8, 7, 9],
+        [0, 1, 2, 6, 5, 4, 3, 7, 8, 9],
+    ]
+    assert graph2.generator_names == ["I", "K", "S"]
+    assert graph2.name == "koltsov3-n10-k3"
+
+
 def test_heisenberg():
     graph1 = MatrixGroups.heisenberg()
     assert graph1.name == "heisenberg-3-ic"
@@ -727,3 +740,26 @@ def test_down_cycles():
         "(4,5)",
     ]
     assert g.name == "down_cycles-6"
+
+
+def test_prefix_cycles():
+    n = 6
+    g = PermutationGroups.prefix_cycles(n)
+    assert np.array_equal(
+        g.generators,
+        [
+            [1, 0, 2, 3, 4, 5],
+            [1, 2, 0, 3, 4, 5],
+            [1, 2, 3, 0, 4, 5],
+            [1, 2, 3, 4, 0, 5],
+            [1, 2, 3, 4, 5, 0],
+        ],
+    )
+    assert g.generator_names == [
+        "(0,1)",
+        "(0,1,2)",
+        "(0,1,2,3)",
+        "(0,1,2,3,4)",
+        "(0,1,2,3,4,5)",
+    ]
+    assert g.name == "prefix_cycles-6"

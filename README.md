@@ -1,19 +1,18 @@
 # CayleyPy
 
-AI-based libarary to work with googol-size graphs.
+AI-based library to work with extremely large graphs.<br>
 Supporting:  Cayley graphs, Schreier coset graphs, more to be added.
-
 
 ## Overview
 
-Exteremely large graphs (e.g. googol size) cannot be approached in a usual way,
+Extremely large graphs (e.g. googol size, ~10<sup>100</sup> nodes) cannot be approached in a usual way,
 it is impossible neither to create, neither to store them by standard methods.
 
 Typically such graphs arise as state-transition graphs.
 For chess, Go or any other games - nodes of the graphs are positions, edges correspond to moves between them.
 For Rubik's cube - nodes are configurations, edges corresponds to configurations different by single moves. 
 
-The most simple and clear examples of such graphs - are [Caley graphs](https://en.wikipedia.org/wiki/Cayley_graph) in mathematics.
+The most simple and clear examples of such graphs - are [Cayley graphs](https://en.wikipedia.org/wiki/Cayley_graph) in mathematics.
 (and [Schreier coset graphs](https://en.wikipedia.org/wiki/Schreier_coset_graph) ). 
 Initial developments will focus on these graphs, supporting other types later. 
 
@@ -25,13 +24,13 @@ We plan to support:
 * Efficient BFS for small subgraphs
 * Efficient random walks generation
 * Efficient Beam Search 
-* Hamiltionan paths finding
+* Hamiltonian paths finding
 * Efficient computing on CPU, GPU, TPU (with JAX), usable on Kaggle.
 * Etc. 
 
 Mathematical applications: 
 * Estimation of diameters and growths
-* Approximation of the word metrics and diffusion distnace
+* Approximation of the word metrics and diffusion distance
 * Estimation of the mixing time for random walks of different types 
 * BFS from given state (growth function, adjacency matrix, last layers).
 * Library of graphs and generators (LRX, TopSpin, Rubik Cubes, wreath, globe etc.,
@@ -47,18 +46,18 @@ See the following Kaggle notebooks for examples of library usage:
 * [Computing spectra](https://www.kaggle.com/code/fedimser/computing-spectra-of-cayley-graphs-using-cayleypy).
 * [Library of puzzles in GAP format in CayleyPy](https://www.kaggle.com/code/fedimser/library-of-puzzles-in-gap-format-in-cayleypy).
 * Path finding in Cayley Graphs:
-  * [Beam seacrh with CayleyPy](https://www.kaggle.com/code/fedimser/beam-search-with-cayleypy) - simple example of finding paths for LRX (n=12) using beam search and neural network.
-  * [Finidng shortest paths for LRX (n=8) using BFS](https://www.kaggle.com/code/fedimser/lrx-solution).
-  * [Finidng shortest paths for LRX cosets (n=16 and n=32) using BFS](https://www.kaggle.com/code/fedimser/lrx-binary-with-cayleypy-bfs-only).
+  * [Beam search with CayleyPy](https://www.kaggle.com/code/fedimser/beam-search-with-cayleypy) - simple example of finding paths for LRX (n=12) using beam search and neural network.
+  * [Finding shortest paths for LRX (n=8) using BFS](https://www.kaggle.com/code/fedimser/lrx-solution).
+  * [Finding shortest paths for LRX cosets (n=16 and n=32) using BFS](https://www.kaggle.com/code/fedimser/lrx-binary-with-cayleypy-bfs-only).
   * [Beam search with neural network for LRX cosets (n=32)](https://www.kaggle.com/code/fedimser/solve-lrx-binary-with-cayleypy).
   * [Beam search for LRX, n=16](https://www.kaggle.com/code/fedimser/lrx-solution-n-16-beamsearch). 
   * [Beam search for LRX, n=32](https://www.kaggle.com/code/fedimser/lrx-solution-n-32-beamsearch)
 * Growth function computations:
   * [For LX](https://www.kaggle.com/code/fedimser/growth-function-for-lx-cayley-graph).
   * [For TopSpin cosets](https://www.kaggle.com/code/fedimser/growth-functions-for-topspin-cosets).
-* Becnhmarks:
+* Benchmarks:
   * [Benchmarks versions of BFS in CayleyPy](https://www.kaggle.com/code/fedimser/benchmark-versions-of-bfs-in-cayleypy).
-  * [Becnhmark BFS on GPU](https://www.kaggle.com/code/fedimser/benchmark-bfs-in-cayleypy-on-gpu-p100).
+  * [Benchmark BFS on GPU](https://www.kaggle.com/code/fedimser/benchmark-bfs-in-cayleypy-on-gpu-p100).
 
 ## Installation
 
@@ -95,7 +94,7 @@ To run all tests, including some slow running tests:
 RUN_SLOW_TESTS=1 pytest
 ```
 
-Before commiting, run these checks:
+Before committing, run these checks:
 
 ```
 ./lint.sh
@@ -130,7 +129,7 @@ your code using Black. There are few convenient ways to do that:
 ### Style
 
 * In general, this repository follows [Google Python Style Guide](https://google.github.io/styleguide/pyguide.html). All
-    contrbutors should read it.
+    contributors should read it.
 * When writing comments, [use punctuation](https://google.github.io/styleguide/pyguide.html#386-punctuation-spelling-and-grammar).
     In particular, always put a period (".") in the end of sentences.
 * We have pylint checks to enforce some style rules. You should fix pylint warnings instead of disabling the check. 
@@ -186,8 +185,8 @@ List of currently available models is
 ### How to add a new predictor model
 1. Train your model.
 2. Verify that when used with beam search, it reliably finds the paths.
-3. Export weights to a file (using `torch.save(model.state_dict(), path)`.
-4. Upload weights as model on Kaggle, make it public and use opensource license (MIT license is recommended).
+3. Export weights to a file (using `torch.save(model.state_dict(), path`).
+4. Upload weights as model on Kaggle, make it public and use open source license (MIT license is recommended).
 5. Make sure the graph for which your model should be used has unique name (that is, `CayleyGraphDef.name`). For
     example, `PermutationGroups.lrx(16)` has name "lrx-16". Also `prepare_graph` given this name should return
     this graph (this is needed for tests).
@@ -200,12 +199,31 @@ List of currently available models is
     * If your model architecture is very different from we already have in library, define new model type for it.
     * For example, we already have model type "MLP" (multi-layer perceptron) defined by `MlpModel` with the following
         parameters: `input_size`, `num_classes_for_one_hot`, `layers_sizes`.
-7. Verify that when you define your model config, call `load` on it and then use that as preditor in beam search,
+7. Verify that when you define your model config, call `load` on it and then use that as predictor in beam search,
     it works.
 8. Add your model to `PREDICTOR_MODELS` in `models_lib`. Use graph name as a key.
 9. Run `pytest cayleypy/models/models_lib_test.py`. This will check that your model can be loaded from Kaggle and used
     for inference (i.e. has correct input and output shape), but it doesn't check quality of your model.
 9. Optionally, add a test that beam search with your model successfully finds a path.
+
+## Kaggle competitions
+
+Our community has recently launched several Kaggle competitions to develop and benchmark our methods and make it easier for the larger audience to get involved. Most of those competitions don't require the usage of this library, however it might be handy as those tasks are the ones 
+
+
+| Competition   | Graph size(s) | Description |
+| --------------| ------------- | ------------|
+| [4x4x4 Cube](https://www.kaggle.com/competitions/cayley-py-444-cube/)                                    | 10<sup>55</sup>                 | 4x4x4 Rubik's cube (play [here](https://alpha.twizzle.net/explore/?puzzle=4x4x4))                                                  |
+| [Christopher's Jewel](https://www.kaggle.com/competitions/cayleypy-christophers-jewel/)                  | (tba)                           | small octahedron-shaped puzzle (play [here](https://alpha.twizzle.net/explore/?puzzle=Christopher%27s+jewel))                      |
+| [Megaminx](https://www.kaggle.com/competitions/cayley-py-megaminx)                                       | (tba)                           | dodecahedron-shaped puzzle (play [here](https://alpha.twizzle.net/explore/?puzzle=Christopher%27s+jewel))                          |
+| [Professor Tetraminx](https://www.kaggle.com/competitions/cayley-py-professor-tetraminx-solve-optimally) | 10<sup>32</sup>                 | tetrahedron-shaped puzzle, medium size version (play [here](https://alpha.twizzle.net/explore/?puzzle=professor+tetraminx))        |
+| [IHES Supercube](https://www.kaggle.com/competitions/cayleypy-ihes-cube)                                 | (tba)                           | version of 3x3x3 Rubik's cube                                                                                                      |
+| [RapaportM2](https://www.kaggle.com/competitions/cayleypy-rapapport-m2/)                                 | (tba)                           | (tba)                                                                                                                              |
+| [Transposons](https://www.kaggle.com/competitions/cayleypy-rapapport-m2/)                                | 10<sup>8</sup>-10<sup>158</sup> | transpositions of adjacent substrings                                                                                              |
+| [Reversals](https://www.kaggle.com/competitions/cayleypy-reversals)                                      | 10<sup>8</sup>-10<sup>64</sup>  | substring reversals                                                                                                                |
+| [Pancake sorting](https://www.kaggle.com/competitions/CayleyPy-pancake)                                  | (tba)                           | (tba)                                                                                                                              |
+| [Glushkov's problem](https://www.kaggle.com/competitions/cayleypy-glushkov/)                             | (tba)                           | (tba)                                                                                                                              |
+
 
 ## Credits
 
