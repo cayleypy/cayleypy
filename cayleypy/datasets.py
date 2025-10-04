@@ -30,9 +30,7 @@ def load_dataset(dataset_name: str, error_if_not_found=True) -> dict[str, Any]:
     return data
 
 
-def _update_dataset(
-    dataset_name: str, keys: list[str], eval_func: Callable[[str], Any]
-):
+def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str], Any]):
     file_name = os.path.join(DATA_DIR, dataset_name + ".csv")
     data = load_dataset(dataset_name, error_if_not_found=False)
     for key in keys:
@@ -131,9 +129,7 @@ def _compute_coxeter_cayley_growth(n_str: str) -> list[int]:
     for i in range(1, n):  # i is the number of elements inserted so far
         new_dp = [0] * (max_inv + 1)
         for k in range(max_inv + 1):
-            for j in range(
-                min(i + 1, k + 1)
-            ):  # insert new element at position j (adds j inversions)
+            for j in range(min(i + 1, k + 1)):  # insert new element at position j (adds j inversions)
                 new_dp[k] += dp[k - j]
         dp = new_dp
 
@@ -159,21 +155,11 @@ def _compute_heisenberg_growth(key: str) -> list[int]:
 
 
 def _compute_sl_fund_roots_growth(n: str, m: str) -> list[int]:
-    return (
-        CayleyGraph(
-            MatrixGroups.special_linear_fundamental_roots(int(n), modulo=int(m))
-        )
-        .bfs()
-        .layer_sizes
-    )
+    return CayleyGraph(MatrixGroups.special_linear_fundamental_roots(int(n), modulo=int(m))).bfs().layer_sizes
 
 
 def _compute_sl_root_weyl_growth(n: str, m: str) -> list[int]:
-    return (
-        CayleyGraph(MatrixGroups.special_linear_root_weyl(int(n), modulo=int(m)))
-        .bfs()
-        .layer_sizes
-    )
+    return CayleyGraph(MatrixGroups.special_linear_root_weyl(int(n), modulo=int(m))).bfs().layer_sizes
 
 
 def _compute_rapaport_m1_cayley_growth(n: str) -> list[int]:
@@ -242,62 +228,29 @@ def generate_datasets():
     )
     _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     keys = [str(n) for n in range(2, 11)]
-    _update_dataset(
-        "transposons_cayley_growth", keys, _compute_transposons_cayley_growth
-    )
+    _update_dataset("transposons_cayley_growth", keys, _compute_transposons_cayley_growth)
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
-    _update_dataset(
-        "full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth
-    )
-    _update_dataset(
-        "cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth
-    )
-    _update_dataset(
-        "rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth
-    )
-    _update_dataset(
-        "rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth
-    )
-    _update_dataset(
-        "down_cycles_cayley_growth", keys, _compute_down_cycles_cayley_growth
-    )
-    _update_dataset(
-        "full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth
-    )
-    _update_dataset(
-        "cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth
-    )
-    _update_dataset(
-        "rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth
-    )
-    _update_dataset(
-        "rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth
-    )
-    _update_dataset(
-        "down_cycles_cayley_growth", keys, _compute_down_cycles_cayley_growth
-    )
-    _update_dataset(
-        "prefix_cycles_cayley_growth", keys, _compute_prefix_cycles_cayley_growth
-    )
+    _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
+    _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
+    _update_dataset("rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth)
+    _update_dataset("rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth)
+    _update_dataset("down_cycles_cayley_growth", keys, _compute_down_cycles_cayley_growth)
+    _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
+    _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
+    _update_dataset("rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth)
+    _update_dataset("rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth)
+    _update_dataset("down_cycles_cayley_growth", keys, _compute_down_cycles_cayley_growth)
+    _update_dataset("prefix_cycles_cayley_growth", keys, _compute_prefix_cycles_cayley_growth)
     keys = [str(n) for n in range(1, 8)]
-    _update_dataset(
-        "burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth
-    )
-    _update_dataset(
-        "signed_reversals_cayley_growth", keys, _compute_signed_reversals_cayley_growth
-    )
+    _update_dataset("burnt_pancake_cayley_growth", keys, _compute_burnt_pancake_cayley_growth)
+    _update_dataset("signed_reversals_cayley_growth", keys, _compute_signed_reversals_cayley_growth)
     keys = []
     for n in range(2, 10):
         group = get_hr_group(n)
         for parameters in group:
             keys.append(",".join([str(x) for x in parameters]))
     _update_dataset("hungarian_rings_growth", keys, _compute_hungarian_rings_growth)
-    keys = [
-        f"{n},{modulo}"
-        for n in range(3, 11)
-        for modulo in range(2, 51)
-        if modulo ** (2 * n - 3) <= 2e6
-    ]
+    keys = [f"{n},{modulo}" for n in range(3, 11) for modulo in range(2, 51) if modulo ** (2 * n - 3) <= 2e6]
     _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)
     keys = [str(n) for n in range(2, 8)]
     _update_dataset("all_cycles_cayley_growth", keys, _compute_all_cycles_cayley_growth)
@@ -310,29 +263,19 @@ def generate_datasets():
         _compute_block_interchange_cayley_growth,
     )
     keys = [f"{n},{k}" for n in range(2, 10) for k in range(2, n + 1)]
-    _update_dataset(
-        "wrapped_k_cycles_cayley_growth", keys, _compute_wrapped_k_cycles_cayley_growth
-    )
+    _update_dataset("wrapped_k_cycles_cayley_growth", keys, _compute_wrapped_k_cycles_cayley_growth)
     keys = [str(n) for n in range(3, 12)]
     _update_dataset("stars_cayley_growth", keys, _compute_stars_cayley_growth)
     keys = [str(n) for n in range(2, 8)]
     _update_dataset("larx_cayley_growth", keys, _compute_larx_cayley_growth)
     keys = [str(n) for n in range(2, 11)]
-    _update_dataset(
-        "sl_2_fund_roots_growth", keys, lambda m: _compute_sl_fund_roots_growth(2, m)
-    )
+    _update_dataset("sl_2_fund_roots_growth", keys, lambda m: _compute_sl_fund_roots_growth(2, m))
     keys = [str(n) for n in range(2, 6)]
-    _update_dataset(
-        "sl_3_fund_roots_growth", keys, lambda m: _compute_sl_fund_roots_growth(3, m)
-    )
+    _update_dataset("sl_3_fund_roots_growth", keys, lambda m: _compute_sl_fund_roots_growth(3, m))
     keys = [str(n) for n in range(2, 11)]
-    _update_dataset(
-        "sl_2_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(2, m)
-    )
+    _update_dataset("sl_2_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(2, m))
     keys = [str(n) for n in range(2, 6)]
-    _update_dataset(
-        "sl_3_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(3, m)
-    )
+    _update_dataset("sl_3_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(3, m))
     keys = [f"{n},{k}" for n in range(3, 10) for k in range(2, min(n, 5) + 1)]
     _update_dataset(
         "increasing_k_cycles_cayley_growth",

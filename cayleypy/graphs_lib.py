@@ -34,9 +34,7 @@ class PermutationGroups:
             for j in range(i + 1, n):
                 generators.append(transposition(n, i, j))
                 generator_names.append(f"({i},{j})")
-        return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names
-        )
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
     @staticmethod
     def transposons(n: int) -> CayleyGraphDef:
@@ -48,17 +46,10 @@ class PermutationGroups:
         for i in range(n):
             for j in range(i + 1, n):
                 for k in range(j, n):
-                    transp = (
-                        list(range(i))
-                        + list(range(j, k + 1))
-                        + list(range(i, j))
-                        + list(range(k + 1, n))
-                    )
+                    transp = list(range(i)) + list(range(j, k + 1)) + list(range(i, j)) + list(range(k + 1, n))
                     generators.append(transp)
                     generator_names.append(f"T[{i}..{j-1},{k}]")
-        return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names
-        )
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
     @staticmethod
     def block_interchange(n: int) -> CayleyGraphDef:
@@ -80,9 +71,7 @@ class PermutationGroups:
                         )
                         generators.append(transp)
                         generator_names.append(f"I[{i}..{j-1},{k}..{l-1}]")
-        return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names
-        )
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
     @staticmethod
     def full_reversals(n: int) -> CayleyGraphDef:
@@ -92,14 +81,10 @@ class PermutationGroups:
         generator_names = []
         for i in range(n):
             for j in range(i + 1, n):
-                perm = (
-                    list(range(i)) + list(range(j, i - 1, -1)) + list(range(j + 1, n))
-                )
+                perm = list(range(i)) + list(range(j, i - 1, -1)) + list(range(j + 1, n))
                 generators.append(perm)
                 generator_names.append(f"R[{i}..{j}]")
-        return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), generator_names=generator_names
-        )
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
 
     @staticmethod
     def signed_reversals(n: int) -> CayleyGraphDef:
@@ -189,9 +174,7 @@ class PermutationGroups:
             list(range(k - 1, -1, -1)) + list(range(k, n)),
         ]
         name = f"top_spin-{n}-{k}"
-        return CayleyGraphDef.create(
-            generators, central_state=list(range(n)), name=name
-        )
+        return CayleyGraphDef.create(generators, central_state=list(range(n)), name=name)
 
     @staticmethod
     def coxeter(n: int) -> CayleyGraphDef:
@@ -865,9 +848,7 @@ class PermutationGroups:
         )
 
     @staticmethod
-    def conjugacy_classes(
-        n: int, classes: dict[tuple[int], Union[int, None]]
-    ) -> CayleyGraphDef:
+    def conjugacy_classes(n: int, classes: dict[tuple[int], Union[int, None]]) -> CayleyGraphDef:
         """
         A conjugacy class of S_n is a subset of permutations with same set of cycle lengths.
 
@@ -906,9 +887,7 @@ class PermutationGroups:
         assert all(
             all(cl > 0 for cl in cycle_lengths) for cycle_lengths in classes
         ), "All cycle lengths must be positive"
-        assert all(
-            sum(cycle_lengths) <= n for cycle_lengths in classes
-        ), "Sum of cycle lengths must be <= n"
+        assert all(sum(cycle_lengths) <= n for cycle_lengths in classes), "Sum of cycle lengths must be <= n"
 
         generators = []
         generator_names = []
@@ -1166,29 +1145,19 @@ class MatrixGroups:
         generator_names = []
         for k in range(n - 1):
             e = MatrixGenerator.create(
-                [
-                    [1 if j == i or (i == k and j == k + 1) else 0 for j in range(n)]
-                    for i in range(n)
-                ],
+                [[1 if j == i or (i == k and j == k + 1) else 0 for j in range(n)] for i in range(n)],
                 modulo=modulo,
             )
             f = MatrixGenerator.create(
-                [
-                    [1 if j == i or (i == k + 1 and j == k) else 0 for j in range(n)]
-                    for i in range(n)
-                ],
+                [[1 if j == i or (i == k + 1 and j == k) else 0 for j in range(n)] for i in range(n)],
                 modulo=modulo,
             )
             generators.extend([e, e.inv, f, f.inv])
-            generator_names.extend(
-                [f"e{k + 1}", f"e{k + 1}'", f"f{k + 1}", f"f{k + 1}'"]
-            )
+            generator_names.extend([f"e{k + 1}", f"e{k + 1}'", f"f{k + 1}", f"f{k + 1}'"])
         name = f"sl_fund_roots-{n}"
         if modulo > 0:
             name += f"%{modulo}"
-        return CayleyGraphDef.for_matrix_group(
-            generators=generators, generator_names=generator_names, name=name
-        )
+        return CayleyGraphDef.for_matrix_group(generators=generators, generator_names=generator_names, name=name)
 
     @staticmethod
     def special_linear_root_weyl(n: int, modulo: int = 0) -> CayleyGraphDef:
