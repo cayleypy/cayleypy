@@ -245,7 +245,6 @@ def generate_datasets():
     _update_dataset("rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth)
     _update_dataset("rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth)
     _update_dataset("down_cycles_cayley_growth", keys, _compute_down_cycles_cayley_growth)
-    _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
     _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
     _update_dataset("rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth)
     _update_dataset("rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth)
