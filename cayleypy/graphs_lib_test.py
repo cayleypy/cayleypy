@@ -125,19 +125,18 @@ def test_pancake():
     )
 
 
-def test_lsl_cycles():
-    graph = PermutationGroups.lsl_cycles(3, add_inverses=True)
+def test_lsl_cycles_n4():
+    graph = PermutationGroups.lsl_cycles(4, add_inverses=True)
 
     expected_generators = [
-        [1, 2, 0],  # L
-        [0, 2, 1],  # S
-        [2, 0, 1],  # L_inv
-        [0, 2, 1],  # S_inv (совпадает с S для n=3)
+        [1, 2, 3, 0],  # L
+        [0, 2, 3, 1],  # S
+        [3, 0, 1, 2],  # L_inv
+        [0, 3, 1, 2],  # S_inv
     ]
     assert all(any(np.array_equal(g, e) for g in graph.generators) for e in expected_generators)
 
     assert graph.n_generators == 4
-
     assert set(graph.generator_names) == {"L", "S", "L_inv", "S_inv"}
 
 

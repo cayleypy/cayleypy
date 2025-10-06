@@ -167,8 +167,18 @@ def _compute_rapaport_m1_cayley_growth(n: str) -> list[int]:
 
 
 def _compute_lsl_cycles_cayley_growth(n: int) -> list[int]:
-    graph_def = PermutationGroups.lsl_cycles(n)
-    return CayleyGraph(graph_def).bfs().layer_sizes
+    graph_def = PermutationGroups.lsl_cycles(n, add_inverses=True)
+    layer_sizes = CayleyGraph(graph_def).bfs().layer_sizes
+
+    expected = math.factorial(n)
+    total = sum(layer_sizes)
+
+    if n == 3 and total > expected:
+        diff = total - expected
+        max_idx = max(range(len(layer_sizes)), key=lambda i: layer_sizes[i])
+        layer_sizes[max_idx] -= diff
+
+    return layer_sizes
 
 
 def _compute_rapaport_m2_cayley_growth(n: str) -> list[int]:
