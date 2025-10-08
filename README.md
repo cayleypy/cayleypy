@@ -85,7 +85,7 @@ To start development, run:
 ```
 git clone https://github.com/cayleypy/cayleypy.git
 cd cayleypy
-pip install -e .[torch,lint,test,dev,docs]
+pip install -e .[lint,test,dev,docs]
 ```
 
 To run all tests, including some slow running tests:
