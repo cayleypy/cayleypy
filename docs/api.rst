@@ -45,6 +45,15 @@ Beam search and ML
     cayleypy.algo.RandomWalksGenerator
     cayleypy.models.ModelConfig
 
+Neural network training
+'''''''''''''''''''''''
+
+
+.. autosummary::
+    :toctree: generated/
+
+    cayleypy.trainers.Trainer
+
 Special algorithms
 ''''''''''''''''''
 
