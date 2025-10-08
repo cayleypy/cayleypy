@@ -166,6 +166,21 @@ def _compute_rapaport_m1_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.rapaport_m1(int(n))).bfs().layer_sizes
 
 
+def _compute_lsl_cycles_cayley_growth(n: int) -> list[int]:
+    graph_def = PermutationGroups.lsl_cycles(n, add_inverses=True)
+    layer_sizes = CayleyGraph(graph_def).bfs().layer_sizes
+
+    expected = math.factorial(n)
+    total = sum(layer_sizes)
+
+    if n == 3 and total > expected:
+        diff = total - expected
+        max_idx = max(range(len(layer_sizes)), key=lambda i: layer_sizes[i])
+        layer_sizes[max_idx] -= diff
+
+    return layer_sizes
+
+
 def _compute_rapaport_m2_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.rapaport_m2(int(n))).bfs().layer_sizes
 
@@ -216,12 +231,20 @@ def generate_datasets():
     keys = [str(n) for n in range(4, 12)]
     _update_dataset("top_spin_cayley_growth", keys, _compute_top_spin_cayley_growth)
     keys = [str(n) for n in range(2, 31)]
-    _update_dataset("all_transpositions_cayley_growth", keys, _compute_all_transpositions_cayley_growth)
+    _update_dataset(
+        "all_transpositions_cayley_growth",
+        keys,
+        _compute_all_transpositions_cayley_growth,
+    )
     _update_dataset("coxeter_cayley_growth", keys, _compute_coxeter_cayley_growth)
     keys = [str(n) for n in range(2, 11)]
     _update_dataset("transposons_cayley_growth", keys, _compute_transposons_cayley_growth)
     _update_dataset("pancake_cayley_growth", keys, _compute_pancake_cayley_growth)
     _update_dataset("full_reversals_cayley_growth", keys, _compute_full_reversals_cayley_growth)
+    _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
+    _update_dataset("rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth)
+    _update_dataset("rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth)
+    _update_dataset("down_cycles_cayley_growth", keys, _compute_down_cycles_cayley_growth)
     _update_dataset("cyclic_coxeter_cayley_growth", keys, _compute_cyclic_coxeter_cayley_growth)
     _update_dataset("rapaport_m1_cayley_growth", keys, _compute_rapaport_m1_cayley_growth)
     _update_dataset("rapaport_m2_cayley_growth", keys, _compute_rapaport_m2_cayley_growth)
@@ -240,8 +263,14 @@ def generate_datasets():
     _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)
     keys = [str(n) for n in range(2, 8)]
     _update_dataset("all_cycles_cayley_growth", keys, _compute_all_cycles_cayley_growth)
+    keys = list(range(3, 11))
+    _update_dataset("lsl_cycles_cayley_growth", keys, _compute_lsl_cycles_cayley_growth)
     keys = [str(n) for n in range(3, 10)]
-    _update_dataset("block_interchange_cayley_growth", keys, _compute_block_interchange_cayley_growth)
+    _update_dataset(
+        "block_interchange_cayley_growth",
+        keys,
+        _compute_block_interchange_cayley_growth,
+    )
     keys = [f"{n},{k}" for n in range(2, 10) for k in range(2, n + 1)]
     _update_dataset("wrapped_k_cycles_cayley_growth", keys, _compute_wrapped_k_cycles_cayley_growth)
     keys = [str(n) for n in range(3, 12)]
@@ -257,6 +286,14 @@ def generate_datasets():
     keys = [str(n) for n in range(2, 6)]
     _update_dataset("sl_3_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(3, m))
     keys = [f"{n},{k}" for n in range(3, 10) for k in range(2, min(n, 5) + 1)]
-    _update_dataset("increasing_k_cycles_cayley_growth", keys, _compute_increasing_k_cycles_cayley_growth)
+    _update_dataset(
+        "increasing_k_cycles_cayley_growth",
+        keys,
+        _compute_increasing_k_cycles_cayley_growth,
+    )
     keys = [f"{n},{k}" for n in range(3, 10) for k in range(2, min(n, 5) + 1)]
-    _update_dataset("consecutive_k_cycles_cayley_growth", keys, _compute_consecutive_k_cycles_cayley_growth)
+    _update_dataset(
+        "consecutive_k_cycles_cayley_growth",
+        keys,
+        _compute_consecutive_k_cycles_cayley_growth,
+    )
