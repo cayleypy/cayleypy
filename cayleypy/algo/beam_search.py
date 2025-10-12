@@ -65,8 +65,12 @@ class BeamSearchAlgorithm:
         :param max_steps: Maximum number of search steps/iterations before giving up.
         :param history_depth: For "advanced" mode, how many previous levels to remember and ban from revisiting.
         :param return_path: For "simple" mode, whether to return path (consumes much more memory if True).
-        :param bfs_result_for_mitm: For "simple" mode, BfsResult with pre-computed neighborhood of central state
-            for meet-in-the-middle optimization. Defaults to None.
+        :param bfs_result_for_mitm: BfsResult with pre-computed neighborhood of central state to compute for
+            meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
+            neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
+            central state).
+            OR
+            int radius of BfsResult to be pre-computed on the go
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
@@ -97,15 +101,12 @@ class BeamSearchAlgorithm:
     def search_simple(
         self,
         start_state: AnyStateType,
-
         *,
         predictor: Optional[Predictor] = None,
         beam_width=1000,
         max_steps=1000,
         return_path=False,
-
         bfs_result_for_mitm: Optional[Union[BfsResult,int]] = None,
-
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
 
@@ -313,10 +314,8 @@ class BeamSearchAlgorithm:
             assert path2 is not None
             return path1 + path2
 
+        # Main beam search cycle.
         t0 = time.time()
-
-        #####################################################################################################
-
         for i_step in range(1, max_steps + 1):
             t_moves = t_isin = t_unique_els = 0.0
             t_full_step = time.time()
