@@ -42,7 +42,7 @@ class BeamSearchAlgorithm:
         max_steps: int = 1000,
         history_depth: int = 0,
         return_path: bool = False,
-        bfs_result_for_mitm: Optional[Union[BfsResult,int]] = None,
+        hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
         verbose: int = 0,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to dest state using Beam Search algorithm.
@@ -50,7 +50,7 @@ class BeamSearchAlgorithm:
         The following beam search modes are supported:
 
           * "simple" - classic beam search algorithm that finds paths from start state to central state.
-            Uses meet-in-the-middle optimization if `bfs_result_for_mitm` is provided.
+            Uses meet-in-the-middle optimization if `hashed_neigbourhood` is provided.
             Supports path restoration if `return_path=True`.
           * "advanced" - enhanced beam search with non-backtracking capabilities.
             Supports configurable history depth to avoid revisiting states.
@@ -65,7 +65,7 @@ class BeamSearchAlgorithm:
         :param max_steps: Maximum number of search steps/iterations before giving up.
         :param history_depth: For "advanced" mode, how many previous levels to remember and ban from revisiting.
         :param return_path: For "simple" mode, whether to return path (consumes much more memory if True).
-        :param bfs_result_for_mitm: BfsResult with pre-computed neighborhood of central state to compute for
+        :param hashed_neigbourhood: BfsResult with pre-computed neighborhood of central state to compute for
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
             central state).
@@ -81,7 +81,7 @@ class BeamSearchAlgorithm:
                 beam_width=beam_width,
                 max_steps=max_steps,
                 return_path=return_path,
-                bfs_result_for_mitm=bfs_result_for_mitm,
+                hashed_neigbourhood=hashed_neigbourhood,
             )
         elif beam_mode == "advanced":
             return self.search_advanced(
@@ -91,7 +91,7 @@ class BeamSearchAlgorithm:
                 beam_width=beam_width,
                 max_steps=max_steps,
                 return_path=return_path,
-                bfs_result_for_mitm=bfs_result_for_mitm,
+                hashed_neigbourhood=hashed_neigbourhood,
                 history_depth=history_depth,
                 verbose=verbose,
             )
@@ -106,7 +106,7 @@ class BeamSearchAlgorithm:
         beam_width=1000,
         max_steps=1000,
         return_path=False,
-        bfs_result_for_mitm: Optional[Union[BfsResult,int]] = None,
+        hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
 
@@ -116,7 +116,7 @@ class BeamSearchAlgorithm:
         :param beam_width: Width of the beam (how many "best" states we consider at each step).
         :param max_steps: Maximum number of iterations before giving up.
         :param return_path: Whether to return path (consumes much more memory if True).
-        :param bfs_result_for_mitm: BfsResult with pre-computed neighborhood of central state to compute for
+        :param hashed_neigbourhood: BfsResult with pre-computed neighborhood of central state to compute for
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
             central state).
@@ -138,23 +138,33 @@ class BeamSearchAlgorithm:
         # Encode states.
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
+        _new_states: torch.Tensor
+        _new_hashes: torch.Tensor
 
-        restore_path_hashes = [beam_hashes,]
+        restore_path_hashes = [
+            beam_hashes,
+        ]
 
         # Check if start state is already the dest.
         if torch.any(beam_hashes == dest_hashes):
             print(beam_hashes, dest_hashes)
             return BeamSearchResult(True, 0, [], debug_scores, graph.definition)
 
-        if bfs_result_for_mitm is not None:
-            if isinstance(bfs_result_for_mitm,int):
-                bfs_result_for_mitm = graph.bfs(start_states=destination_state,
-                                                max_diameter=bfs_result_for_mitm,
-                                                return_all_hashes=True)
+        # Precompute meet in the middle \ destination state neighborhood hashing optimization.
+        bfs_result_for_mitm: BfsResult
+        if hashed_neigbourhood is not None:
+            if isinstance(hashed_neigbourhood, int):
+                bfs_result_for_mitm = graph.bfs(
+                    start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
+                )
+            else:
+                bfs_result_for_mitm = hashed_neigbourhood
             assert bfs_result_for_mitm.graph == graph.definition
             bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
         else:
-            bfs_layers_hashes = [dest_hashes,]
+            bfs_layers_hashes = [
+                dest_hashes,
+            ]
 
         # Checks if any of `hashes` are in neighborhood of the central state.
         # Returns the number of the first layer where intersection was found, or -1 if not found.
@@ -228,7 +238,7 @@ class BeamSearchAlgorithm:
         max_steps: int = 1000,
         return_path=False,
         history_depth: int = 0,
-        bfs_result_for_mitm: Optional[Union[BfsResult,int]] = None,
+        hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
         verbose: int = 0,
     ) -> BeamSearchResult:
         """Advanced beam search using PyTorch with non-backtracking capabilities.
@@ -246,7 +256,7 @@ class BeamSearchAlgorithm:
         :param return_path: Whether to return path (consumes much more memory if True).
         :param history_depth: How many previous levels to remember and ban from revisiting.
         :param batch_size: Batch size for model predictions. - UNUSED FOR NOW BUT WILL BE USED LATER
-        :param bfs_result_for_mitm: BfsResult with pre-computed neighborhood of central state to compute for
+        :param hashed_neigbourhood: BfsResult with pre-computed neighborhood of central state to compute for
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
             central state).
@@ -259,7 +269,7 @@ class BeamSearchAlgorithm:
 
         graph = self.graph
 
-                # Initialize predictor if not provided.
+        # Initialize predictor if not provided.
         if predictor is None:
             predictor = Predictor(graph, "hamming")
 
@@ -270,28 +280,37 @@ class BeamSearchAlgorithm:
         # Encode states.
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
+        _new_states: torch.Tensor
+        _new_hashes: torch.Tensor
 
-        restore_path_hashes = [beam_hashes,]
+        restore_path_hashes = [
+            beam_hashes,
+        ]
 
         # Check if start state is already the dest.
         if torch.any(beam_hashes == dest_hashes):
             return BeamSearchResult(True, 0, [], debug_scores, graph.definition)
 
-        if bfs_result_for_mitm is not None:
-            if isinstance(bfs_result_for_mitm,int):
-                bfs_result_for_mitm = graph.bfs(start_states=destination_state,
-                                                max_diameter=bfs_result_for_mitm,
-                                                return_all_hashes=True)
+        # Precompute meet in the middle \ destination state neighborhood hashing optimization.
+        # Precompute meet in the middle \ destination state neighborhood hashing optimization.
+        bfs_result_for_mitm: BfsResult
+        if hashed_neigbourhood is not None:
+            if isinstance(hashed_neigbourhood, int):
+                bfs_result_for_mitm = graph.bfs(
+                    start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
+                )
+            else:
+                bfs_result_for_mitm = hashed_neigbourhood
             assert bfs_result_for_mitm.graph == graph.definition
             bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
         else:
-            bfs_layers_hashes = [dest_hashes,]
+            bfs_layers_hashes = [
+                dest_hashes,
+            ]
 
         # Initialize hash storage for non-backtracking.
         if history_depth > 0:
-            nonbacktrack_hashes = beam_hashes.expand(
-                beam_width * graph.definition.n_generators, history_depth
-            ).clone()
+            nonbacktrack_hashes = beam_hashes.expand(beam_width * graph.definition.n_generators, history_depth).clone()
             i_cyclic_index_for_hash_storage = 0
 
         # Checks if any of `hashes` are in neighborhood of the central state.
@@ -343,7 +362,6 @@ class BeamSearchAlgorithm:
                 # Path found.
                 path = _restore_path(bfs_layer_id)
                 return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
-
 
             # Non-backtracking: forbid visiting states visited before.
             if history_depth > 0:
@@ -403,7 +421,7 @@ class BeamSearchAlgorithm:
             if verbose >= 100 and (i_step - 1) % 15 == 0:
                 t_full_step = time.time() - t_full_step
                 print(
-                    f"Time: {time.time() - t0:.1f}s, t_moves: {t_moves:.3f}s, " #t_hash: {t_hash:.3f}s, 
+                    f"Time: {time.time() - t0:.1f}s, t_moves: {t_moves:.3f}s, "  # t_hash: {t_hash:.3f}s,
                     f"t_isin: {t_isin:.3f}s, t_unique_els: {t_unique_els:.3f}s, t_full_step: {t_full_step:.3f}s"
                 )
 
