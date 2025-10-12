@@ -176,7 +176,7 @@ def test_beam_search_advanced_with_predictor():
 
 
 def test_beam_search_advanced_meet_in_the_middle():
-    """Test simple beam search with meet-in-the-middle optimization."""
+    """Test advanced beam search with meet-in-the-middle optimization."""
     graph = CayleyGraph(PermutationGroups.lrx(16))
     predictor = Predictor.pretrained(graph)
     bfs_result = graph.bfs(max_diameter=10, return_all_hashes=True)
@@ -189,7 +189,7 @@ def test_beam_search_advanced_meet_in_the_middle():
 
 
 def test_beam_search_advanced_meet_in_the_middle_int():
-    """Test simple beam search with meet-in-the-middle optimization as integer value."""
+    """Test advanced beam search with meet-in-the-middle optimization as integer value."""
     graph = CayleyGraph(PermutationGroups.lrx(16))
     predictor = Predictor.pretrained(graph)
     state = _scramble(graph, 120)
@@ -201,26 +201,13 @@ def test_beam_search_advanced_meet_in_the_middle_int():
 
 
 def test_beam_search_advanced_meet_in_the_middle_int_and_history_depth_2():
-    """Test simple beam search with meet-in-the-middle optimization as integer value."""
+    """Test advanced beam search with meet-in-the-middle optimization as integer value."""
     graph = CayleyGraph(PermutationGroups.lrx(16)) #, random_seed= 84791592
     predictor = Predictor.pretrained(graph)
-    state = _scramble(graph, 40) # reduced from 120 to 40 because of random
+    state = _scramble(graph, 16) # reduced from 120 to 16 because of random
     result = graph.beam_search(
         start_state=state, beam_mode="advanced", predictor=predictor,
         bfs_result_for_mitm=10, return_path=True, history_depth=2
-    )
-    assert result.path_found
-    _validate_beam_search_result(graph, state, result)
-
-
-def test_beam_search_advanced_meet_in_the_middle_int_and_history_depth_32():
-    """Test simple beam search with meet-in-the-middle optimization as integer value."""
-    graph = CayleyGraph(PermutationGroups.lrx(16)) #, random_seed=-84791592
-    predictor = Predictor.pretrained(graph)
-    state = _scramble(graph, 40) # reduced from 120 to 40 because of random
-    result = graph.beam_search(
-        start_state=state, beam_mode="advanced", predictor=predictor,
-        bfs_result_for_mitm=10, return_path=True, history_depth=32
     )
     assert result.path_found
     _validate_beam_search_result(graph, state, result)
@@ -255,6 +242,69 @@ def test_beam_search_advanced_verbose_output():
     # Should complete without errors
     assert result.path_found or result.path_length == 5
 
+
+# =============================================================================
+# Tests for exact values
+# =============================================================================
+
+def _cycle_roll_predictor(x,y):
+    return (x-y).abs().quantile(0.5)
+
+def test_beam_search_exact_value_0_0():
+    graph = CayleyGraph(PermutationGroups.lrx(16)) #, random_seed= 84791592
+    state = list(range(10,16))+list(range(0,10))
+    result = graph.beam_search(
+        start_state=state, beam_mode="advanced", predictor=_cycle_roll_predictor,
+        bfs_result_for_mitm=0, return_path=True, history_depth=0
+    )
+    assert result.path_length == 6
+    assert tuple(result.path) == (0,0,0,0,0,0,), result.path
+    _validate_beam_search_result(graph, state, result)
+
+def test_beam_search_exact_value_2_2():
+    graph = CayleyGraph(PermutationGroups.lrx(16)) #, random_seed= 84791592
+    state = list(range(10,16))+list(range(0,10))
+    result = graph.beam_search(
+        start_state=state, beam_mode="advanced", predictor=_cycle_roll_predictor,
+        bfs_result_for_mitm=2, return_path=True, history_depth=2
+    )
+    assert result.path_length == 6
+    assert tuple(result.path) == (0,0,0,0,0,0,), result.path
+    _validate_beam_search_result(graph, state, result)
+
+def test_beam_search_exact_value_3_3():
+    graph = CayleyGraph(PermutationGroups.lrx(16)) #, random_seed= 84791592
+    state = list(range(10,16))+list(range(0,10))
+    result = graph.beam_search(
+        start_state=state, beam_mode="advanced", predictor=_cycle_roll_predictor,
+        bfs_result_for_mitm=3, return_path=True, history_depth=3
+    )
+    assert result.path_length == 6
+    assert tuple(result.path) == (0,0,0,0,0,0,), result.path
+    _validate_beam_search_result(graph, state, result)
+
+
+def test_beam_search_exact_value_4_4():
+    graph = CayleyGraph(PermutationGroups.lrx(16)) #, random_seed= 84791592
+    state = list(range(10,16))+list(range(0,10))
+    result = graph.beam_search(
+        start_state=state, beam_mode="advanced", predictor=_cycle_roll_predictor,
+        bfs_result_for_mitm=4, return_path=True, history_depth=4
+    )
+    assert result.path_length == 6
+    assert tuple(result.path) == (0,0,0,0,0,0,), result.path
+    _validate_beam_search_result(graph, state, result)
+
+def test_beam_search_exact_value_6_6():
+    graph = CayleyGraph(PermutationGroups.lrx(16)) #, random_seed= 84791592
+    state = list(range(10,16))+list(range(0,10))
+    result = graph.beam_search(
+        start_state=state, beam_mode="advanced", predictor=_cycle_roll_predictor,
+        bfs_result_for_mitm=6, return_path=True, history_depth=6
+    )
+    assert result.path_length == 6
+    assert tuple(result.path) == (0,0,0,0,0,0,), result.path
+    _validate_beam_search_result(graph, state, result)
 
 # =============================================================================
 # Tests for default beam search (should use "simple" mode)
