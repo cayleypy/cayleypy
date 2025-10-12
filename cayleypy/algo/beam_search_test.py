@@ -99,6 +99,18 @@ def test_beam_search_simple_meet_in_the_middle():
     _validate_beam_search_result(graph, state, result)
 
 
+def test_beam_search_simple_meet_in_the_middle_int():
+    """Test simple beam search with meet-in-the-middle optimization as integer value."""
+    graph = CayleyGraph(PermutationGroups.lrx(16))
+    predictor = Predictor.pretrained(graph)
+    state = _scramble(graph, 120)
+    result = graph.beam_search(
+        start_state=state, beam_mode="simple", predictor=predictor, bfs_result_for_mitm=10, return_path=True
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, state, result)
+
+
 def test_beam_search_simple_matrix_groups():
     """Test simple beam search on matrix groups."""
     graph = CayleyGraph(MatrixGroups.heisenberg())
@@ -161,6 +173,57 @@ def test_beam_search_advanced_with_predictor():
     state = _scramble(graph, 120)
     result = graph.beam_search(start_state=state, beam_mode="advanced", predictor=predictor, history_depth=3)
     assert result.path_found
+
+
+def test_beam_search_advanced_meet_in_the_middle():
+    """Test simple beam search with meet-in-the-middle optimization."""
+    graph = CayleyGraph(PermutationGroups.lrx(16))
+    predictor = Predictor.pretrained(graph)
+    bfs_result = graph.bfs(max_diameter=10, return_all_hashes=True)
+    state = _scramble(graph, 120)
+    result = graph.beam_search(
+        start_state=state, beam_mode="advanced", predictor=predictor, bfs_result_for_mitm=bfs_result, return_path=True
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, state, result)
+
+
+def test_beam_search_advanced_meet_in_the_middle_int():
+    """Test simple beam search with meet-in-the-middle optimization as integer value."""
+    graph = CayleyGraph(PermutationGroups.lrx(16))
+    predictor = Predictor.pretrained(graph)
+    state = _scramble(graph, 120)
+    result = graph.beam_search(
+        start_state=state, beam_mode="advanced", predictor=predictor, bfs_result_for_mitm=10, return_path=True
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, state, result)
+
+
+def test_beam_search_advanced_meet_in_the_middle_int_and_history_depth_2():
+    """Test simple beam search with meet-in-the-middle optimization as integer value."""
+    graph = CayleyGraph(PermutationGroups.lrx(16)) #, random_seed= 84791592
+    predictor = Predictor.pretrained(graph)
+    state = _scramble(graph, 40) # reduced from 120 to 40 because of random
+    result = graph.beam_search(
+        start_state=state, beam_mode="advanced", predictor=predictor,
+        bfs_result_for_mitm=10, return_path=True, history_depth=2
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, state, result)
+
+
+def test_beam_search_advanced_meet_in_the_middle_int_and_history_depth_32():
+    """Test simple beam search with meet-in-the-middle optimization as integer value."""
+    graph = CayleyGraph(PermutationGroups.lrx(16)) #, random_seed=-84791592
+    predictor = Predictor.pretrained(graph)
+    state = _scramble(graph, 40) # reduced from 120 to 40 because of random
+    result = graph.beam_search(
+        start_state=state, beam_mode="advanced", predictor=predictor,
+        bfs_result_for_mitm=10, return_path=True, history_depth=32
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, state, result)
 
 
 def test_beam_search_advanced_matrix_groups():
