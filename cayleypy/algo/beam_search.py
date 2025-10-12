@@ -35,7 +35,7 @@ class BeamSearchAlgorithm:
         self,
         *,
         start_state: AnyStateType,
-        dest_states: Optional[AnyStateType] = None,
+        destination_state: Optional[AnyStateType] = None,
         beam_mode: str = "simple",
         predictor: Optional[Predictor] = None,
         beam_width: int = 1000,
@@ -57,7 +57,7 @@ class BeamSearchAlgorithm:
             Uses PyTorch for efficient batch processing.
 
         :param start_state: State from which to start search.
-        :param dest_states: Target state to find. Defaults to central state for "simple" mode.
+        :param destination_state: Target state to find. Defaults to central state for "simple" mode.
         :param beam_mode: Type of beam search (see above). Defaults to "simple".
         :param predictor: A heuristic that estimates scores for states (lower score = closer to dest).
           Defaults to Hamming distance heuristic.
@@ -86,7 +86,7 @@ class BeamSearchAlgorithm:
         elif beam_mode == "advanced":
             return self.search_advanced(
                 start_state=start_state,
-                dest_states=dest_states,
+                destination_state=destination_state,
                 predictor=predictor,
                 beam_width=beam_width,
                 max_steps=max_steps,
@@ -133,11 +133,11 @@ class BeamSearchAlgorithm:
             predictor = Predictor(graph, "hamming")
 
         # Use central state as a dest state.
-        dest_states = graph.central_state
+        destination_state = graph.central_state
 
         # Encode states.
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
-        dest_states, dest_hashes = graph.get_unique_states(graph.encode_states(dest_states))
+        _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
 
         restore_path_hashes = [beam_hashes,]
 
@@ -148,11 +148,13 @@ class BeamSearchAlgorithm:
 
         if bfs_result_for_mitm is not None:
             if isinstance(bfs_result_for_mitm,int):
-                bfs_result_for_mitm = graph.bfs(max_diameter=bfs_result_for_mitm, return_all_hashes=True)
+                bfs_result_for_mitm = graph.bfs(start_states=destination_state,
+                                                max_diameter=bfs_result_for_mitm,
+                                                return_all_hashes=True)
             assert bfs_result_for_mitm.graph == graph.definition
             bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
         else:
-            bfs_layers_hashes = [graph.central_state_hash]
+            bfs_layers_hashes = [dest_hashes,]
 
         # Checks if any of `hashes` are in neighborhood of the central state.
         # Returns the number of the first layer where intersection was found, or -1 if not found.
@@ -219,7 +221,7 @@ class BeamSearchAlgorithm:
     def search_advanced(
         self,
         start_state: AnyStateType,
-        dest_states: Optional[AnyStateType] = None,
+        destination_state: Optional[AnyStateType] = None,
         *,
         predictor: Optional[Predictor] = None,
         beam_width: int = 1000,
@@ -237,7 +239,7 @@ class BeamSearchAlgorithm:
         - Configurable history depth for state banning
 
         :param start_state: State from which to start search.
-        :param dest_states: Target state to find. Defaults to central state.
+        :param destination_state: Target state to find. Defaults to central state.
         :param predictor: Predictor object for scoring states. If None, uses Hamming distance.
         :param beam_width: Width of the beam (how many best states to consider).
         :param max_steps: Maximum number of search steps.
@@ -262,14 +264,12 @@ class BeamSearchAlgorithm:
             predictor = Predictor(graph, "hamming")
 
         # Use central state as dest if not specified.
-        if dest_states is None:
-            dest_states = graph.central_state
-        else:
-            dest_states = graph.encode_states(dest_states)
+        if destination_state is None:
+            destination_state = graph.central_state
 
         # Encode states.
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
-        dest_states, dest_hashes = graph.get_unique_states(graph.encode_states(dest_states))
+        _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
 
         restore_path_hashes = [beam_hashes,]
 
@@ -279,11 +279,13 @@ class BeamSearchAlgorithm:
 
         if bfs_result_for_mitm is not None:
             if isinstance(bfs_result_for_mitm,int):
-                bfs_result_for_mitm = graph.bfs(max_diameter=bfs_result_for_mitm, return_all_hashes=True)
+                bfs_result_for_mitm = graph.bfs(start_states=destination_state,
+                                                max_diameter=bfs_result_for_mitm,
+                                                return_all_hashes=True)
             assert bfs_result_for_mitm.graph == graph.definition
             bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
         else:
-            bfs_layers_hashes = [graph.central_state_hash]
+            bfs_layers_hashes = [dest_hashes,]
 
         # Initialize hash storage for non-backtracking.
         if history_depth > 0:
