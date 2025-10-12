@@ -138,8 +138,6 @@ class BeamSearchAlgorithm:
         # Encode states.
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
-        _new_states: torch.Tensor
-        _new_hashes: torch.Tensor
 
         restore_path_hashes = [
             beam_hashes,
@@ -168,6 +166,9 @@ class BeamSearchAlgorithm:
 
         # Checks if any of `hashes` are in neighborhood of the central state.
         # Returns the number of the first layer where intersection was found, or -1 if not found.
+        _new_states: torch.Tensor
+        _new_hashes: torch.Tensor
+
         def _check_path_found(hashes):
             for j, layer in enumerate(bfs_layers_hashes):
                 if torch.any(isin_via_searchsorted(layer, hashes)):
@@ -280,8 +281,6 @@ class BeamSearchAlgorithm:
         # Encode states.
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
-        _new_states: torch.Tensor
-        _new_hashes: torch.Tensor
 
         restore_path_hashes = [
             beam_hashes,
@@ -315,6 +314,9 @@ class BeamSearchAlgorithm:
 
         # Checks if any of `hashes` are in neighborhood of the central state.
         # Returns the number of the first layer where intersection was found, or -1 if not found.
+        _new_states: torch.Tensor
+        _new_hashes: torch.Tensor
+
         def _check_path_found(hashes):
             for j, layer in enumerate(bfs_layers_hashes):
                 if torch.any(isin_via_searchsorted(layer, hashes)):
