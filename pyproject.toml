@@ -26,17 +26,12 @@ dependencies = [
     "numba",
     "numpy",
     "scipy",
+    "torch>=2.6.0",
 ]
 
 # Development dependencies
 # pip install .[torch,lint,test,dev,docs]
 [project.optional-dependencies]
-torch = [
-    # torch is required, but it is optional here because if it is  in dependencies,
-    # Kaggle would spend several minutes installing some dependencies, even though
-    # it has torch installed.
-    "torch"
-]
 lint = [
     "black",
     "mypy==1.15.0",
