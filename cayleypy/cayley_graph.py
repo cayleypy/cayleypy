@@ -78,7 +78,7 @@ class CayleyGraph:
         self.verbose = verbose
         self.batch_size = batch_size
         self.memory_limit_bytes = int(memory_limit_gb * (2**30))
-        self.bit_encoding_width_raw = bit_encoding_width
+        self.bit_encoding_width = bit_encoding_width
 
         # Pick device. It will be used to store all tensors.
         assert device in ["auto", "cpu", "cuda"]
@@ -461,7 +461,7 @@ class CayleyGraph:
         ans = CayleyGraph(
             new_def,
             _hasher=self.hasher,
-            bit_encoding_width=self.bit_encoding_width_raw,
+            bit_encoding_width=self.bit_encoding_width,
         )
         ans.hasher = self.hasher
         ans.string_encoder = self.string_encoder
