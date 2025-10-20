@@ -460,8 +460,8 @@ class CayleyGraph:
             max_layer_size_to_store=max_layer_size_to_store,
             max_layer_size_to_explore=max_layer_size_to_explore,
             max_diameter=max_diameter,
-            return_all_edges = True,
-            return_all_hashes = True,
+            return_all_edges=True,
+            return_all_hashes=True,
             stop_condition=stop_condition,
             disable_batching=disable_batching,
         )

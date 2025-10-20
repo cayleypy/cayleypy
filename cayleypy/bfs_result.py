@@ -209,9 +209,9 @@ class BfsResult:
 
     def laplacian_matrix(self) -> np.ndarray:
         """Returns Laplacian matrix as a NumPy array."""
-        A = self.adjacency_matrix()
-        D = np.diag(A.sum(axis=1))
-        return D - A
+        adj_m = self.adjacency_matrix()
+        diag_m = np.diag(adj_m.sum(axis=1))
+        return diag_m - adj_m
 
     def adjacency_matrix_sparse(self) -> coo_array:
         """Returns adjacency matrix as a sparse SciPy array."""
