@@ -207,6 +207,12 @@ class BfsResult:
             ans[i1, i2] = 1
         return ans
 
+    def laplacian_matrix(self) -> np.ndarray:
+        """Returns Laplacian matrix as a NumPy array."""
+        A = self.adjacency_matrix()
+        D = np.diag(A.sum(axis=1))
+        return D - A
+
     def adjacency_matrix_sparse(self) -> coo_array:
         """Returns adjacency matrix as a sparse SciPy array."""
         num_edges = len(self.edges_list)

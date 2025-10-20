@@ -212,7 +212,7 @@ class CayleyGraph:
         stop_condition: Optional[Callable[[torch.Tensor, torch.Tensor], bool]] = None,
         disable_batching: bool = False,
     ) -> BfsResult:
-        """Runs bread-first search (BFS) algorithm from given `start_states`.
+        """Runs breadth-first search (BFS) algorithm from given `start_states`.
 
         BFS visits all vertices of the graph in layers, where next layer contains vertices adjacent to previous layer
         that were not visited before. As a result, we get all vertices grouped by their distance from the set of initial
@@ -428,6 +428,44 @@ class CayleyGraph:
         if path_to is None:
             return None
         return self.definition.revert_path(path_to)
+
+    def laplacian_matrix(
+        self,
+        start_states: Union[None, torch.Tensor, np.ndarray, list] = None,
+        max_layer_size_to_store: Optional[int] = 1000,
+        max_layer_size_to_explore: int = 10**12,
+        max_diameter: int = 1000000,
+        stop_condition: Optional[Callable[[torch.Tensor, torch.Tensor], bool]] = None,
+        disable_batching: bool = False,
+    ) -> np.ndarray:
+        """
+        Runs breadth-first search and return a Laplacian Matrix for the discovered graph.
+
+        :param start_states: states on 0-th layer of BFS. Defaults to destination state of the graph.
+        :param max_layer_size_to_store: maximal size of layer to store.
+               If None, all layers will be stored (use this if you need full graph).
+               Defaults to 1000.
+               First and last layers are always stored.
+        :param max_layer_size_to_explore: if reaches layer of larger size, will stop the BFS.
+        :param max_diameter: maximal number of BFS iterations.
+        :param stop_condition: function to be called after each iteration. It takes 2 tensors: latest computed layer and
+            its hashes, and returns whether BFS must immediately terminate. If it returns True, the layer that was
+            passed to the function will be the last returned layer in the result. This function can also be used as a
+            "hook" to do some computations after BFS iteration (in which case it must always return False).
+        :param disable_batching: Disable batching. Use if you need states and hashes to be in the same order.
+        :return: NumPy NdArray object for a graph with discovered BFS results.
+        """
+        bfs = self.bfs(
+            start_states=start_states,
+            max_layer_size_to_store=max_layer_size_to_store,
+            max_layer_size_to_explore=max_layer_size_to_explore,
+            max_diameter=max_diameter,
+            return_all_edges = True,
+            return_all_hashes = True,
+            stop_condition=stop_condition,
+            disable_batching=disable_batching,
+        )
+        return bfs.laplacian_matrix()
 
     def to_networkx_graph(self):
         return self.bfs(
