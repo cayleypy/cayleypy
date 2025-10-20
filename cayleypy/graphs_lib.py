@@ -613,9 +613,8 @@ class PermutationGroups:
         """
         Construct the Cayley graph definition for the LSL cycles on the symmetric group S_n.
 
-        The LSL (Left-Shift-Left) generating set consists of:
-          • L — the full left rotation (cycle (0 1 2 ... n-1))
-          • S — the partial shift that moves elements 1..n-1 left by one position, keeping 0 fixed
+        The LSL Long and Sub-Long cycles, i.e. full cyclic shift and cyclic shift rotating only positions from the
+        second to the last keeping first one stable. Respectively LSL+I - adding inverses
 
         Parameters
         ----------
