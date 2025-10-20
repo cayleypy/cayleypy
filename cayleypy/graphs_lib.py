@@ -610,25 +610,38 @@ class PermutationGroups:
 
     @staticmethod
     def lsl_cycles(n: int, add_inverses: bool = True) -> CayleyGraphDef:
-        assert n >= 3
+        """
+        Construct the Cayley graph definition for the LSL cycles on the symmetric group S_n.
+
+        The LSL (Left-Shift-Left) generating set consists of:
+          • L — the full left rotation (cycle (0 1 2 ... n-1))
+          • S — the partial shift that moves elements 1..n-1 left by one position, keeping 0 fixed
+
+        Parameters
+        ----------
+        n : int
+            Degree of the symmetric group S_n. Must satisfy n >= 3.
+        add_inverses : bool, optional
+            If True (default), include inverse permutations L⁻¹ and S⁻¹
+            in the generator set to make the graph undirected.
+
+        Returns
+        -------
+        CayleyGraphDef
+            A Cayley graph definition object containing generators,
+            generator names, and central state corresponding to the LSL cycles.
+        """
+        assert n >= 3, "Need n >= 3"
 
         L = permutation_from_cycles(n, [list(range(n))])
-
         S = permutation_from_cycles(n, [list(range(1, n)), [0]])
 
         generators = [L, S]
         names = ["L", "S"]
 
         if add_inverses:
-
-            def inverse(perm: list[int]) -> list[int]:
-                inv = [0] * len(perm)
-                for i, p in enumerate(perm):
-                    inv[p] = i
-                return inv
-
-            L_inv = inverse(L)
-            S_inv = inverse(S)
+            L_inv = inverse_permutation(L)
+            S_inv = inverse_permutation(S)
 
             generators += [L_inv, S_inv]
             names += ["L_inv", "S_inv"]

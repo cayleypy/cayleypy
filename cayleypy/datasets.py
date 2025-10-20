@@ -166,19 +166,8 @@ def _compute_rapaport_m1_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.rapaport_m1(int(n))).bfs().layer_sizes
 
 
-def _compute_lsl_cycles_cayley_growth(n: int) -> list[int]:
-    graph_def = PermutationGroups.lsl_cycles(n, add_inverses=True)
-    layer_sizes = CayleyGraph(graph_def).bfs().layer_sizes
-
-    expected = math.factorial(n)
-    total = sum(layer_sizes)
-
-    if n == 3 and total > expected:
-        diff = total - expected
-        max_idx = max(range(len(layer_sizes)), key=lambda i: layer_sizes[i])
-        layer_sizes[max_idx] -= diff
-
-    return layer_sizes
+def _compute_lsl_cycles_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.lsl_cycles(int(n))).bfs().layer_sizes
 
 
 def _compute_rapaport_m2_cayley_growth(n: str) -> list[int]:
@@ -263,7 +252,7 @@ def generate_datasets():
     _update_dataset("heisenberg_growth", keys, _compute_heisenberg_growth)
     keys = [str(n) for n in range(2, 8)]
     _update_dataset("all_cycles_cayley_growth", keys, _compute_all_cycles_cayley_growth)
-    keys = list(range(3, 11))
+    keys = [str(n) for n in range(3, 11)]
     _update_dataset("lsl_cycles_cayley_growth", keys, _compute_lsl_cycles_cayley_growth)
     keys = [str(n) for n in range(3, 10)]
     _update_dataset(
