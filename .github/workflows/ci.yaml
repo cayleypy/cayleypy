@@ -30,7 +30,7 @@ jobs:
           python-version: '3.12'
           architecture: 'x64'
       - name: Install requirements
-        run: pip install .[torch,lint,test]
+        run: pip install .[lint,test]
       - name: Lint
         run: ./lint.sh
   pytest-ubuntu:
@@ -46,7 +46,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
           architecture: 'x64'
       - name: Install requirements
-        run: pip install .[torch,test]
+        run: pip install .[test]
       - name: Run tests
         run: RUN_SLOW_TESTS=1 pytest
   pytest-windows:
@@ -59,7 +59,7 @@ jobs:
           python-version: '3.12'
           architecture: 'x64'
       - name: Install requirements
-        run: pip install .[torch,test]
+        run: pip install .[test]
       - name: Run tests
         run: pytest
   pytest-macos:
@@ -72,7 +72,7 @@ jobs:
           python-version: '3.12'
           architecture: 'x64'
       - name: Install requirements
-        run: pip install .[torch,test]
+        run: pip install .[test]
       - name: Run tests
         run: RUN_SLOW_TESTS=1 pytest
   build-docs:
@@ -87,6 +87,6 @@ jobs:
       - name: Install requirements
         run: |
           sudo apt-get install pandoc
-          pip install .[torch,docs]
+          pip install .[docs]
       - name: Build the docs
         run: docs/build_docs.sh

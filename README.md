@@ -85,7 +85,7 @@ To start development, run:
 ```
 git clone https://github.com/cayleypy/cayleypy.git
 cd cayleypy
-pip install -e .[torch,lint,test,dev,docs]
+pip install -e .[lint,test,dev,docs]
 ```
 
 To run all tests, including some slow running tests:
@@ -159,14 +159,22 @@ Then, you need to define your graph. Definition consists of the following:
 * Central state (optional, defaults to neutral element in the group, e.g. 
     identity permutation).
 
-When you are ready, do the following:
-1. Create a new branch in this repository (not a fork).
-2. Add your function where you decided. See how other graphs are defined and follow that as an example.
-3. Write a docstring for your function, describing your graph. If possible, include reference
+When you are ready do the following: 
+1. Create a fork of this repository.
+2. Clone your fork and make a new bracnch in your fork.
+3. Add your function to an approritate place. See how other graphs are defined and follow that as an example.
+4. Write a docstring for your function, describing your graph. If possible, include reference
    (e.g. to Wikipedia article, Arxiv paper or a book) where the graph is defined.
-4. Add a test that creates an instance of your graph for small size and checks something about it 
+5. Add a test that creates an instance of your graph for small size and checks something about it 
      (at least check number of generators).
-5. Create a pull request.
+6. Create a pull request from your fork to the this repository.
+7. Make sure that all automated checks (like unittests and style checks) are passed.
+8. Get two approvals from the reviewers team. They might make comments or request changes before
+   provding an approval -- implement those. If needed, discuss how to proceed. If a commit
+   is pushed after the approval, the approval has to be obtained again. 
+9. Once approvals are granted -- merge the PR. 
+
+For more details on how to make PRs with forks refer to [this guide](https://graphite.dev/guides/create-and-manage-pull-requests-from-fork).
 
 ## Predictor models
 
@@ -214,8 +222,8 @@ Our community has recently launched several Kaggle competitions to develop and b
 | Competition   | Graph size(s) | Description |
 | --------------| ------------- | ------------|
 | [4x4x4 Cube](https://www.kaggle.com/competitions/cayley-py-444-cube/)                                    | 10<sup>55</sup>                 | 4x4x4 Rubik's cube (play [here](https://alpha.twizzle.net/explore/?puzzle=4x4x4))                                                  |
-| [Christopher's Jewel](https://www.kaggle.com/competitions/cayleypy-christophers-jewel/)                  | (tba)                           | small octahedron-shaped puzzle (play [here](https://alpha.twizzle.net/explore/?puzzle=Christopher%27s+jewel))                      |
-| [Megaminx](https://www.kaggle.com/competitions/cayley-py-megaminx)                                       | (tba)                           | dodecahedron-shaped puzzle (play [here](https://alpha.twizzle.net/explore/?puzzle=Christopher%27s+jewel))                          |
+| [Christopher's Jewel](https://www.kaggle.com/competitions/cayleypy-christophers-jewel/)                  | 10<sup>16<sup>                  | small octahedron-shaped puzzle (play [here](https://alpha.twizzle.net/explore/?puzzle=Christopher%27s+jewel))                      |
+| [Megaminx](https://www.kaggle.com/competitions/cayley-py-megaminx)                                       | 10<sup>69<sup>                  | dodecahedron-shaped puzzle (play [here](https://alpha.twizzle.net/explore/?puzzle=megaminx))                          |
 | [Professor Tetraminx](https://www.kaggle.com/competitions/cayley-py-professor-tetraminx-solve-optimally) | 10<sup>32</sup>                 | tetrahedron-shaped puzzle, medium size version (play [here](https://alpha.twizzle.net/explore/?puzzle=professor+tetraminx))        |
 | [IHES Supercube](https://www.kaggle.com/competitions/cayleypy-ihes-cube)                                 | (tba)                           | version of 3x3x3 Rubik's cube                                                                                                      |
 | [RapaportM2](https://www.kaggle.com/competitions/cayleypy-rapapport-m2/)                                 | (tba)                           | (tba)                                                                                                                              |
