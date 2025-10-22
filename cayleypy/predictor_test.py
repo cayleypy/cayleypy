@@ -1,10 +1,12 @@
 import torch
+import pytest
 
 from .cayley_graph import CayleyGraph
 from .graphs_lib import PermutationGroups
 from .predictor import Predictor
 
 
+@pytest.mark.unit
 def test_hamming_predictor():
     graph_def = PermutationGroups.lrx(5).with_central_state("01001")
     graph = CayleyGraph(graph_def, device="cpu")

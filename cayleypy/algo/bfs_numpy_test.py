@@ -1,6 +1,9 @@
+import pytest
+
 from cayleypy import CayleyGraph, load_dataset, bfs_numpy, PermutationGroups
 
 
+@pytest.mark.unit
 def test_bfs_numpy():
     graph = CayleyGraph(PermutationGroups.lrx(7))
     assert bfs_numpy(graph) == load_dataset("lrx_cayley_growth")["7"]
@@ -17,6 +20,7 @@ def test_bfs_numpy():
 
 
 # This test checks that StringEncoder.implement_permutation_1d works correctly.
+@pytest.mark.unit
 def test_bfs_numpy_lrx_16():
     graph = CayleyGraph(PermutationGroups.lrx(16))
     result = bfs_numpy(graph, max_diameter=10)
