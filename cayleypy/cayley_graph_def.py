@@ -345,3 +345,6 @@ class CayleyGraphDef:
         idx = self.generators_inverse_map
         assert idx is not None, "Cannot revert path because generators are not inverse closed."
         return [idx[i] for i in path[::-1]]
+
+    def save_json(self, filename: str):
+        """Saves this graph definition to a JSON file."""
