@@ -648,6 +648,21 @@ def test_down_cycles():
     assert g.name == "down_cycles-6"
 
 
+def test_lsl_cycles():
+    graph = PermutationGroups.lsl_cycles(5, add_inverses=True)
+
+    expected_generators = [
+        [1, 2, 3, 4, 0],  # L
+        [0, 2, 3, 4, 1],  # S
+        [4, 0, 1, 2, 3],  # L_inv
+        [0, 4, 1, 2, 3],  # S_inv
+    ]
+    assert all(any(np.array_equal(g, e) for g in graph.generators) for e in expected_generators)
+
+    assert graph.n_generators == 4
+    assert set(graph.generator_names) == {"L", "S", "L_inv", "S_inv"}
+
+
 def test_prefix_cycles():
     n = 6
     g = PermutationGroups.prefix_cycles(n)
