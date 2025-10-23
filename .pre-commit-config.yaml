@@ -1,0 +1,38 @@
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+    #  - id: trailing-whitespace
+    #    exclude: \.((csv)|(gap)|(ksolve))$
+    #  - id: end-of-file-fixer
+    #    exclude: \.((csv)|(gap)|(ksolve))$
+      - id: check-added-large-files
+  - repo: https://github.com/ambv/black
+    rev: 25.9.0
+    hooks:
+      - id: black
+        files: ^cayleypy/
+        require_serial: true
+        args: [--check]
+  - repo: local
+    hooks:
+      - id: pylint
+        name: pylint
+        entry: pylint
+        language: system
+        types: [python]
+        require_serial: true
+        files: ^cayleypy/
+      - id: mypy
+        name: mypy
+        entry: mypy
+        language: system
+        types: [python]
+        require_serial: true
+        files: ^cayleypy/
+      - id: pytest-check
+        name: pytest-check
+        entry: pytest
+        language: system
+        pass_filenames: false
+        always_run: true
