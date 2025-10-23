@@ -167,7 +167,8 @@ When you are ready do the following:
    (e.g. to Wikipedia article, Arxiv paper or a book) where the graph is defined.
 5. Add a test that creates an instance of your graph for small size and checks something about it 
      (at least check number of generators).
-6. Create a pull request from your fork to the this repository.
+6. Create a pull request from your fork to the this repository. 
+   Choose PR name reflecting your changes (e.g. "Update graphs_lib" is a poor choice, while "Add LRX groups to graphs_lib" is a better one). 
 7. Make sure that all automated checks (like unittests and style checks) are passed.
 8. Get two approvals from the reviewers team. They might make comments or request changes before
    provding an approval -- implement those. If needed, discuss how to proceed. If a commit
