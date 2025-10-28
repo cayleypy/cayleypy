@@ -183,6 +183,10 @@ def _compute_larx_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.larx(int(n))).bfs().layer_sizes
 
 
+def _compute_lsl_cycles_cayley_growth(n: str) -> list[int]:
+    return CayleyGraph(PermutationGroups.lsl_cycles(int(n))).bfs().layer_sizes
+
+
 def _compute_increasing_k_cycles_cayley_growth(key: str) -> list[int]:
     n, k = map(int, key.split(","))
     return CayleyGraph(PermutationGroups.increasing_k_cycles(n, k)).bfs().layer_sizes
@@ -260,3 +264,5 @@ def generate_datasets():
     _update_dataset("increasing_k_cycles_cayley_growth", keys, _compute_increasing_k_cycles_cayley_growth)
     keys = [f"{n},{k}" for n in range(3, 10) for k in range(2, min(n, 5) + 1)]
     _update_dataset("consecutive_k_cycles_cayley_growth", keys, _compute_consecutive_k_cycles_cayley_growth)
+    keys = [str(n) for n in range(4, 8)]
+    _update_dataset("lsl_cycles_cayley_growth", keys, _compute_lsl_cycles_cayley_growth)
