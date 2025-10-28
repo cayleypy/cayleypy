@@ -101,6 +101,13 @@ def test_pancake_cayley_growth():
         _verify_layers_fast(PermutationGroups.pancake(n), layer_sizes)
 
 
+def test_lsl_cycles_cayley_growth():
+    dataset = load_dataset("lsl_cycles_cayley_growth")
+    for key, layer_sizes in dataset.items():
+        assert sum(layer_sizes) == math.factorial(int(key))
+        assert len(layer_sizes) >= 2, f"Layer count too small for n={key}"
+
+
 def test_full_reversals_cayley_growth():
     for key, layer_sizes in load_dataset("full_reversals_cayley_growth").items():
         n = int(key)
