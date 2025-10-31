@@ -89,19 +89,21 @@ jobs:
           architecture: 'x64'
       - name: Install requirements
         run: pip install .[test]
-#      - name: Download previous benchmark data
-#        uses: actions/cache@v4
-#        with:
-#          path: ./cache/benchmarks
-#          key: ${{ runner.os }}-${{ matrix.python-version }}-benchmark
+      - name: Cache benchmark data
+        uses: actions/cache@v4
+        with:
+          path: ./.benchmarks
+          key: benchmarks-${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}
+          restore-keys: |
+            benchmarks-${{ runner.os }}-${{ matrix.python-version }}-
       - name: Run benchmarks
-        run: pytest -m "benchmark" --benchmark-json ${{ runner.os }}-${{ matrix.python-version }}.json
+        run: pytest -m "benchmark" --benchmark-json .benchmarks/${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}.json
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
         with:
           name: Python Benchmark with pytest-benchmark
           tool: 'pytest'
-          output-file-path: ${{ runner.os }}-${{ matrix.python-version }}.json
+          output-file-path: .benchmarks/${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           alert-threshold: '125%'
