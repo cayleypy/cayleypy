@@ -464,3 +464,57 @@ def test_benchmark_top_spin(benchmark, benchmark_mode, n):
         bit_encoding_width = 1 if benchmark_mode == "bit_encoded" else None
         graph = CayleyGraph(graph_def, bit_encoding_width=bit_encoding_width)
         benchmark.pedantic(graph.bfs, iterations=1, rounds=5)
+
+
+@pytest.mark.parametrize("bit_encoding_width", [3, 4, 8, "auto"])
+def test_bit_encoding_width_values(bit_encoding_width):
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, bit_encoding_width=bit_encoding_width)
+    bfs_result = graph.bfs(max_diameter=3)
+    # Compare only first layers
+    assert bfs_result.layer_sizes == load_dataset("lrx_cayley_growth")["5"][:4]
+
+
+def test_modified_copy_preserves_hasher_and_encoder():
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, bit_encoding_width=3)
+
+    new_def = graph_def.with_central_state("01210")
+    new_graph = graph.modified_copy(new_def)
+
+    assert new_graph.hasher is graph.hasher
+    assert new_graph.string_encoder is graph.string_encoder
+
+    assert torch.equal(new_graph.central_state, torch.tensor([0, 1, 2, 1, 0]))
+    assert not torch.equal(new_graph.central_state, graph.central_state)
+
+
+def test_with_inverted_generators_path_reversal():
+    graph_def = PermutationGroups.lrx(4)
+    graph = CayleyGraph(graph_def)
+
+    inv_graph = graph.with_inverted_generators
+    assert inv_graph.definition.n_generators == graph.definition.n_generators
+
+    bfs_result = graph.bfs(return_all_hashes=True)
+    start_state = torch.tensor([0, 1, 2, 3])
+
+    path_to = graph.find_path_to(start_state, bfs_result)
+    path_from = graph.find_path_from(start_state, bfs_result)
+
+    assert path_from == graph.definition.revert_path(path_to)
+
+
+def test_bfs_on_modified_copy_preserves_structure_safe():
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, bit_encoding_width=3)
+
+    new_def = graph_def.with_central_state("01210")
+    new_graph = graph.modified_copy(new_def)
+
+    bfs_result = new_graph.bfs(max_diameter=5)
+
+    assert bfs_result.bfs_completed or len(bfs_result.layer_sizes) > 0
+    assert not torch.equal(new_graph.central_state, graph.central_state)
+    assert new_graph.hasher is graph.hasher
+    assert new_graph.string_encoder is graph.string_encoder
