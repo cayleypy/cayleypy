@@ -1,9 +1,12 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import numpy as np
+import pytest
+
 from cayleypy import CayleyGraph, BfsResult, PermutationGroups
 
 
+@pytest.mark.unit
 def test_adjacency_matrix():
     graph = CayleyGraph(PermutationGroups.lrx(4))
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
@@ -16,6 +19,7 @@ def test_adjacency_matrix():
     assert np.array_equal(adj_mx_1, adj_mx_2)
 
 
+@pytest.mark.unit
 def test_bfs_result_eq():
     graph_1 = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
     graph_2 = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
@@ -37,6 +41,7 @@ def test_bfs_result_eq():
             assert bfs_res_3 != bfs_res_3_md, "Bfs results must be different if bfs was not completed"
 
 
+@pytest.mark.unit
 def test_bfs_result_save_load():
 
     with TemporaryDirectory() as temp_dir:

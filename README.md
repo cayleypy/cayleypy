@@ -91,14 +91,14 @@ pip install -e .[lint,test,dev,docs]
 To run all tests, including some slow running tests:
 
 ```
-RUN_SLOW_TESTS=1 pytest
+pytest -m "unit or (unit and slow)"
 ```
 
 Before committing, run these checks:
 
 ```
 ./lint.sh
-pytest 
+pytest -m "unit and not slow"
 ```
 
 To check coverage, run:

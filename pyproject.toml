@@ -109,3 +109,10 @@ disable = [
 
 [tool.black]
 line-length = 120
+
+[tool.pytest.ini_options]
+markers = [
+    "unit: marks tests that are unit tests and need to run before commit (default run is with '-m \"unit and not slow\"')",
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+    "benchmark: marks tests for benchmark suite"
+]

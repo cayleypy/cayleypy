@@ -1,6 +1,7 @@
 from math import comb
 
 import numpy as np
+import pytest
 
 from cayleypy import MatrixGroups
 from cayleypy.cayley_graph_def import MatrixGenerator
@@ -8,6 +9,7 @@ from cayleypy.graphs_lib import PermutationGroups
 from cayleypy.permutation_utils import permutation_from_cycles
 
 
+@pytest.mark.unit
 def test_lrx():
     graph = PermutationGroups.lrx(4)
     assert np.array_equal(graph.generators, [[1, 2, 3, 0], [3, 0, 1, 2], [1, 0, 2, 3]])
@@ -20,6 +22,7 @@ def test_lrx():
     assert graph.name == "lrx-5(k=3)"
 
 
+@pytest.mark.unit
 def test_top_spin():
     graph = PermutationGroups.top_spin(5)
     assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 2, 1, 0, 4]])
@@ -28,6 +31,7 @@ def test_top_spin():
     assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [2, 1, 0, 3, 4]])
 
 
+@pytest.mark.unit
 def test_all_transpositions():
     graph = PermutationGroups.all_transpositions(3)
     assert np.array_equal(graph.generators, [[1, 0, 2], [2, 1, 0], [0, 2, 1]])
@@ -37,6 +41,7 @@ def test_all_transpositions():
     assert graph.n_generators == (20 * 19) // 2
 
 
+@pytest.mark.unit
 def test_transposons():
     graph = PermutationGroups.transposons(4)
     assert np.array_equal(
@@ -68,6 +73,7 @@ def test_transposons():
     ]
 
 
+@pytest.mark.unit
 def test_block_interchange():
     graph = PermutationGroups.block_interchange(4)
     assert np.array_equal(
@@ -109,6 +115,7 @@ def test_block_interchange():
     ]
 
 
+@pytest.mark.unit
 def test_pancake():
     graph = PermutationGroups.pancake(6)
     assert graph.n_generators == 5
@@ -119,6 +126,7 @@ def test_pancake():
     )
 
 
+@pytest.mark.unit
 def test_cubic_pancake():
     graph = PermutationGroups.cubic_pancake(n=15, subset=1)
     assert graph.n_generators == 3
@@ -205,6 +213,7 @@ def test_cubic_pancake():
     )
 
 
+@pytest.mark.unit
 def test_burnt_pancake():
     graph = PermutationGroups.burnt_pancake(6)
     assert graph.n_generators == 6
@@ -222,6 +231,7 @@ def test_burnt_pancake():
     )
 
 
+@pytest.mark.unit
 def test_full_reversals():
     graph = graph = PermutationGroups.full_reversals(4)
     assert graph.n_generators == 6
@@ -231,6 +241,7 @@ def test_full_reversals():
     )
 
 
+@pytest.mark.unit
 def test_signed_reversals():
     graph = graph = PermutationGroups.signed_reversals(3)
     assert graph.n_generators == 6
@@ -248,6 +259,7 @@ def test_signed_reversals():
     )
 
 
+@pytest.mark.unit
 def test_cyclic_coxeter():
     graph = PermutationGroups.cyclic_coxeter(4)
     assert graph.n_generators == 4
@@ -259,6 +271,7 @@ def test_cyclic_coxeter():
     assert np.array_equal(graph.generators, [[1, 0, 2], [0, 2, 1], [2, 1, 0]])
 
 
+@pytest.mark.unit
 def test_three_cycles():
     graph = PermutationGroups.three_cycles(4)
     assert graph.n_generators == 8
@@ -275,6 +288,7 @@ def test_three_cycles():
     assert np.array_equal(graph.generators, expected_generators)
 
 
+@pytest.mark.unit
 def test_three_cycles_0ij():
     graph = PermutationGroups.three_cycles_0ij(4)
     assert graph.n_generators == 6
@@ -282,6 +296,7 @@ def test_three_cycles_0ij():
     assert np.array_equal(graph.generators, expected_generators)
 
 
+@pytest.mark.unit
 def test_three_cycles_01i():
     graph = PermutationGroups.three_cycles_01i(4)
     assert graph.n_generators == 4
@@ -298,6 +313,7 @@ def test_three_cycles_01i():
     assert graph.generator_names == ["(0 1 2)", "(0 1 3)"]
 
 
+@pytest.mark.unit
 def test_stars():
     assert len(PermutationGroups.stars(3).generators) == 2
     assert len(PermutationGroups.stars(4).generators) == 3
@@ -308,6 +324,7 @@ def test_stars():
     assert result_4.generators == [[1, 0, 2, 3], [2, 1, 0, 3], [3, 1, 2, 0]]
 
 
+@pytest.mark.unit
 def test_generalized_stars():
     assert len(PermutationGroups.generalized_stars(3, 1).generators) == 2
     assert len(PermutationGroups.generalized_stars(4, 2).generators) == 4
@@ -318,6 +335,7 @@ def test_generalized_stars():
     assert result_4.generators == [[2, 1, 0, 3], [3, 1, 2, 0], [0, 2, 1, 3], [0, 3, 2, 1]]
 
 
+@pytest.mark.unit
 def test_derangements():
     assert PermutationGroups.derangements(2).generators == [[1, 0]]
     assert PermutationGroups.derangements(3).generators == [[1, 2, 0], [2, 0, 1]]
@@ -325,6 +343,7 @@ def test_derangements():
     assert len(PermutationGroups.derangements(5).generators) == 44
 
 
+@pytest.mark.unit
 def test_involutive_derangements():
     assert PermutationGroups.involutive_derangements(2).generators == [[1, 0]]
     assert PermutationGroups.involutive_derangements(4).generators == [[1, 0, 3, 2], [2, 3, 0, 1], [3, 2, 1, 0]]
@@ -332,6 +351,7 @@ def test_involutive_derangements():
     assert len(PermutationGroups.involutive_derangements(8).generators) == 105
 
 
+@pytest.mark.unit
 def test_rapaport_m1():
     graph_n4 = PermutationGroups.rapaport_m1(4)
     assert graph_n4.generators == [[1, 0, 2, 3], [1, 0, 3, 2], [0, 2, 1, 3]]
@@ -347,6 +367,7 @@ def test_rapaport_m1():
     ]
 
 
+@pytest.mark.unit
 def test_rapaport_m2():
     graph_n5 = PermutationGroups.rapaport_m2(5)
     assert graph_n5.generators == [[1, 0, 2, 3, 4], [1, 0, 3, 2, 4], [0, 2, 1, 4, 3]]
@@ -354,6 +375,7 @@ def test_rapaport_m2():
     assert graph_n6.generators == [[1, 0, 2, 3, 4, 5], [1, 0, 3, 2, 5, 4], [0, 2, 1, 4, 3, 5]]
 
 
+@pytest.mark.unit
 def test_all_cycles():
     graph = PermutationGroups.all_cycles(3)
     assert graph.n_generators == 5
@@ -373,11 +395,13 @@ def test_all_cycles():
     assert PermutationGroups.all_cycles(6).n_generators == 409
 
 
+@pytest.mark.unit
 def test_wrapped_k_cycles():
     graph = PermutationGroups.wrapped_k_cycles(5, 3)
     assert graph.generators == [[1, 2, 0, 3, 4], [0, 2, 3, 1, 4], [0, 1, 3, 4, 2], [3, 1, 2, 4, 0], [1, 4, 2, 3, 0]]
 
 
+@pytest.mark.unit
 def test_larx():
     graph1 = PermutationGroups.larx(3)
     assert graph1.generators == [[1, 0, 2], [0, 2, 1]]
@@ -385,6 +409,7 @@ def test_larx():
     assert graph2.generators == [[1, 0, 2, 3], [0, 2, 3, 1]]
 
 
+@pytest.mark.unit
 def test_sheveleva2():
     graph = PermutationGroups.sheveleva2(5, 2)
     assert graph.generators == [[1, 0, 2, 3, 4], [0, 2, 3, 4, 1]]
@@ -392,6 +417,7 @@ def test_sheveleva2():
     assert graph2.generators == [[1, 0, 3, 2, 4, 7, 6, 5], [0, 2, 1, 4, 5, 6, 3, 7]]
 
 
+@pytest.mark.unit
 def test_koltsov3():
     graph = PermutationGroups.koltsov3(6, 2)
     assert graph.generators == [[1, 0, 3, 2, 5, 4], [0, 2, 1, 4, 3, 5], [0, 4, 3, 2, 1, 5]]
@@ -405,6 +431,7 @@ def test_koltsov3():
     assert graph2.name == "koltsov3-n10-k3"
 
 
+@pytest.mark.unit
 def test_heisenberg():
     graph1 = MatrixGroups.heisenberg()
     assert graph1.name == "heisenberg-3-ic"
@@ -437,6 +464,7 @@ def test_heisenberg():
     assert graph4.generators_inverse_closed
 
 
+@pytest.mark.unit
 def test_sl_fund_roots():
     graph = MatrixGroups.special_linear_fundamental_roots(2)
     assert graph.n_generators == 4
@@ -463,6 +491,7 @@ def test_sl_fund_roots():
     ]
 
 
+@pytest.mark.unit
 def test_sl_root_weyl():
     graph = MatrixGroups.special_linear_root_weyl(2)
     assert graph.n_generators == 4
@@ -498,6 +527,7 @@ def test_sl_root_weyl():
     ]
 
 
+@pytest.mark.unit
 def test_increasing_k_cycles_basic():
     g = PermutationGroups.increasing_k_cycles(3, 2)
     assert g.generators_permutations == [[1, 0, 2], [2, 1, 0], [0, 2, 1]]
@@ -518,6 +548,7 @@ def test_increasing_k_cycles_basic():
     assert g.n_generators == comb(n, k)
 
 
+@pytest.mark.unit
 def test_consecutive_k_cycles_basic_counts():
     g = PermutationGroups.consecutive_k_cycles(5, 2)
     assert g.n_generators == (5 - 2 + 1)
@@ -526,6 +557,7 @@ def test_consecutive_k_cycles_basic_counts():
     assert g3.n_generators == (6 - 3 + 1)
 
 
+@pytest.mark.unit
 def test_consecutive_k_cycles_contains_expected_generators():
     g = PermutationGroups.consecutive_k_cycles(3, 2)
     assert g.generators_permutations == [[1, 0, 2], [0, 2, 1]]
@@ -542,6 +574,7 @@ def test_consecutive_k_cycles_contains_expected_generators():
     assert g.name == "consecutive_k_cycles-6-3"
 
 
+@pytest.mark.unit
 def test_conjugacy_class():
     n = 4
     classes = {(2, 2): None, (3,): None}
@@ -597,6 +630,7 @@ def test_conjugacy_class():
     assert graph.name == "conjugacy_class-5-2,2,1_5-3,1,1_7"
 
 
+@pytest.mark.unit
 def test_rand_generators():
     n = 6
     k = 4
@@ -605,6 +639,7 @@ def test_rand_generators():
     assert graph.name == "rand_generators-6-4"
 
 
+@pytest.mark.unit
 def test_down_cycles():
     n = 6
     g = PermutationGroups.down_cycles(n)
@@ -648,6 +683,7 @@ def test_down_cycles():
     assert g.name == "down_cycles-6"
 
 
+@pytest.mark.unit
 def test_lsl_cycles():
     graph = PermutationGroups.lsl_cycles(5, add_inverses=True)
 
@@ -663,6 +699,7 @@ def test_lsl_cycles():
     assert set(graph.generator_names) == {"L", "S", "L_inv", "S_inv"}
 
 
+@pytest.mark.unit
 def test_prefix_cycles():
     n = 6
     g = PermutationGroups.prefix_cycles(n)
