@@ -90,12 +90,16 @@ jobs:
       - name: Install requirements
         run: pip install .[test]
       - name: Cache benchmark data
+        id: cache-bench-data
         uses: actions/cache@v4
         with:
           path: ./.benchmarks
           key: benchmarks-${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}
           restore-keys: |
             benchmarks-${{ runner.os }}-${{ matrix.python-version }}-
+      - name: Create benchmark directory
+        if: steps.cache-bench-data.outputs.cache-hit != 'true'
+        run: mkdir .benchmarks
       - name: Run benchmarks
         run: pytest -m "benchmark" --benchmark-json .benchmarks/${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}.json
       - name: Store benchmark result
