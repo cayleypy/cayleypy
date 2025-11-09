@@ -210,19 +210,22 @@ class BeamSearchAlgorithm:
                 return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
             # Pick `beam_width` states with lowest scores.
-            if len(_new_states) >= beam_width:
+            if _new_states.shape[0] > beam_width:
                 scores = predictor(graph.decode_states(_new_states))
-                idx = torch.argsort(scores)[:beam_width]
-                _new_states = _new_states[idx, :]
-                _new_hashes = _new_hashes[idx]
-                best_score = float(scores[idx[0]].detach())
+                vals, idx = torch.topk(scores, k=min(beam_width, len(scores)), largest=False, sorted=True)
+                best_score = float(vals[0])
+
+                beam_states = _new_states[idx, :]
+                beam_hashes = _new_hashes[idx]
+
                 debug_scores[i_step] = best_score
+
                 if graph.verbose >= 2:
                     print(f"Iteration {i_step}, best score {best_score}.")
+            else:
+                beam_states = _new_states
+                beam_hashes = _new_hashes
 
-            # Update variables for next iteration.
-            beam_states = _new_states
-            beam_hashes = _new_hashes
             if return_path:
                 restore_path_hashes.append(beam_hashes)
 
@@ -393,15 +396,15 @@ class BeamSearchAlgorithm:
 
                 # Select best states.
                 if isinstance(scores, torch.Tensor):
-                    idx = torch.argsort(scores)[:beam_width]
+                    vals, idx = torch.topk(scores, k=min(beam_width, len(scores)), largest=False, sorted=True)
+                    best_score = float(vals[0])
                 else:
                     idx = torch.tensor(np.argsort(scores)[:beam_width], device=graph.device)
+                    best_score = float(scores[idx[0].item()])
 
                 beam_states = _new_states[idx, :]
                 beam_hashes = _new_hashes[idx]
-                best_score = float(
-                    scores[idx[0]].detach() if isinstance(scores, torch.Tensor) else scores[idx[0].item()]
-                )
+
                 debug_scores[i_step] = best_score
 
                 if verbose >= 2:
