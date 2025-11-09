@@ -85,7 +85,7 @@ To start development, run:
 ```
 git clone https://github.com/cayleypy/cayleypy.git
 cd cayleypy
-pip install -e .[torch,lint,test,dev,docs]
+pip install -e .[lint,test,dev,docs]
 ```
 
 To run all tests, including some slow running tests:
@@ -167,7 +167,8 @@ When you are ready do the following:
    (e.g. to Wikipedia article, Arxiv paper or a book) where the graph is defined.
 5. Add a test that creates an instance of your graph for small size and checks something about it 
      (at least check number of generators).
-6. Create a pull request from your fork to the this repository.
+6. Create a pull request from your fork to the this repository. 
+   Choose PR name reflecting your changes (e.g. "Update graphs_lib" is a poor choice, while "Add LRX groups to graphs_lib" is a better one). 
 7. Make sure that all automated checks (like unittests and style checks) are passed.
 8. Get two approvals from the reviewers team. They might make comments or request changes before
    provding an approval -- implement those. If needed, discuss how to proceed. If a commit
@@ -223,9 +224,9 @@ Our community has recently launched several Kaggle competitions to develop and b
 | --------------| ------------- | ------------|
 | [4x4x4 Cube](https://www.kaggle.com/competitions/cayley-py-444-cube/)                                    | 10<sup>55</sup>                 | 4x4x4 Rubik's cube (play [here](https://alpha.twizzle.net/explore/?puzzle=4x4x4))                                                  |
 | [Christopher's Jewel](https://www.kaggle.com/competitions/cayleypy-christophers-jewel/)                  | 10<sup>16<sup>                  | small octahedron-shaped puzzle (play [here](https://alpha.twizzle.net/explore/?puzzle=Christopher%27s+jewel))                      |
-| [Megaminx](https://www.kaggle.com/competitions/cayley-py-megaminx)                                       | 10<sup>69<sup>                  | dodecahedron-shaped puzzle (play [here](https://alpha.twizzle.net/explore/?puzzle=megaminx))                          |
+| [Megaminx](https://www.kaggle.com/competitions/cayley-py-megaminx)                                       | 10<sup>69<sup>                  | dodecahedron-shaped puzzle (play [here](https://alpha.twizzle.net/explore/?puzzle=megaminx))                                       |
 | [Professor Tetraminx](https://www.kaggle.com/competitions/cayley-py-professor-tetraminx-solve-optimally) | 10<sup>32</sup>                 | tetrahedron-shaped puzzle, medium size version (play [here](https://alpha.twizzle.net/explore/?puzzle=professor+tetraminx))        |
-| [IHES Supercube](https://www.kaggle.com/competitions/cayleypy-ihes-cube)                                 | (tba)                           | version of 3x3x3 Rubik's cube                                                                                                      |
+| [IHES Supercube](https://www.kaggle.com/competitions/cayleypy-ihes-cube)                                 | 10<sup>24</sup>                 | a variant of 3×3×3 Rubik’s cube with oriented faces                                                                           |
 | [RapaportM2](https://www.kaggle.com/competitions/cayleypy-rapapport-m2/)                                 | (tba)                           | (tba)                                                                                                                              |
 | [Transposons](https://www.kaggle.com/competitions/cayleypy-rapapport-m2/)                                | 10<sup>8</sup>-10<sup>158</sup> | transpositions of adjacent substrings                                                                                              |
 | [Reversals](https://www.kaggle.com/competitions/cayleypy-reversals)                                      | 10<sup>8</sup>-10<sup>64</sup>  | substring reversals                                                                                                                |
