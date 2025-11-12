@@ -17,8 +17,8 @@ def test_adjacency_matrix():
 
 
 def test_bfs_result_eq():
-    graph_1 = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
-    graph_2 = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
+    graph_1 = CayleyGraph(PermutationGroups.lrx(4), device="cpu", random_seed=43)
+    graph_2 = CayleyGraph(PermutationGroups.lrx(4), device="cpu", random_seed=43)
     graph_3 = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
 
     for return_all_hashes in [True, False]:

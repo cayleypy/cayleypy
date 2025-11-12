@@ -150,7 +150,7 @@ def test_bfs_batching_lrx(batch_size: int):
 # Test that batching works when state doesn't fit in int64.
 def test_bfs_batching_coxeter20():
     graph_def = PermutationGroups.coxeter(20)
-    graph = CayleyGraph(graph_def, batch_size=10000)
+    graph = CayleyGraph(graph_def, batch_size=10000, bit_encoding_width="auto")
     assert not graph.hasher.is_identity
     assert graph.string_encoder.encoded_length == 2
     result = graph.bfs(max_diameter=7)

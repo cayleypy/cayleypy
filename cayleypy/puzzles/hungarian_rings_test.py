@@ -249,5 +249,5 @@ def test_layer_sizes(parameters: tuple[int, int, int, int], layer_sizes: list[in
     generators, generator_names = hungarian_rings_generators(*parameters)
     n = len(generators[0])
     graph_def = CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)
-    assert bfs_numpy(CayleyGraph(graph_def)) == layer_sizes
-    assert CayleyGraph(graph_def).bfs().layer_sizes == layer_sizes
+    assert bfs_numpy(CayleyGraph(graph_def, bit_encoding_width="auto")) == layer_sizes
+    assert CayleyGraph(graph_def, bit_encoding_width="auto").bfs().layer_sizes == layer_sizes
