@@ -72,7 +72,7 @@ class MatrixGenerator:
         """Multiplies (from left) this matrix by a batch of n*m torch Tensors."""
         assert len(states.shape) == 3
         assert states.shape[1] == self.n
-        mx = torch.tensor(self.matrix, dtype=torch.int64, device=states.device)
+        mx = torch.tensor(self.matrix, dtype=states.dtype, device=states.device)
         mx = mx.unsqueeze(0).unsqueeze(-1)
         ans = (mx * states.unsqueeze(1)).sum(dim=2)
         if self.modulo > 0:

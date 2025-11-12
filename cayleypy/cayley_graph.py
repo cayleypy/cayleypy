@@ -1,7 +1,7 @@
 import gc
 import math
 from functools import cached_property
-from typing import Callable, Optional, Union
+from typing import Callable, Optional, Union, Literal
 
 import numpy as np
 import torch
@@ -50,8 +50,9 @@ class CayleyGraph:
         definition: CayleyGraphDef,
         *,
         device: str = "auto",
+        dtype: Union[torch.dtype, Literal["auto"]] = "auto",
         random_seed: Optional[int] = None,
-        bit_encoding_width: Union[Optional[int], str] = "auto",
+        bit_encoding_width: Union[Optional[int], str] = None,  # "auto",
         verbose: int = 0,
         batch_size: int = 2**20,
         hash_chunk_size: int = 2**25,
@@ -63,10 +64,11 @@ class CayleyGraph:
 
         :param definition: definition of the graph (as CayleyPyDef).
         :param device: one of ['auto','cpu','cuda'] - PyTorch device to store all tensors.
+        :param dtype: one of 'auto' or torch.dtype - PyTorch tensors dtype to store states.
         :param random_seed: random seed for deterministic hashing.
         :param bit_encoding_width: how many bits (between 1 and 63) to use to encode one element in a state.
                  If 'auto', optimal width will be picked.
-                 If None, elements will be encoded by int64 numbers.
+                 If None, elements will be encoded by numbers of a type defined in :param dtype.
         :param verbose: Level of logging. 0 means no logging.
         :param batch_size: Size of batch for batch processing.
         :param hash_chunk_size: Size of chunk for hashing.
@@ -88,7 +90,9 @@ class CayleyGraph:
         if verbose > 0:
             print(f"Using device: {self.device}.")
 
-        self.central_state = torch.as_tensor(definition.central_state, device=self.device, dtype=torch.int64)
+        self.dtype = torch.int64 if dtype == "auto" else dtype
+
+        self.central_state = torch.as_tensor(definition.central_state, device=self.device, dtype=self.dtype)
         self.encoded_state_size: int = self.definition.state_size
         self.string_encoder: Optional[StringEncoder] = None
 
@@ -190,7 +194,7 @@ class CayleyGraph:
         """Calculates all neighbors of `states` (in internal representation)."""
         states_num = states.shape[0]
         neighbors = torch.zeros(
-            (states_num * self.definition.n_generators, states.shape[1]), dtype=torch.int64, device=self.device
+            (states_num * self.definition.n_generators, states.shape[1]), dtype=self.dtype, device=self.device
         )
         for i in range(self.definition.n_generators):
             dst = neighbors[i * states_num : (i + 1) * states_num, :]
@@ -458,11 +462,7 @@ class CayleyGraph:
 
         The new graph will use the same encoding and hashing for states as the original.
         """
-        ans = CayleyGraph(
-            new_def,
-            _hasher=self.hasher,
-            bit_encoding_width=self.bit_encoding_width,
-        )
+        ans = CayleyGraph(new_def, _hasher=self.hasher, bit_encoding_width=self.bit_encoding_width, dtype=self.dtype)
         ans.hasher = self.hasher
         ans.string_encoder = self.string_encoder
         return ans

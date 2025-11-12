@@ -135,7 +135,7 @@ def test_beam_search_simple_not_found():
 
 def test_beam_search_advanced_lrx_few_steps():
     """Test advanced beam search on small LRX graph with few steps."""
-    graph = CayleyGraph(PermutationGroups.lrx(5))
+    graph = CayleyGraph(PermutationGroups.lrx(5), dtype=torch.int8)
 
     # Test starting from central state
     result0 = graph.beam_search(start_state=[0, 1, 2, 3, 4], beam_mode="advanced")
