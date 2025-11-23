@@ -1,6 +1,4 @@
 import itertools
-import os
-
 import pytest
 
 from cayleypy.permutation_utils import compose_permutations
@@ -16,8 +14,6 @@ from .hungarian_rings import (
 )
 from .. import CayleyGraphDef, CayleyGraph, bfs_numpy
 
-RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
-
 circular_shift_test_data = [
     (10, 1, [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]),
     (10, 11, [1, 2, 3, 4, 5, 6, 7, 8, 9, 0]),
@@ -32,11 +28,13 @@ circular_shift_test_data = [
 ]
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("size, step, expected_result", circular_shift_test_data)
 def test_circular_shift(size, step, expected_result):
     assert _circular_shift(items=list(range(0, size)), step=step) == expected_result
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize(
     "left_size, left_index, right_size, right_index, full_size, exp_result",
     [
@@ -51,6 +49,7 @@ def test_create_right_ring(left_size, left_index, right_size, right_index, full_
     assert right_ring == exp_result
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize(
     "left_index, right_index, exp_intersections",
     [
@@ -100,6 +99,7 @@ wreath_moves = [
 ]
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize(
     "left_size, left_index, right_size, right_index, step, expected_result_l, expected_result_r",
     hr_symmetric_test_data + hr_test_data + wreath_moves,
@@ -124,12 +124,14 @@ hr_value_error_data = [
 ]
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("left_size,left_index,right_size,right_index,step", hr_value_error_data)
 def test_hr_permutations_value_errors(left_size: int, left_index: int, right_size: int, right_index: int, step: int):
     with pytest.raises(ValueError):
         hungarian_rings_permutations(left_size, left_index, right_size, right_index, step=step)
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize(
     "left_size, left_index, right_size, right_index, step", [(6, 3, 6, 2, 2), (6, 1, 5, 2, -7), (13, 9, 5, 2, 6)]
 )
@@ -151,7 +153,8 @@ def test_hr_permutations_compensation(left_size: int, left_index: int, right_siz
     assert compose_permutations(r_permutations, r_counter_perm) == list(range(full_size))
 
 
-@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
+@pytest.mark.unit
+@pytest.mark.slow
 def test_hr_permutations_compensation_bf():
     two_inter_params = [range(2, 6), range(1, 5), range(2, 6), range(1, 5), range(-7, 8)]
     one_inter_params = [range(2, 6), [0], range(2, 6), [0], range(-7, 8)]
@@ -174,6 +177,7 @@ def test_hr_permutations_compensation_bf():
         assert compose_permutations(r_permutations, r_counter_perm) == list(range(full_size))
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize(
     "n, parameters",
     [
@@ -221,11 +225,13 @@ groups_data = [
 ]
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("pair, variants", pairs_data.items())
 def test_get_pair_variants(pair: tuple[int, int], variants: list):
     assert get_pair_variants(*pair) == variants
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("n, group", groups_data)
 def test_get_group(n: int, group: list):
     assert get_group(n) == group
@@ -244,6 +250,7 @@ layer_sizes_data = [
 ]
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("parameters, layer_sizes", layer_sizes_data)
 def test_layer_sizes(parameters: tuple[int, int, int, int], layer_sizes: list[int]):
     generators, generator_names = hungarian_rings_generators(*parameters)

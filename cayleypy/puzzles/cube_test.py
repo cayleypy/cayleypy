@@ -1,8 +1,10 @@
 import numpy as np
+import pytest
 
 from .puzzles import Puzzles
 
 
+@pytest.mark.unit
 def test_cube_222_qstm():
     graph = Puzzles.rubik_cube(2, metric="QSTM")
     assert graph.n_generators == 12
@@ -27,31 +29,37 @@ def test_cube_222_qstm():
     )
 
 
+@pytest.mark.unit
 def test_cube_222_qtm():
     graph = Puzzles.rubik_cube(2, metric="QTM")
     assert graph.n_generators == 12
 
 
+@pytest.mark.unit
 def test_cube_222_htm():
     graph = Puzzles.rubik_cube(2, metric="HTM")
     assert graph.n_generators == 18
 
 
+@pytest.mark.unit
 def test_cube_333_qtm():
     graph = Puzzles.rubik_cube(3, metric="QTM")
     assert graph.n_generators == 12
 
 
+@pytest.mark.unit
 def test_cube_333_htm():
     graph = Puzzles.rubik_cube(3, metric="HTM")
     assert graph.n_generators == 18
 
 
+@pytest.mark.unit
 def test_cube_222_atm():
     graph = Puzzles.rubik_cube(2, metric="ATM")
     assert graph.n_generators == 24
 
 
+@pytest.mark.unit
 def test_cube_333_atm():
     graph = Puzzles.rubik_cube(3, metric="ATM")
     assert graph.n_generators == 78

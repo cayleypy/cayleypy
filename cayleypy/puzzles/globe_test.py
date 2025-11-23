@@ -1,9 +1,11 @@
 # pylint: disable=line-too-long
 import numpy as np
+import pytest
 
 from .puzzles import Puzzles
 
 
+@pytest.mark.unit
 def test_globe_3_4():
     graph = Puzzles.globe_puzzle(3, 4)
 
@@ -36,6 +38,7 @@ def test_globe_3_4():
     assert np.array_equal(graph.generators, expected_generators)
 
 
+@pytest.mark.unit
 def test_globe_2_6():
     graph = Puzzles.globe_puzzle(2, 6)
 

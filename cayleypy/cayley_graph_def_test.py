@@ -3,6 +3,7 @@ import pytest
 from cayleypy import CayleyGraphDef, MatrixGenerator, PermutationGroups
 
 
+@pytest.mark.unit
 def test_inverse_permutations():
     graph_def = CayleyGraphDef.create([[1, 0, 2, 3], [1, 2, 3, 0], [0, 2, 3, 1]])
     inv = graph_def.with_inverted_generators()
@@ -10,6 +11,7 @@ def test_inverse_permutations():
     assert inv.generators_permutations == [[1, 0, 2, 3], [3, 0, 1, 2], [0, 3, 1, 2]]
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("modulo", [0, 10, 17])
 def test_inverse_matrices(modulo: int):
     x = MatrixGenerator.create([[1, 1, 0], [0, 1, 0], [0, 0, 1]], modulo=modulo)
@@ -21,6 +23,7 @@ def test_inverse_matrices(modulo: int):
     assert inv.generators_matrices[0] == x_inv
 
 
+@pytest.mark.unit
 def test_make_inverse_closed():
     graph = PermutationGroups.lrx(4)
     assert graph.make_inverse_closed() == graph
