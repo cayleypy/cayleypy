@@ -204,7 +204,7 @@ def test_beam_search_advanced_meet_in_the_middle_int_and_history_depth_2():
     """Test advanced beam search with meet-in-the-middle optimization as integer value."""
     graph = CayleyGraph(PermutationGroups.lrx(16))  # , random_seed= 84791592
     predictor = Predictor.pretrained(graph)
-    state = _scramble(graph, 16)  # reduced from 120 to 16 because of random
+    state = _scramble(graph, 120)  # reduced from 120 to 16 because of random
     result = graph.beam_search(
         start_state=state,
         beam_mode="advanced",
@@ -243,6 +243,126 @@ def test_beam_search_advanced_verbose_output():
 
     # Test with verbose=1
     result = graph.beam_search(start_state=start_state, beam_mode="advanced", verbose=1, max_steps=5)
+    # Should complete without errors
+    assert result.path_found or result.path_length == 5
+
+
+# =============================================================================
+# Tests for "iterated" beam search mode
+# =============================================================================
+
+
+def test_beam_search_iterated_lrx_few_steps():
+    """Test iterated beam search on small LRX graph with few steps."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), dtype=torch.int8)
+
+    # Test starting from central state
+    result0 = graph.beam_search(start_state=[0, 1, 2, 3, 4], beam_mode="iterated")
+    assert result0.path_found
+    assert result0.path_length == 0
+
+    # Test one step away
+    result1 = graph.beam_search(start_state=[1, 0, 2, 3, 4], beam_mode="iterated")
+    assert result1.path_found
+    assert result1.path_length == 1
+
+    # Test two steps away
+    result2 = graph.beam_search(start_state=[4, 1, 0, 2, 3], beam_mode="iterated")
+    assert result2.path_found
+    assert result2.path_length == 2
+
+
+def test_beam_search_iterated_with_history_depth():
+    """Test iterated beam search with non-backtracking (history_depth > 0)."""
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    start_state = np.random.permutation(8)
+
+    # Test with history_depth = 2
+    result = graph.beam_search(
+        start_state=start_state, beam_mode="iterated", history_depth=4, beam_width=1000, max_steps=20
+    )
+    # Should find path or exhaust search space
+    assert result.path_found or result.path_length == 20
+
+
+def test_beam_search_iterated_with_predictor():
+    """Test iterated beam search with pretrained predictor."""
+    graph = CayleyGraph(PermutationGroups.lrx(16))
+    predictor = Predictor.pretrained(graph)
+    state = _scramble(graph, 120)
+    result = graph.beam_search(start_state=state, beam_mode="iterated", predictor=predictor, history_depth=10)
+    assert result.path_found
+
+
+def test_beam_search_iterated_meet_in_the_middle():
+    """Test iterated beam search with meet-in-the-middle optimization."""
+    graph = CayleyGraph(PermutationGroups.lrx(16))
+    predictor = Predictor.pretrained(graph)
+    bfs_result = graph.bfs(max_diameter=10, return_all_hashes=True)
+    state = _scramble(graph, 120)
+    result = graph.beam_search(
+        start_state=state, beam_mode="iterated", predictor=predictor, hashed_neigbourhood=bfs_result, return_path=True
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, state, result)
+
+
+def test_beam_search_iterated_meet_in_the_middle_int():
+    """Test iterated beam search with meet-in-the-middle optimization as integer value."""
+    graph = CayleyGraph(PermutationGroups.lrx(16))
+    predictor = Predictor.pretrained(graph)
+    state = _scramble(graph, 120)
+    result = graph.beam_search(
+        start_state=state, beam_mode="iterated", predictor=predictor, hashed_neigbourhood=10, return_path=True
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, state, result)
+
+
+def test_beam_search_iterated_meet_in_the_middle_int_and_history_depth_2():
+    """Test iterated beam search with meet-in-the-middle optimization as integer value."""
+    graph = CayleyGraph(PermutationGroups.lrx(16))  # , random_seed= 84791592
+    predictor = Predictor.pretrained(graph)
+    state = _scramble(graph, 120)  # reduced from 120 to 16 because of random
+    result = graph.beam_search(
+        start_state=state,
+        beam_mode="iterated",
+        predictor=predictor,
+        hashed_neigbourhood=10,
+        return_path=True,
+        history_depth=2,
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, state, result)
+
+
+# For now iterated beam search don't works with matrix groups.
+# def test_beam_search_iterated_matrix_groups():
+#     """Test iterated beam search on matrix groups."""
+#     graph = CayleyGraph(MatrixGroups.heisenberg())
+#     start_state = [[1, 2, 3], [0, 1, 1], [0, 0, 1]]
+#     bs_result = graph.beam_search(start_state=start_state, beam_mode="iterated", history_depth=1)
+#     assert bs_result.path_found
+
+
+def test_beam_search_iterated_not_found():
+    """Test iterated beam search when path is not found."""
+    n = 50
+    graph = CayleyGraph(PermutationGroups.lrx(n))
+    start_state = np.random.permutation(n)
+    bs_result = graph.beam_search(
+        start_state=start_state, beam_mode="iterated", beam_width=10, max_steps=10, history_depth=2
+    )
+    assert not bs_result.path_found
+
+
+def test_beam_search_iterated_verbose_output():
+    """Test iterated beam search with verbose output."""
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    start_state = np.random.permutation(8)
+
+    # Test with verbose=1
+    result = graph.beam_search(start_state=start_state, beam_mode="iterated", verbose=1, max_steps=5)
     # Should complete without errors
     assert result.path_found or result.path_length == 5
 
