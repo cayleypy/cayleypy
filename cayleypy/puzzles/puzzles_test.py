@@ -23,6 +23,7 @@ def test_mini_pyramorphix():
         assert restored == list(range(24))
     assert set(graph.generator_names) == set(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
 
+
 def test_picture_puzzle333():
     graph = Puzzles.picture_puzzle333()
     assert graph.n_generators == len(PICTURE_CUBE_333_ALLOWED_MOVES)
@@ -39,6 +40,7 @@ def test_picture_puzzle333():
         restored = [gen[i] for i in inverse]
         assert restored == list(range(72))
     assert set(graph.generator_names) == set(PICTURE_CUBE_333_ALLOWED_MOVES.keys())
+
 
 def test_pyraminx():
     perm_set_length = 36
