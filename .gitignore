@@ -4,6 +4,7 @@ __pycache__/
 *.ipynb
 .coverage
 *.egg-info
+repomix-output.xml
 build/
 htmlcov/
 .venv/

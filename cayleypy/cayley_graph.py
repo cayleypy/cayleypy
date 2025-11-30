@@ -3,6 +3,8 @@ import math
 from functools import cached_property
 from typing import Callable, Optional, Union, Literal
 
+from collections.abc import Generator as typing_Generator
+
 import numpy as np
 import torch
 
@@ -200,6 +202,13 @@ class CayleyGraph:
             dst = neighbors[i * states_num : (i + 1) * states_num, :]
             self.apply_generator_batched(i, states, dst)
         return neighbors
+
+    def get_neighbors_generator(self, states: torch.Tensor) -> typing_Generator[torch.Tensor, torch.Tensor, None]:
+        """Calculates all neighbors of `states` (in internal representation)."""
+        neighbors = torch.zeros_like(states)
+        for i in range(self.definition.n_generators):
+            self.apply_generator_batched(i, states, neighbors)
+            yield neighbors.clone()
 
     def get_neighbors_decoded(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates neighbors in decoded (external) representation."""
