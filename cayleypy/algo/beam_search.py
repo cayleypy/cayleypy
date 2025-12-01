@@ -70,7 +70,7 @@ class BeamSearchAlgorithm:
         max_steps: int = 1000,
         history_depth: int = 0,
         return_path: bool = False,
-        path_device: Union[str, torch.device] = "cpu",
+        path_device: Union[str, torch.device] = "auto",
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
         verbose: int = 0,
     ) -> BeamSearchResult:
@@ -151,7 +151,7 @@ class BeamSearchAlgorithm:
         beam_width: int = 1000,
         max_steps: int = 1000,
         return_path: bool = False,
-        path_device: Union[str, torch.device] = "cpu",
+        path_device: Union[str, torch.device] = "auto",
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
@@ -185,6 +185,9 @@ class BeamSearchAlgorithm:
         # Encode states.
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
+
+        if path_device == 'auto':
+            path_device = 'cpu' if return_path else graph.device
 
         if return_path:
             restore_path_hashes = [
@@ -276,7 +279,7 @@ class BeamSearchAlgorithm:
         beam_width: int = 1000,
         max_steps: int = 1000,
         return_path: bool = False,
-        path_device: Union[str, torch.device] = "cpu",
+        path_device: Union[str, torch.device] = "auto",
         history_depth: int = 0,
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
         verbose: int = 0,
@@ -321,6 +324,9 @@ class BeamSearchAlgorithm:
         # Encode states.
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
+
+        if path_device == 'auto':
+            path_device = 'cpu' if return_path else graph.device
 
         if return_path:
             restore_path_hashes = [
@@ -444,7 +450,7 @@ class BeamSearchAlgorithm:
                 beam_hashes = _new_hashes
 
                 if verbose >= 2:
-                    print(f"Step {i_step}, not scored cause beam_width is big enougth.")
+                    print(f"Step {i_step}, not scored cause beam_width is big enough.")
 
             if return_path:
                 restore_path_hashes.append(beam_hashes.to(path_device))
@@ -478,7 +484,7 @@ class BeamSearchAlgorithm:
         beam_width: int = 1000,
         max_steps: int = 1000,
         return_path: bool = False,
-        path_device: Union[str, torch.device] = "cpu",
+        path_device: Union[str, torch.device] = "auto",
         history_depth: int = 0,
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
         verbose: int = 0,
@@ -534,6 +540,9 @@ class BeamSearchAlgorithm:
         # Encode states.
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
+
+        if path_device == 'auto':
+            path_device = 'cpu' if return_path else graph.device
 
         if return_path:
             restore_path_hashes = [
@@ -689,7 +698,7 @@ class BeamSearchAlgorithm:
                 if i_step in debug_scores:
                     print(f"Step {i_step}, best score: {debug_scores[i_step]:.2f}.")
                 else:
-                    print(f"Step {i_step}, not scored cause beam_width is big enougth.")
+                    print(f"Step {i_step}, not scored cause beam_width is big enough.")
 
             if return_path:
                 restore_path_hashes.append(beam_hashes.to(path_device))
