@@ -35,11 +35,11 @@ def _restore_path(
     if found_layer_id == 0:
         return graph.restore_path(restore_path_hashes, graph.central_state)
     assert bfs_result_for_mitm is not None
-    mask = isin_via_searchsorted(_new_hashes, bfs_layers_hashes[found_layer_id])
+    mask = isin_via_searchsorted(_new_hashes, bfs_layers_hashes[found_layer_id].to(graph.device))
     assert torch.any(mask), "No intersection in Meet-in-the-middle."
     middle_state = graph.decode_states(_new_states[mask.nonzero()[0].item()].reshape((1, -1)))
     path1 = graph.restore_path(restore_path_hashes, middle_state)
-    path2 = graph.find_path_from(middle_state, bfs_result_for_mitm)
+    path2 = graph.find_path_from(middle_state, bfs_result_for_mitm.to_device(graph.device))
     assert path2 is not None
     return path1 + path2
 
@@ -235,9 +235,9 @@ class BeamSearchAlgorithm:
                 if return_path:
                     path = _restore_path(
                         bfs_layer_id,
-                        _new_hashes.to(path_device),
-                        _new_states.to(path_device),
-                        graph.modified_copy(graph.definition, device=path_device),
+                        _new_hashes,
+                        _new_states,
+                        graph,
                         restore_path_hashes,
                         bfs_layers_hashes,
                         bfs_result_for_mitm,
@@ -385,9 +385,9 @@ class BeamSearchAlgorithm:
                 if return_path:
                     path = _restore_path(
                         bfs_layer_id,
-                        _new_hashes.to(path_device),
-                        _new_states.to(path_device),
-                        graph.modified_copy(graph.definition, device=path_device),
+                        _new_hashes,
+                        _new_states,
+                        graph,
                         restore_path_hashes,
                         bfs_layers_hashes,
                         bfs_result_for_mitm,
@@ -617,9 +617,9 @@ class BeamSearchAlgorithm:
                     if return_path:
                         path = _restore_path(
                             bfs_layer_id,
-                            _new_hashes_chunk.to(path_device),
-                            _new_states_chunk.to(path_device),
-                            graph.modified_copy(graph.definition, device=path_device),
+                            _new_hashes_chunk,
+                            _new_states_chunk,
+                            graph,
                             restore_path_hashes,
                             bfs_layers_hashes,
                             bfs_result_for_mitm,

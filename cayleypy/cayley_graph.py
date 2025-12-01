@@ -57,7 +57,7 @@ class CayleyGraph:
         bit_encoding_width: Union[Optional[int], str] = None,  # "auto",
         verbose: int = 0,
         batch_size: int = 2**20,
-        hash_chunk_size: int = 2**25,
+        hash_chunk_size: int = 2**16,
         memory_limit_gb: float = 16,
         _hasher: Optional[StateHasher] = None,
         **unused_kwargs,
@@ -405,7 +405,7 @@ class CayleyGraph:
             # in this graph that moves new_cur_state->cur_state - this is what we append to the answer.
             candidates = inv_graph.get_neighbors_decoded(cur_state)
             candidates_hashes = self.hasher.make_hashes(self.encode_states(candidates))
-            mask = torch.isin(candidates_hashes, hashes[i])
+            mask = torch.isin(candidates_hashes, hashes[i].to(self.device))
             assert torch.any(mask), "Not found any neighbor on previous layer."
             gen_id = int(mask.nonzero()[0].item())
             path.append(gen_id)
@@ -424,7 +424,7 @@ class CayleyGraph:
         bfs_result.check_has_layer_hashes()
         layers_hashes = bfs_result.layers_hashes
         for i, bfs_layer in enumerate(layers_hashes):
-            if bool(isin_via_searchsorted(end_state_hash, bfs_layer)):
+            if bool(isin_via_searchsorted(end_state_hash, bfs_layer.to(self.device))):
                 return self.restore_path(layers_hashes[:i], end_state)
         return None
 
