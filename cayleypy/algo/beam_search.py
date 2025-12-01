@@ -228,7 +228,7 @@ class BeamSearchAlgorithm:
             _new_states, _new_hashes = graph.get_unique_states(_new_states)
 
             # Check if dest state is found.
-            bfs_layer_id = _check_path_found(_new_hashes, bfs_layers_hashes)
+            bfs_layer_id = _check_path_found(_new_hashes.to(path_device), bfs_layers_hashes)
             if bfs_layer_id != -1:
                 # Path found.
                 path = None
@@ -378,7 +378,7 @@ class BeamSearchAlgorithm:
             t_unique_els += time.time() - t1
 
             # Check if dest state is found.
-            bfs_layer_id = _check_path_found(_new_hashes, bfs_layers_hashes)
+            bfs_layer_id = _check_path_found(_new_hashes.to(path_device), bfs_layers_hashes)
             if bfs_layer_id != -1:
                 # Path found.
                 path = None
@@ -610,7 +610,7 @@ class BeamSearchAlgorithm:
                         continue
 
                 # Check if dest state is found.
-                bfs_layer_id = _check_path_found(_new_hashes_chunk, bfs_layers_hashes)
+                bfs_layer_id = _check_path_found(_new_hashes_chunk.to(path_device), bfs_layers_hashes)
                 if bfs_layer_id != -1:
                     # Path found.
                     path = None
