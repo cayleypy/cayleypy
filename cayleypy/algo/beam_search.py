@@ -186,8 +186,8 @@ class BeamSearchAlgorithm:
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
 
-        if path_device == 'auto':
-            path_device = 'cpu' if return_path else graph.device
+        if path_device == "auto":
+            path_device = "cpu" if return_path else graph.device
 
         if return_path:
             restore_path_hashes = [
@@ -325,8 +325,8 @@ class BeamSearchAlgorithm:
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
 
-        if path_device == 'auto':
-            path_device = 'cpu' if return_path else graph.device
+        if path_device == "auto":
+            path_device = "cpu" if return_path else graph.device
 
         if return_path:
             restore_path_hashes = [
@@ -541,8 +541,8 @@ class BeamSearchAlgorithm:
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
 
-        if path_device == 'auto':
-            path_device = 'cpu' if return_path else graph.device
+        if path_device == "auto":
+            path_device = "cpu" if return_path else graph.device
 
         if return_path:
             restore_path_hashes = [
