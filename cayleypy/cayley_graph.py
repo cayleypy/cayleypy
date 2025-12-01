@@ -466,12 +466,18 @@ class CayleyGraph:
         """Returns copy of this graph with inverted generators."""
         return self.modified_copy(self.definition.with_inverted_generators())
 
-    def modified_copy(self, new_def: CayleyGraphDef) -> "CayleyGraph":
+    def modified_copy(self, new_def: CayleyGraphDef, device: Union[str, None, torch.device] = None) -> "CayleyGraph":
         """Makes a copy of this graph with different definition but other parameters unchanged.
 
         The new graph will use the same encoding and hashing for states as the original.
         """
-        ans = CayleyGraph(new_def, _hasher=self.hasher, bit_encoding_width=self.bit_encoding_width, dtype=self.dtype)
+        ans = CayleyGraph(
+            new_def,
+            _hasher=self.hasher,
+            bit_encoding_width=self.bit_encoding_width,
+            dtype=self.dtype,
+            device=str(self.device) if device is None else str(device),
+        )
         ans.hasher = self.hasher
         ans.string_encoder = self.string_encoder
         return ans
