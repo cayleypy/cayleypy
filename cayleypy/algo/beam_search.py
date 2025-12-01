@@ -16,6 +16,34 @@ if TYPE_CHECKING:
     from ..cayley_graph import CayleyGraph
 
 
+def _check_path_found(hashes, bfs_layers_hashes):
+    for j, layer in enumerate(bfs_layers_hashes):
+        if torch.any(isin_via_searchsorted(layer, hashes)):
+            return j
+    return -1
+
+
+def _restore_path(
+    found_layer_id: int,
+    _new_hashes: torch.Tensor,
+    _new_states: torch.Tensor,
+    graph: "CayleyGraph",
+    restore_path_hashes: list,
+    bfs_layers_hashes: list,
+    bfs_result_for_mitm: BfsResult,
+) -> Optional[list[int]]:
+    if found_layer_id == 0:
+        return graph.restore_path(restore_path_hashes, graph.central_state)
+    assert bfs_result_for_mitm is not None
+    mask = isin_via_searchsorted(_new_hashes, bfs_layers_hashes[found_layer_id].to(graph.device))
+    assert torch.any(mask), "No intersection in Meet-in-the-middle."
+    middle_state = graph.decode_states(_new_states[mask.nonzero()[0].item()].reshape((1, -1)))
+    path1 = graph.restore_path(restore_path_hashes, middle_state)
+    path2 = graph.find_path_from(middle_state, bfs_result_for_mitm.to_device(graph.device))
+    assert path2 is not None
+    return path1 + path2
+
+
 class BeamSearchAlgorithm:
     """Beam search algorithm for finding paths in Cayley graphs.
 
@@ -42,6 +70,7 @@ class BeamSearchAlgorithm:
         max_steps: int = 1000,
         history_depth: int = 0,
         return_path: bool = False,
+        path_device: Union[str, torch.device] = "auto",
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
         verbose: int = 0,
     ) -> BeamSearchResult:
@@ -65,6 +94,7 @@ class BeamSearchAlgorithm:
         :param max_steps: Maximum number of search steps/iterations before giving up.
         :param history_depth: For "advanced" mode, how many previous levels to remember and ban from revisiting.
         :param return_path: For "simple" mode, whether to return path (consumes much more memory if True).
+        :param path_device: Device to store the path on.
         :param hashed_neigbourhood: BfsResult with pre-computed neighborhood of central state to compute for
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
@@ -81,6 +111,7 @@ class BeamSearchAlgorithm:
                 beam_width=beam_width,
                 max_steps=max_steps,
                 return_path=return_path,
+                path_device=path_device,
                 hashed_neigbourhood=hashed_neigbourhood,
             )
         elif beam_mode == "advanced":
@@ -91,6 +122,7 @@ class BeamSearchAlgorithm:
                 beam_width=beam_width,
                 max_steps=max_steps,
                 return_path=return_path,
+                path_device=path_device,
                 hashed_neigbourhood=hashed_neigbourhood,
                 history_depth=history_depth,
                 verbose=verbose,
@@ -103,6 +135,7 @@ class BeamSearchAlgorithm:
                 beam_width=beam_width,
                 max_steps=max_steps,
                 return_path=return_path,
+                path_device=path_device,
                 hashed_neigbourhood=hashed_neigbourhood,
                 history_depth=history_depth,
                 verbose=verbose,
@@ -118,6 +151,7 @@ class BeamSearchAlgorithm:
         beam_width: int = 1000,
         max_steps: int = 1000,
         return_path: bool = False,
+        path_device: Union[str, torch.device] = "auto",
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
@@ -128,6 +162,7 @@ class BeamSearchAlgorithm:
         :param beam_width: Width of the beam (how many "best" states we consider at each step).
         :param max_steps: Maximum number of iterations before giving up.
         :param return_path: Whether to return path (consumes much more memory if True).
+        :param path_device: Device to store the path on.
         :param hashed_neigbourhood: BfsResult with pre-computed neighborhood of central state to compute for
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
@@ -151,55 +186,36 @@ class BeamSearchAlgorithm:
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
 
-        restore_path_hashes = [
-            beam_hashes,
-        ]
+        if path_device == "auto":
+            path_device = "cpu" if return_path else graph.device
+
+        if return_path:
+            restore_path_hashes = [
+                beam_hashes.to(path_device),
+            ]
 
         # Check if start state is already the dest.
         if torch.any(beam_hashes == dest_hashes):
-            print(beam_hashes, dest_hashes)
             return BeamSearchResult(True, 0, [], debug_scores, graph.definition)
 
         # Precompute meet in the middle \ destination state neighborhood hashing optimization.
         bfs_result_for_mitm: BfsResult
-        if hashed_neigbourhood is not None:
-            if isinstance(hashed_neigbourhood, int):
-                bfs_result_for_mitm = graph.bfs(
-                    start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
-                )
-            else:
-                bfs_result_for_mitm = hashed_neigbourhood
-            assert bfs_result_for_mitm.graph == graph.definition
-            bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
+
+        hashed_neigbourhood = 0 if hashed_neigbourhood is None else hashed_neigbourhood
+
+        if isinstance(hashed_neigbourhood, int):
+            bfs_result_for_mitm = graph.bfs(
+                start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
+            ).to_device(path_device)
         else:
-            bfs_layers_hashes = [
-                dest_hashes,
-            ]
+            bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
+        assert bfs_result_for_mitm.graph == graph.definition
+        bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
         # Checks if any of `hashes` are in neighborhood of the central state.
         # Returns the number of the first layer where intersection was found, or -1 if not found.
         _new_states: torch.Tensor
         _new_hashes: torch.Tensor
-
-        def _check_path_found(hashes):
-            for j, layer in enumerate(bfs_layers_hashes):
-                if torch.any(isin_via_searchsorted(layer, hashes)):
-                    return j
-            return -1
-
-        def _restore_path(found_layer_id: int) -> Optional[list[int]]:
-            if not return_path:
-                return None
-            if found_layer_id == 0:
-                return graph.restore_path(restore_path_hashes, graph.central_state)
-            assert bfs_result_for_mitm is not None
-            mask = isin_via_searchsorted(_new_hashes, bfs_layers_hashes[found_layer_id])
-            assert torch.any(mask), "No intersection in Meet-in-the-middle."
-            middle_state = graph.decode_states(_new_states[mask.nonzero()[0].item()].reshape((1, -1)))
-            path1 = graph.restore_path(restore_path_hashes, middle_state)
-            path2 = graph.find_path_from(middle_state, bfs_result_for_mitm)
-            assert path2 is not None
-            return path1 + path2
 
         # Main beam search cycle.
         for i_step in range(1, max_steps + 1):
@@ -215,10 +231,20 @@ class BeamSearchAlgorithm:
             _new_states, _new_hashes = graph.get_unique_states(_new_states)
 
             # Check if dest state is found.
-            bfs_layer_id = _check_path_found(_new_hashes)
+            bfs_layer_id = _check_path_found(_new_hashes.to(path_device), bfs_layers_hashes)
             if bfs_layer_id != -1:
                 # Path found.
-                path = _restore_path(bfs_layer_id)
+                path = None
+                if return_path:
+                    path = _restore_path(
+                        bfs_layer_id,
+                        _new_hashes,
+                        _new_states,
+                        graph,
+                        restore_path_hashes,
+                        bfs_layers_hashes,
+                        bfs_result_for_mitm,
+                    )
                 return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
             # Pick `beam_width` states with lowest scores.
@@ -239,7 +265,7 @@ class BeamSearchAlgorithm:
                 beam_hashes = _new_hashes
 
             if return_path:
-                restore_path_hashes.append(beam_hashes)
+                restore_path_hashes.append(beam_hashes.to(path_device))
 
         # Path not found.
         return BeamSearchResult(False, 0, None, debug_scores, graph.definition)
@@ -253,6 +279,7 @@ class BeamSearchAlgorithm:
         beam_width: int = 1000,
         max_steps: int = 1000,
         return_path: bool = False,
+        path_device: Union[str, torch.device] = "auto",
         history_depth: int = 0,
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
         verbose: int = 0,
@@ -270,6 +297,7 @@ class BeamSearchAlgorithm:
         :param beam_width: Width of the beam (how many best states to consider).
         :param max_steps: Maximum number of search steps.
         :param return_path: Whether to return path (consumes much more memory if True).
+        :param path_device: Device to store the path on.
         :param history_depth: How many previous levels to remember and ban from revisiting.
         :param batch_size: Batch size for model predictions. - UNUSED FOR NOW BUT WILL BE USED LATER
         :param hashed_neigbourhood: BfsResult with pre-computed neighborhood of central state to compute for
@@ -297,9 +325,13 @@ class BeamSearchAlgorithm:
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
 
-        restore_path_hashes = [
-            beam_hashes,
-        ]
+        if path_device == "auto":
+            path_device = "cpu" if return_path else graph.device
+
+        if return_path:
+            restore_path_hashes = [
+                beam_hashes.to(path_device),
+            ]
 
         # Check if start state is already the dest.
         if torch.any(beam_hashes == dest_hashes):
@@ -308,19 +340,17 @@ class BeamSearchAlgorithm:
         # Precompute meet in the middle \ destination state neighborhood hashing optimization.
         # Precompute meet in the middle \ destination state neighborhood hashing optimization.
         bfs_result_for_mitm: BfsResult
-        if hashed_neigbourhood is not None:
-            if isinstance(hashed_neigbourhood, int):
-                bfs_result_for_mitm = graph.bfs(
-                    start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
-                )
-            else:
-                bfs_result_for_mitm = hashed_neigbourhood
-            assert bfs_result_for_mitm.graph == graph.definition
-            bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
+
+        hashed_neigbourhood = 0 if hashed_neigbourhood is None else hashed_neigbourhood
+
+        if isinstance(hashed_neigbourhood, int):
+            bfs_result_for_mitm = graph.bfs(
+                start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
+            ).to_device(path_device)
         else:
-            bfs_layers_hashes = [
-                dest_hashes,
-            ]
+            bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
+        assert bfs_result_for_mitm.graph == graph.definition
+        bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
         # Initialize hash storage for non-backtracking.
         if history_depth > 0:
@@ -331,26 +361,6 @@ class BeamSearchAlgorithm:
         # Returns the number of the first layer where intersection was found, or -1 if not found.
         _new_states: torch.Tensor
         _new_hashes: torch.Tensor
-
-        def _check_path_found(hashes):
-            for j, layer in enumerate(bfs_layers_hashes):
-                if torch.any(isin_via_searchsorted(layer, hashes)):
-                    return j
-            return -1
-
-        def _restore_path(found_layer_id: int) -> Optional[list[int]]:
-            if not return_path:
-                return None
-            if found_layer_id == 0:
-                return graph.restore_path(restore_path_hashes, graph.central_state)
-            assert bfs_result_for_mitm is not None
-            mask = isin_via_searchsorted(_new_hashes, bfs_layers_hashes[found_layer_id])
-            assert torch.any(mask), "No intersection in Meet-in-the-middle."
-            middle_state = graph.decode_states(_new_states[mask.nonzero()[0].item()].reshape((1, -1)))
-            path1 = graph.restore_path(restore_path_hashes, middle_state)
-            path2 = graph.find_path_from(middle_state, bfs_result_for_mitm)
-            assert path2 is not None
-            return path1 + path2
 
         # Main beam search cycle.
         t0 = time.time()
@@ -374,10 +384,20 @@ class BeamSearchAlgorithm:
             t_unique_els += time.time() - t1
 
             # Check if dest state is found.
-            bfs_layer_id = _check_path_found(_new_hashes)
+            bfs_layer_id = _check_path_found(_new_hashes.to(path_device), bfs_layers_hashes)
             if bfs_layer_id != -1:
                 # Path found.
-                path = _restore_path(bfs_layer_id)
+                path = None
+                if return_path:
+                    path = _restore_path(
+                        bfs_layer_id,
+                        _new_hashes,
+                        _new_states,
+                        graph,
+                        restore_path_hashes,
+                        bfs_layers_hashes,
+                        bfs_result_for_mitm,
+                    )
                 return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
             # Non-backtracking: forbid visiting states visited before.
@@ -430,10 +450,10 @@ class BeamSearchAlgorithm:
                 beam_hashes = _new_hashes
 
                 if verbose >= 2:
-                    print(f"Step {i_step}, not scored cause beam_width is big enougth.")
+                    print(f"Step {i_step}, not scored cause beam_width is big enough.")
 
             if return_path:
-                restore_path_hashes.append(beam_hashes)
+                restore_path_hashes.append(beam_hashes.to(path_device))
 
             t_predict = time.time() - t_predict
 
@@ -464,6 +484,7 @@ class BeamSearchAlgorithm:
         beam_width: int = 1000,
         max_steps: int = 1000,
         return_path: bool = False,
+        path_device: Union[str, torch.device] = "auto",
         history_depth: int = 0,
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
         verbose: int = 0,
@@ -480,7 +501,8 @@ class BeamSearchAlgorithm:
         :param predictor: Predictor object for scoring states. If None, uses Hamming distance.
         :param beam_width: Width of the beam (how many best states to consider).
         :param max_steps: Maximum number of search steps.
-        :param return_path: Whether to return path (consumes much more memory if True).
+        :param return_path: Whether to return path (consumes much more memory if True) or on which device to store it.
+        :param path_device: Device to store the path on.
         :param history_depth: How many previous levels to remember and ban from revisiting.
         :param batch_size: Batch size for model predictions. - UNUSED FOR NOW BUT WILL BE USED LATER
         :param hashed_neigbourhood: BfsResult with pre-computed neighborhood of central state to compute for
@@ -519,9 +541,13 @@ class BeamSearchAlgorithm:
         beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
         _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
 
-        restore_path_hashes = [
-            beam_hashes,
-        ]
+        if path_device == "auto":
+            path_device = "cpu" if return_path else graph.device
+
+        if return_path:
+            restore_path_hashes = [
+                beam_hashes.to(path_device),
+            ]
 
         # Check if start state is already the dest.
         if torch.any(beam_hashes == dest_hashes):
@@ -530,19 +556,17 @@ class BeamSearchAlgorithm:
         # Precompute meet in the middle \ destination state neighborhood hashing optimization.
         # Precompute meet in the middle \ destination state neighborhood hashing optimization.
         bfs_result_for_mitm: BfsResult
-        if hashed_neigbourhood is not None:
-            if isinstance(hashed_neigbourhood, int):
-                bfs_result_for_mitm = graph.bfs(
-                    start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
-                )
-            else:
-                bfs_result_for_mitm = hashed_neigbourhood
-            assert bfs_result_for_mitm.graph == graph.definition
-            bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
+
+        hashed_neigbourhood = 0 if hashed_neigbourhood is None else hashed_neigbourhood
+
+        if isinstance(hashed_neigbourhood, int):
+            bfs_result_for_mitm = graph.bfs(
+                start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
+            ).to_device(path_device)
         else:
-            bfs_layers_hashes = [
-                dest_hashes,
-            ]
+            bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
+        assert bfs_result_for_mitm.graph == graph.definition
+        bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
         # Initialize hash storage for non-backtracking.
         if history_depth > 0:
@@ -553,26 +577,6 @@ class BeamSearchAlgorithm:
         # Returns the number of the first layer where intersection was found, or -1 if not found.
         _new_states_chunk: torch.Tensor
         _new_hashes_chunk: torch.Tensor
-
-        def _check_path_found(hashes):
-            for j, layer in enumerate(bfs_layers_hashes):
-                if torch.any(isin_via_searchsorted(layer, hashes)):
-                    return j
-            return -1
-
-        def _restore_path(found_layer_id: int) -> Optional[list[int]]:
-            if not return_path:
-                return None
-            if found_layer_id == 0:
-                return graph.restore_path(restore_path_hashes, graph.central_state)
-            assert bfs_result_for_mitm is not None
-            mask = isin_via_searchsorted(_new_hashes_chunk, bfs_layers_hashes[found_layer_id])
-            assert torch.any(mask), "No intersection in Meet-in-the-middle."
-            middle_state = graph.decode_states(_new_states_chunk[mask.nonzero()[0].item()].reshape((1, -1)))
-            path1 = graph.restore_path(restore_path_hashes, middle_state)
-            path2 = graph.find_path_from(middle_state, bfs_result_for_mitm)
-            assert path2 is not None
-            return path1 + path2
 
         # Main beam search cycle.
         t0 = time.time()
@@ -615,10 +619,20 @@ class BeamSearchAlgorithm:
                         continue
 
                 # Check if dest state is found.
-                bfs_layer_id = _check_path_found(_new_hashes_chunk)
+                bfs_layer_id = _check_path_found(_new_hashes_chunk.to(path_device), bfs_layers_hashes)
                 if bfs_layer_id != -1:
                     # Path found.
-                    path = _restore_path(bfs_layer_id)
+                    path = None
+                    if return_path:
+                        path = _restore_path(
+                            bfs_layer_id,
+                            _new_hashes_chunk,
+                            _new_states_chunk,
+                            graph,
+                            restore_path_hashes,
+                            bfs_layers_hashes,
+                            bfs_result_for_mitm,
+                        )
                     return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
                 # Non-backtracking: forbid visiting states visited before.
@@ -684,10 +698,10 @@ class BeamSearchAlgorithm:
                 if i_step in debug_scores:
                     print(f"Step {i_step}, best score: {debug_scores[i_step]:.2f}.")
                 else:
-                    print(f"Step {i_step}, not scored cause beam_width is big enougth.")
+                    print(f"Step {i_step}, not scored cause beam_width is big enough.")
 
             if return_path:
-                restore_path_hashes.append(beam_hashes)
+                restore_path_hashes.append(beam_hashes.to(path_device))
 
             # Verbose output.
             if verbose >= 10 and (i_step - 1) % 10 == 0:
