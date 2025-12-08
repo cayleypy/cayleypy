@@ -1,9 +1,11 @@
 import torch
+import pytest
 
 from .models_lib import PREDICTOR_MODELS
 from .. import prepare_graph, Predictor, CayleyGraph
 
 
+@pytest.mark.unit
 def test_loads_predictor_models():
     # Checks that all models can be loaded and successfully return prediction for central state of the graph.
     # This test does not check model quality.

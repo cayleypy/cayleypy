@@ -8,6 +8,7 @@ from .permutation_utils import apply_permutation
 from .string_encoder import StringEncoder
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("code_width,n", [(1, 2), (1, 5), (2, 30), (10, 100), (4, 16), (1, 64)])
 def test_encode_decode(code_width, n):
     num_states = 5
@@ -18,6 +19,7 @@ def test_encode_decode(code_width, n):
     assert torch.equal(s, enc.decode(s_encoded))
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("code_width,n", [(1, 2), (1, 5), (2, 30), (10, 100), (4, 16), (1, 64)])
 def test_permutation(code_width: int, n: int):
     num_states = 5
@@ -33,6 +35,7 @@ def test_permutation(code_width: int, n: int):
     assert torch.equal(ans, expected)
 
 
+@pytest.mark.unit
 @pytest.mark.parametrize("code_width,n", [(1, 2), (1, 5), (2, 30), (4, 16), (1, 64)])
 def test_permutation_1d(code_width: int, n: int):
     num_states = 5

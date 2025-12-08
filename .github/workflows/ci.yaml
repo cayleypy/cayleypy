@@ -48,7 +48,7 @@ jobs:
       - name: Install requirements
         run: pip install .[test]
       - name: Run tests
-        run: RUN_SLOW_TESTS=1 pytest
+        run: pytest -m "unit or (unit and slow)"
   pytest-windows:
     name: Tests (Windows)
     runs-on: windows-latest
@@ -61,7 +61,7 @@ jobs:
       - name: Install requirements
         run: pip install .[test]
       - name: Run tests
-        run: pytest
+        run: pytest -m "unit or (unit and slow)"
   pytest-macos:
     name: Tests (MacOS)
     runs-on: macos-latest
@@ -74,7 +74,46 @@ jobs:
       - name: Install requirements
         run: pip install .[test]
       - name: Run tests
-        run: RUN_SLOW_TESTS=1 pytest
+        run:  pytest -m "unit or (unit and slow)"
+  benchmark-ubuntu:
+    strategy:
+      matrix:
+        python-version: [ '3.9', '3.10', '3.11', '3.12', '3.13' ]
+    name: Benchmarks (Ubuntu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          architecture: 'x64'
+      - name: Install requirements
+        run: pip install .[test]
+      - name: Cache benchmark data
+        id: cache-bench-data
+        uses: actions/cache@v4
+        with:
+          path: ./.benchmarks
+          key: benchmarks-${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}
+          restore-keys: |
+            benchmarks-${{ runner.os }}-${{ matrix.python-version }}-
+      - name: Create benchmark directory
+        if: steps.cache-bench-data.outputs.cache-hit != 'true'
+        run: mkdir .benchmarks
+      - name: Run benchmarks
+        run: pytest -m "benchmark" --benchmark-json .benchmarks/${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}.json
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Python Benchmark with pytest-benchmark
+          tool: 'pytest'
+          output-file-path: .benchmarks/${{ runner.os }}-${{ matrix.python-version }}-${{ github.sha }}.json
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          alert-threshold: '125%'
+          comment-on-alert: true
+          fail-on-alert: true
+          alert-comment-cc-users: '@hulk8'
   build-docs:
     name: Build documentation
     runs-on: ubuntu-latest

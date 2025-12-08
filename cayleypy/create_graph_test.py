@@ -1,18 +1,22 @@
 import numpy as np
+import pytest
 
 from cayleypy import create_graph, PermutationGroups
 
 
+@pytest.mark.unit
 def test_create_graph_from_name():
     graph = create_graph(name="pancake", n=10)
     assert graph.definition == PermutationGroups.pancake(10)
 
 
+@pytest.mark.unit
 def test_create_graph_permutations():
     graph = create_graph(generators_permutations=[[1, 2, 3, 0], [1, 0, 2, 3]])
     assert graph.definition.generators_permutations == PermutationGroups.lx(4).generators_permutations
 
 
+@pytest.mark.unit
 def test_create_graph_from_matrices():
     m1 = [[1, 2], [3, 4]]
     m2 = np.array([[5, 6], [7, 8]])
@@ -23,6 +27,7 @@ def test_create_graph_from_matrices():
     assert np.array_equal(graph.definition.generators_matrices[1].matrix, m2)
 
 
+@pytest.mark.unit
 def test_create_graph_make_inverse_closed():
     graph = create_graph(name="lx", n=4, make_inverse_closed=True)
     assert graph.definition.name == "lx-4-ic"
@@ -30,6 +35,7 @@ def test_create_graph_make_inverse_closed():
     assert graph.definition.generators_permutations == [[1, 2, 3, 0], [1, 0, 2, 3], [3, 0, 1, 2]]
 
 
+@pytest.mark.unit
 def test_create_graph_by_name_and_central_state():
     graph = create_graph(name="lrx", n=8, central_state="00001111")
     assert graph.definition.generators_permutations == PermutationGroups.lrx(8).generators_permutations

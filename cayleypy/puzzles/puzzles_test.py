@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 
 from .moves import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES, MEGAMINX_MOVES
 from .puzzles import Puzzles
@@ -6,6 +7,7 @@ from ..cayley_graph import CayleyGraph
 from ..permutation_utils import is_permutation, inverse_permutation
 
 
+@pytest.mark.unit
 def test_mini_pyramorphix():
     graph = Puzzles.mini_pyramorphix()
     assert graph.n_generators == len(MINI_PYRAMORPHIX_ALLOWED_MOVES)
@@ -24,6 +26,7 @@ def test_mini_pyramorphix():
     assert set(graph.generator_names) == set(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
 
 
+@pytest.mark.unit
 def test_pyraminx():
     perm_set_length = 36
     graph = Puzzles.pyraminx()
@@ -39,6 +42,7 @@ def test_pyraminx():
         assert len(gen) == perm_set_length
 
 
+@pytest.mark.unit
 def test_megaminx():
     perm_set_length = 120
     graph = Puzzles.megaminx()

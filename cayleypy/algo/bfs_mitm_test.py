@@ -1,10 +1,12 @@
 import numpy as np
 import torch
+import pytest
 
 from cayleypy import PermutationGroups, CayleyGraph, Puzzles
 from cayleypy.algo import MeetInTheMiddle
 
 
+@pytest.mark.unit
 def test_find_path_bfs_mitm_lrx10():
     graph = CayleyGraph(PermutationGroups.lrx(10))
     br12 = graph.bfs(max_diameter=12, return_all_hashes=True)
@@ -21,6 +23,7 @@ def test_find_path_bfs_mitm_lrx10():
     graph.validate_path(start_state, path)
 
 
+@pytest.mark.unit
 def test_find_path_bfs_mitm_lrx20():
     graph = CayleyGraph(PermutationGroups.lrx(20))
     br11 = graph.bfs(max_diameter=11, return_all_hashes=True)
@@ -37,6 +40,7 @@ def test_find_path_bfs_mitm_lrx20():
     graph.validate_path(start_state, path)
 
 
+@pytest.mark.unit
 def test_find_path_bfs_mitm_cube222():
     graph = CayleyGraph(Puzzles.rubik_cube(2, metric="fixed_HTM"), verbose=2)
     br = graph.bfs(max_diameter=6, return_all_hashes=True)
@@ -50,6 +54,7 @@ def test_find_path_bfs_mitm_cube222():
     graph.validate_path(start_state, path2)
 
 
+@pytest.mark.unit
 def test_mitm_lx10():
     # This test checks that MITM finds paths correctly for not inverse-closed generators (such as LX).
     graph = CayleyGraph(PermutationGroups.lx(10))
@@ -71,6 +76,7 @@ def test_mitm_lx10():
     assert path2 == path
 
 
+@pytest.mark.unit
 def test_mitm_find_path_between_lx10():
     graph = CayleyGraph(PermutationGroups.lx(10))
     perm1 = [2, 6, 4, 5, 9, 7, 8, 3, 1, 0]
@@ -85,6 +91,7 @@ def _state_to_tuple(state):
     return tuple(int(x) for x in state)
 
 
+@pytest.mark.unit
 def test_find_path_between_sets_lrx10():
     n = 10
     graph = CayleyGraph(PermutationGroups.lrx(n))
