@@ -183,7 +183,11 @@ class BeamSearchAlgorithm:
 
         # Initialize predictor if not provided.
         if predictor is None:
-            predictor = Predictor(graph, "hamming")
+            _predictor = Predictor(graph, "hamming")
+        elif isinstance(predictor, Predictor):
+            _predictor = predictor
+        else:
+            _predictor = Predictor(graph, predictor)
 
         # Use central state as a dest state.
         destination_state = graph.central_state
@@ -256,7 +260,7 @@ class BeamSearchAlgorithm:
 
             # Pick `beam_width` states with lowest scores.
             if _new_states.shape[0] > beam_width:
-                scores = predictor(graph.decode_states(_new_states))
+                scores = _predictor(graph.decode_states(_new_states))
                 vals, idx = torch.topk(scores, k=min(beam_width, len(scores)), largest=False, sorted=True)
                 best_score = float(vals[0])
 
@@ -326,7 +330,11 @@ class BeamSearchAlgorithm:
 
         # Initialize predictor if not provided.
         if predictor is None:
-            predictor = Predictor(graph, "hamming")
+            _predictor = Predictor(graph, "hamming")
+        elif isinstance(predictor, Predictor):
+            _predictor = predictor
+        else:
+            _predictor = Predictor(graph, predictor)
 
         # Use central state as dest if not specified.
         if destination_state is None:
@@ -440,7 +448,7 @@ class BeamSearchAlgorithm:
             t_predict = time.time()
             if _new_states.shape[0] > beam_width:
                 # Score states using predictor.
-                scores = predictor(graph.decode_states(_new_states))
+                scores = _predictor(graph.decode_states(_new_states))
 
                 # Select best states.
                 if isinstance(scores, torch.Tensor):
@@ -548,7 +556,11 @@ class BeamSearchAlgorithm:
 
         # Initialize predictor if not provided.
         if predictor is None:
-            predictor = Predictor(graph, "hamming")
+            _predictor = Predictor(graph, "hamming")
+        elif isinstance(predictor, Predictor):
+            _predictor = predictor
+        else:
+            _predictor = Predictor(graph, predictor)
 
         # Use central state as dest if not specified.
         if destination_state is None:
@@ -678,7 +690,7 @@ class BeamSearchAlgorithm:
                 t1 = time.time()
                 if _new_states_chunk.shape[0] > beam_width_part:
                     # Score states using predictor.
-                    scores = predictor(graph.decode_states(_new_states_chunk))
+                    scores = _predictor(graph.decode_states(_new_states_chunk))
 
                     # Select best states.
                     if isinstance(scores, torch.Tensor):
