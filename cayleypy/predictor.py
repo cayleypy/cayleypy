@@ -59,9 +59,6 @@ class Predictor:
         with torch.inference_mode():
             num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
             if num_batches > 1:
-                ans = []  # type: list[torch.Tensor]
-                for batch in states.tensor_split(num_batches, dim=0):
-                    ans.append(self.predict(batch))
-                return torch.hstack(ans)
+                return torch.cat([self.predict(b) for b in states.tensor_split(num_batches, dim=0)])
             else:
                 return self.predict(states)

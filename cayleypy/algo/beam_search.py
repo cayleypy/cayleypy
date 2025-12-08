@@ -36,7 +36,8 @@ def _restore_path(
         return graph.restore_path(restore_path_hashes, graph.central_state)
     assert bfs_result_for_mitm is not None
     mask = isin_via_searchsorted(_new_hashes, bfs_layers_hashes[found_layer_id].to(graph.device))
-    assert torch.any(mask), "No intersection in Meet-in-the-middle."
+    if not torch.any(mask):
+        raise ValueError("No intersection in Meet-in-the-middle.")
     middle_state = graph.decode_states(_new_states[mask.nonzero()[0].item()].reshape((1, -1)))
     path1 = graph.restore_path(restore_path_hashes, middle_state)
     path2 = graph.find_path_from(middle_state, bfs_result_for_mitm.to_device(graph.device))
@@ -72,6 +73,7 @@ class BeamSearchAlgorithm:
         return_path: bool = False,
         path_device: Union[str, torch.device] = "auto",
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
+        memory_cleanup: bool = False,
         verbose: int = 0,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to dest state using Beam Search algorithm.
@@ -113,6 +115,7 @@ class BeamSearchAlgorithm:
                 return_path=return_path,
                 path_device=path_device,
                 hashed_neigbourhood=hashed_neigbourhood,
+                memory_cleanup=memory_cleanup,
             )
         elif beam_mode == "advanced":
             return self.search_advanced(
@@ -125,6 +128,7 @@ class BeamSearchAlgorithm:
                 path_device=path_device,
                 hashed_neigbourhood=hashed_neigbourhood,
                 history_depth=history_depth,
+                memory_cleanup=memory_cleanup,
                 verbose=verbose,
             )
         elif beam_mode == "iterated":
@@ -138,6 +142,7 @@ class BeamSearchAlgorithm:
                 path_device=path_device,
                 hashed_neigbourhood=hashed_neigbourhood,
                 history_depth=history_depth,
+                memory_cleanup=memory_cleanup,
                 verbose=verbose,
             )
         else:
@@ -153,6 +158,7 @@ class BeamSearchAlgorithm:
         return_path: bool = False,
         path_device: Union[str, torch.device] = "auto",
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
+        memory_cleanup: bool = False,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
 
@@ -209,7 +215,8 @@ class BeamSearchAlgorithm:
             ).to_device(path_device)
         else:
             bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
-        assert bfs_result_for_mitm.graph == graph.definition
+        if bfs_result_for_mitm.graph != graph.definition:
+            raise ValueError("Graph from bfs_result_for_mitm must be the same.")
         bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
         # Checks if any of `hashes` are in neighborhood of the central state.
@@ -267,6 +274,9 @@ class BeamSearchAlgorithm:
             if return_path:
                 restore_path_hashes.append(beam_hashes.to(path_device))
 
+            if memory_cleanup:
+                graph.free_memory()
+
         # Path not found.
         return BeamSearchResult(False, 0, None, debug_scores, graph.definition)
 
@@ -282,6 +292,7 @@ class BeamSearchAlgorithm:
         path_device: Union[str, torch.device] = "auto",
         history_depth: int = 0,
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
+        memory_cleanup: bool = False,
         verbose: int = 0,
     ) -> BeamSearchResult:
         """Advanced beam search using PyTorch with non-backtracking capabilities.
@@ -349,7 +360,8 @@ class BeamSearchAlgorithm:
             ).to_device(path_device)
         else:
             bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
-        assert bfs_result_for_mitm.graph == graph.definition
+        if bfs_result_for_mitm.graph != graph.definition:
+            raise ValueError("Graph from bfs_result_for_mitm must be the same.")
         bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
         # Initialize hash storage for non-backtracking.
@@ -455,6 +467,9 @@ class BeamSearchAlgorithm:
             if return_path:
                 restore_path_hashes.append(beam_hashes.to(path_device))
 
+            if memory_cleanup:
+                graph.free_memory()
+
             t_predict = time.time() - t_predict
 
             # Verbose output.
@@ -487,6 +502,7 @@ class BeamSearchAlgorithm:
         path_device: Union[str, torch.device] = "auto",
         history_depth: int = 0,
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
+        memory_cleanup: bool = False,
         verbose: int = 0,
     ) -> BeamSearchResult:
         """Advanced beam search using PyTorch with non-backtracking capabilities.
@@ -519,7 +535,8 @@ class BeamSearchAlgorithm:
         graph = self.graph
 
         # For now iterated beam search don't works with matrix groups.
-        assert graph.definition.is_permutation_group()
+        if not graph.definition.is_permutation_group():
+            raise ValueError("Iterated beam search actually realized only for Permutation Groups.")
 
         beam_width_part = beam_width // graph.definition.n_generators
 
@@ -565,7 +582,8 @@ class BeamSearchAlgorithm:
             ).to_device(path_device)
         else:
             bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
-        assert bfs_result_for_mitm.graph == graph.definition
+        if bfs_result_for_mitm.graph != graph.definition:
+            raise ValueError("Graph from bfs_result_for_mitm must be the same.")
         bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
         # Initialize hash storage for non-backtracking.
@@ -702,6 +720,9 @@ class BeamSearchAlgorithm:
 
             if return_path:
                 restore_path_hashes.append(beam_hashes.to(path_device))
+
+            if memory_cleanup:
+                graph.free_memory()
 
             # Verbose output.
             if verbose >= 10 and (i_step - 1) % 10 == 0:
