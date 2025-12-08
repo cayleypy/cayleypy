@@ -239,8 +239,11 @@ Our community has recently launched several Kaggle competitions to develop and b
 
 ## Credits
 
-The idea of the project - Alexander Chervov - see https://arxiv.org/abs/2502.18663, 
-https://arxiv.org/abs/2502.13266, discussion group https://t.me/sberlogasci/1,
+The idea of the project - Alexander Chervov - see 
+[arXiv:2502.18663](https://arxiv.org/abs/2502.18663), 
+[arXiv:2502.13266](https://arxiv.org/abs/2502.13266),
+[arxiv:2509.19162](https://arxiv.org/abs/2509.19162),
+discussion group https://t.me/sberlogasci/1,
 Early ideas and prototypes appeared during Kaggle challenge Santa 2023:
 Prototype: https://www.kaggle.com/code/alexandervc/santa23-globe26-modeling5,
 Description: https://www.kaggle.com/competitions/santa-2023/discussion/466399, 
