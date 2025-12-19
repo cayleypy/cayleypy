@@ -424,25 +424,25 @@ class BeamSearchAlgorithm:
             if history_depth > 0:
 
                 t1 = time.time()
-                mask_new = ~torch.isin(_new_hashes, nonbacktrack_hashes.view(-1), assume_unique=False)
-                t_isin += time.time() - t1
-                mask_new_sum = mask_new.sum().item()
+                mask_new = torch.ones_like(_new_hashes, dtype=torch.bool)
+                for j in range(nonbacktrack_hashes.shape[1]):
+                    mask_new *= ~torch.isin(_new_hashes, nonbacktrack_hashes[:, j], assume_unique=False)
 
-                if mask_new_sum > 0:
+                # Update hash storage.
+                i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
+                i_tmp = len(_new_hashes)
+                nonbacktrack_hashes[:i_tmp, i_cyclic_index_for_hash_storage] = _new_hashes
 
-                    # Update hash storage.
-                    i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
-                    i_tmp = len(_new_hashes)
-                    nonbacktrack_hashes[:i_tmp, i_cyclic_index_for_hash_storage] = _new_hashes
-
-                    # Filter by nonbacktrack.
+                if mask_new.sum().item() > 0:
                     _new_states = _new_states[mask_new, :]
                     _new_hashes = _new_hashes[mask_new]
 
-                else:
-                    if verbose >= 1:
-                        print(f"Cannot find new states at step {i_step}.")
-                    return BeamSearchResult(False, i_step, None, debug_scores, graph.definition)
+                t_isin += time.time() - t1
+
+            if _new_hashes.shape[0] == 0:
+                if verbose >= 1:
+                    print(f"Cannot find new states at step {i_step}.")
+                return BeamSearchResult(False, i_step, None, debug_scores, graph.definition)
 
             # Estimate states and select top beam_width ones.
             t_predict = time.time()
@@ -639,14 +639,11 @@ class BeamSearchAlgorithm:
 
                 # Skip already generated states instead of deduplication at the end.
                 if _chunk_idx > 0:
-                    mask_new = ~torch.isin(_new_hashes_chunk, accm_hashes.view(-1), assume_unique=False)
-                    mask_new_sum = mask_new.sum().item()
+                    mask_new = ~torch.isin(_new_hashes_chunk, accm_hashes, assume_unique=False)
 
-                    if mask_new_sum > 0:
+                    if mask_new.sum().item() > 0:
                         _new_states_chunk = _new_states_chunk[mask_new, :]
                         _new_hashes_chunk = _new_hashes_chunk[mask_new]
-                    else:
-                        continue
 
                 # Check if dest state is found.
                 bfs_layer_id = _check_path_found(_new_hashes_chunk.to(path_device), bfs_layers_hashes)
@@ -667,24 +664,23 @@ class BeamSearchAlgorithm:
 
                 # Non-backtracking: forbid visiting states visited before.
                 if history_depth > 0:
-
                     t1 = time.time()
-                    mask_new = ~torch.isin(_new_hashes_chunk, nonbacktrack_hashes.view(-1), assume_unique=False)
-                    t_isin += time.time() - t1
-                    mask_new_sum = mask_new.sum().item()
 
-                    if mask_new_sum > 0:
+                    mask_new = torch.ones_like(_new_hashes_chunk, dtype=torch.bool)
+                    for j in range(nonbacktrack_hashes.shape[1]):
+                        mask_new *= ~torch.isin(_new_hashes_chunk, nonbacktrack_hashes[:, j], assume_unique=False)
 
-                        # Update hash storage.
-                        nonbacktrack_hashes[i_tmp : i_tmp + len(_new_hashes_chunk), i_cyclic_index_for_hash_storage] = (
-                            _new_hashes_chunk
-                        )
-                        i_tmp += len(_new_hashes_chunk)
+                    # Update hash storage.
+                    nonbacktrack_hashes[i_tmp : i_tmp + len(_new_hashes_chunk), i_cyclic_index_for_hash_storage] = (
+                        _new_hashes_chunk
+                    )
+                    i_tmp += len(_new_hashes_chunk)
 
+                    if mask_new.sum().item() > 0:
                         _new_states_chunk = _new_states_chunk[mask_new, :]
                         _new_hashes_chunk = _new_hashes_chunk[mask_new]
-                    else:
-                        continue
+
+                    t_isin += time.time() - t1
 
                 # Estimate states and select top beam_width ones.
                 t1 = time.time()
