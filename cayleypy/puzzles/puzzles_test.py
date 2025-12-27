@@ -24,8 +24,8 @@ def test_mini_pyramorphix():
     assert set(graph.generator_names) == set(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
 
 
-def test_picture_puzzle333():
-    graph = Puzzles.picture_puzzle333()
+def test_picture_cube333():
+    graph = Puzzles.picture_cube333()
     assert graph.n_generators == len(PICTURE_CUBE_333_ALLOWED_MOVES)
     assert graph.generator_names == list(PICTURE_CUBE_333_ALLOWED_MOVES.keys())
     expected_generators = np.array([PICTURE_CUBE_333_ALLOWED_MOVES[k] for k in graph.generator_names])

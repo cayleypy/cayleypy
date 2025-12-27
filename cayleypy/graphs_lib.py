@@ -917,8 +917,8 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
         return Puzzles.rubik_cube(3, "HTM")
     elif name == "mini_pyramorphix":
         return Puzzles.mini_pyramorphix()
-    elif name == "picture_puzzle333":
-        return Puzzles.picture_puzzle333()
+    elif name == "picture_cube333":
+        return Puzzles.picture_cube333()
     elif name == "pyraminx":
         return Puzzles.pyraminx()
     elif name == "hungarian_rings":
