@@ -1,6 +1,6 @@
 import numpy as np
 
-from .moves import MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES, MEGAMINX_MOVES
+from .moves import PICTURE_CUBE_333_ALLOWED_MOVES, MINI_PYRAMORPHIX_ALLOWED_MOVES, PYRAMINX_MOVES, MEGAMINX_MOVES
 from .puzzles import Puzzles
 from ..cayley_graph import CayleyGraph
 from ..permutation_utils import is_permutation, inverse_permutation
@@ -22,6 +22,24 @@ def test_mini_pyramorphix():
         restored = [gen[i] for i in inverse]
         assert restored == list(range(24))
     assert set(graph.generator_names) == set(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
+
+
+def test_picture_cube333():
+    graph = Puzzles.picture_cube333()
+    assert graph.n_generators == len(PICTURE_CUBE_333_ALLOWED_MOVES)
+    assert graph.generator_names == list(PICTURE_CUBE_333_ALLOWED_MOVES.keys())
+    expected_generators = np.array([PICTURE_CUBE_333_ALLOWED_MOVES[k] for k in graph.generator_names])
+    assert np.array_equal(graph.generators, expected_generators)
+    for gen in graph.generators:
+        assert len(gen) == 72
+        assert is_permutation(gen)
+    identity = list(range(72))
+    assert any(gen != identity for gen in graph.generators)
+    for gen in graph.generators:
+        inverse = inverse_permutation(gen)
+        restored = [gen[i] for i in inverse]
+        assert restored == list(range(72))
+    assert set(graph.generator_names) == set(PICTURE_CUBE_333_ALLOWED_MOVES.keys())
 
 
 def test_pyraminx():
