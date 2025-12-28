@@ -525,8 +525,6 @@ class PermutationGroups:
     @staticmethod
     def lsl_cycles(n: int, add_inverses: bool = True) -> CayleyGraphDef:
         """
-        Construct the Cayley graph definition for the LSL cycles on the symmetric group S_n.
-
         The LSL Long and Sub-Long cycles, i.e. full cyclic shift and cyclic shift rotating only positions from the
         second to the last keeping first one stable. Respectively LSL+I - adding inverses
 
@@ -919,6 +917,8 @@ def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
         return Puzzles.rubik_cube(3, "HTM")
     elif name == "mini_pyramorphix":
         return Puzzles.mini_pyramorphix()
+    elif name == "picture_cube333":
+        return Puzzles.picture_cube333()
     elif name == "pyraminx":
         return Puzzles.pyraminx()
     elif name == "hungarian_rings":
