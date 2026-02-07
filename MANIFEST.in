@@ -1,0 +1,1 @@
+recursive-include cayleypy/cpp_algo *.cpp *.cc *.cxx *.hpp *.h *.cu *.cuh
