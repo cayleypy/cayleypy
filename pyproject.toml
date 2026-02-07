@@ -33,7 +33,7 @@ dependencies = [
 # pip install .[torch,lint,test,dev,docs]
 [project.optional-dependencies]
 lint = [
-    "black",
+    "black==25.1.0",
     "mypy==1.15.0",
     "pylint"
 ]
