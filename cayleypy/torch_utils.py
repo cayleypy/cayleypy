@@ -28,3 +28,16 @@ class TorchHashSet:
         for i in range(1, len(self.data)):
             mask &= ~isin_via_searchsorted(x, self.data[i])
         return mask
+
+
+def torch_sort(x: torch.Tensor) -> torch.Tensor:
+    """Sorts int32 1D tensor with fallback to cupy.sort if length of tensor is too large for torch."""
+    if x.shape[0] >= 2**31 and x.device.type == "cuda":
+        import cupy
+
+        x = x.contiguous()
+        cx = cupy.from_dlpack(torch.utils.dlpack.to_dlpack(x))
+        cx.sort(axis=-1)
+        return x
+    else:
+        return torch.sort(x)[0]
