@@ -12,7 +12,7 @@ from .bfs_result import BfsResult
 from .cayley_graph_def import AnyStateType, CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
 from .string_encoder import StringEncoder
-from .torch_utils import isin_via_searchsorted
+from .torch_utils import isin_via_searchsorted, torch_sort
 
 
 class CayleyGraph:
@@ -291,7 +291,7 @@ class CayleyGraph:
                     layer2_batches.append(layer2_batch)
                     layer2_hashes_batches.append(layer2_hashes_batch)
                 layer2_hashes = torch.hstack(layer2_hashes_batches)
-                layer2_hashes, _ = torch.sort(layer2_hashes)
+                layer2_hashes = torch_sort(layer2_hashes)
                 layer2 = layer2_hashes.reshape((-1, 1)) if self.hasher.is_identity else torch.vstack(layer2_batches)
             else:
                 layer1_neighbors = self.get_neighbors(layer1)
