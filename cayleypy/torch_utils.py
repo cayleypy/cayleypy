@@ -31,8 +31,8 @@ class TorchHashSet:
 
 
 def torch_sort(x: torch.Tensor) -> torch.Tensor:
-    """Sorts int32 1D tensor with fallback to cupy.sort if length of tensor is too large for torch."""
-    if x.shape[0] >= 2**31 and x.device.type == "cuda":
+    """Sorts int32 1D tensor. Uses in-place sort for CUDA (to save memory)."""
+    if x.device.type == "cuda":
         import cupy
 
         x = x.contiguous()
