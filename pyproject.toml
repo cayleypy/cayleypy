@@ -35,7 +35,8 @@ dependencies = [
 lint = [
     "black==25.1.0",
     "mypy==1.15.0",
-    "pylint"
+    "pylint",
+    "types-tqdm"
 ]
 test = [
     "pytest",
