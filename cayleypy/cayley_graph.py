@@ -56,6 +56,7 @@ class CayleyGraph:
         batch_size: int = 2**20,
         hash_chunk_size: int = 2**25,
         memory_limit_gb: float = 16,
+        num_gpus: int = 1,
         _hasher: Optional[StateHasher] = None,
         **unused_kwargs,
     ):
@@ -73,6 +74,8 @@ class CayleyGraph:
         :param memory_limit_gb: Approximate available memory, in GB.
                  It is safe to set this to less than available on your machine, it will just cause more frequent calls
                  to the "free memory" function.
+        :param num_gpus: Number of GPUs for distributing BFS computation.
+                 When >1, hash history is sharded across GPUs to reduce per-GPU memory.
         """
         self.definition = definition
         self.verbose = verbose
@@ -87,6 +90,15 @@ class CayleyGraph:
         self.device = torch.device(device)
         if verbose > 0:
             print(f"Using device: {self.device}.")
+
+        # Multi-GPU setup: secondary GPUs store shards of seen_states_hashes.
+        if num_gpus > 1 and self.device.type == "cuda":
+            available = torch.cuda.device_count()
+            self.num_gpus = min(num_gpus, available)
+            self.gpu_devices = [torch.device(f"cuda:{i}") for i in range(self.num_gpus)]
+        else:
+            self.num_gpus = 1
+            self.gpu_devices = [self.device]
 
         self.central_state = torch.as_tensor(definition.central_state, device=self.device, dtype=torch.int64)
         self.encoded_state_size: int = self.definition.state_size
@@ -112,6 +124,57 @@ class CayleyGraph:
         else:
             self.hasher = StateHasher(self, random_seed, chunk_size=hash_chunk_size)
         self.central_state_hash = self.hasher.make_hashes(self.encode_states(self.central_state))
+
+        # Replicate generator data on each GPU for distributed BFS.
+        if self.num_gpus > 1:
+            self._setup_multi_gpu()
+
+    def _setup_multi_gpu(self):
+        """Replicate generator data on each GPU for distributed BFS."""
+        self._gpu_permutations = {}
+        for dev in self.gpu_devices:
+            if self.definition.is_permutation_group():
+                self._gpu_permutations[dev] = self.permutations_torch.to(dev)
+
+    def _get_neighbors_on_device(self, states: torch.Tensor, dev: torch.device) -> torch.Tensor:
+        """Compute neighbors of `states` on the specified device."""
+        states_num = states.shape[0]
+        neighbors = torch.zeros(
+            (states_num * self.definition.n_generators, states.shape[1]),
+            dtype=torch.int64,
+            device=dev,
+        )
+        for i in range(self.definition.n_generators):
+            dst = neighbors[i * states_num : (i + 1) * states_num, :]
+            if self.definition.is_permutation_group():
+                if self.string_encoder is not None:
+                    self.encoded_generators[i](states, dst)
+                else:
+                    perms = self._gpu_permutations[dev]
+                    move = perms[i].reshape((1, -1)).expand(states_num, -1)
+                    dst[:, :] = torch.gather(states, 1, move)
+            else:
+                assert self.definition.is_matrix_group()
+                n, m = self.definition.decoded_state_shape
+                mx = self.definition.generators_matrices[i]
+                src_r = states.reshape((states_num, n, m))
+                dst[:, :] = mx.apply_batch_torch(src_r).reshape((states_num, n * m))
+        return neighbors
+
+    def _get_unique_states_on_device(
+        self, states: torch.Tensor, dev: torch.device
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+        """Removes duplicates from `states` on the given device, sorts by hash."""
+        if self.hasher.is_identity:
+            unique_hashes = torch.unique(states.reshape(-1), sorted=True)
+            return unique_hashes.reshape((-1, 1)), unique_hashes
+        hashes = self.hasher.make_hashes(states)
+        hashes_sorted, idx = torch.sort(hashes, stable=True)
+        mask = torch.ones(hashes_sorted.size(0), dtype=torch.bool, device=dev)
+        if hashes_sorted.size(0) > 1:
+            mask[1:] = hashes_sorted[1:] != hashes_sorted[:-1]
+        unique_idx = idx[mask]
+        return states[unique_idx], hashes[unique_idx]
 
     def get_unique_states(
         self, states: torch.Tensor, hashes: Optional[torch.Tensor] = None
@@ -201,6 +264,101 @@ class CayleyGraph:
         """Calculates neighbors in decoded (external) representation."""
         return self.decode_states(self.get_neighbors(self.encode_states(states)))
 
+    def _bfs_layer_distributed(
+        self,
+        layer1_parts: list[torch.Tensor],
+        seen_parts: list[list[torch.Tensor]],
+        accepted_parts: list[torch.Tensor],
+        streams: list[torch.cuda.Stream],
+    ) -> list[torch.Tensor]:
+        """Process one BFS layer with fully distributed computation across GPUs.
+
+        Each GPU owns hashes where hash % num_gpus == gpu_index.
+        All data (layer1, seen hashes, results) is partitioned accordingly.
+        No data is gathered onto a single GPU -- batching is done per-GPU from local parts.
+
+        :param layer1_parts: layer1_parts[g] is the partition of current layer on GPU g (sorted hashes).
+        :param seen_parts: seen_parts[g] is list of sorted tensors of previously seen hashes owned by GPU g.
+        :param accepted_parts: accumulated results for current layer, per GPU (from prior batch rounds).
+        :param streams: CUDA streams, one per GPU.
+        :return: new_layer_parts[g] -- the new states found in this layer, per GPU.
+        """
+        ng = self.num_gpus
+        is_id = self.hasher.is_identity
+
+        # Determine number of batches based on total layer size and batch_size.
+        total_size = sum(len(p) for p in layer1_parts)
+        num_batches = max(1, int(math.ceil(total_size / self.batch_size)))
+
+        # Split each GPU's partition into the same number of sub-batches.
+        per_gpu_batches = [list(layer1_parts[g].tensor_split(num_batches, dim=0)) for g in range(ng)]
+
+        for b in range(num_batches):
+            # Phase 1: Parallel neighbor gen + local dedup on each GPU.
+            phase1_results = [torch.empty(0, dtype=torch.int64, device=self.gpu_devices[g]) for g in range(ng)]
+            for g in range(ng):
+                chunk = per_gpu_batches[g][b]
+                dev = self.gpu_devices[g]
+                if len(chunk) == 0:
+                    continue
+                stream = streams[g]
+                with torch.cuda.stream(stream):
+                    if is_id:
+                        chunk = chunk.reshape(-1, 1)
+                    neighbors = self._get_neighbors_on_device(chunk, dev)
+                    _, unique_hashes = self._get_unique_states_on_device(neighbors, dev)
+                    del neighbors
+                    phase1_results[g] = unique_hashes
+            for g in range(ng):
+                streams[g].synchronize()
+
+            # Phase 2: Hash-partition redistribution (all-to-all).
+            send_bufs = [
+                [torch.empty(0, dtype=torch.int64, device=self.gpu_devices[t]) for t in range(ng)] for _ in range(ng)
+            ]
+            for g in range(ng):
+                hashes_g = phase1_results[g]
+                if len(hashes_g) == 0:
+                    continue
+                ownership = hashes_g % ng
+                for t in range(ng):
+                    mask = ownership == t
+                    selected = hashes_g[mask]
+                    send_bufs[g][t] = selected.to(self.gpu_devices[t], non_blocking=True)
+            torch.cuda.synchronize()
+
+            # Phase 3: Each GPU receives from all sources, deduplicates, filters.
+            for g in range(ng):
+                dev = self.gpu_devices[g]
+                stream = streams[g]
+                with torch.cuda.stream(stream):
+                    received = torch.cat([send_bufs[src][g] for src in range(ng)])
+                    if len(received) == 0:
+                        continue
+
+                    received = torch.unique(received, sorted=True)
+
+                    for sp in seen_parts[g]:
+                        if len(received) > 0 and len(sp) > 0:
+                            mask = ~isin_via_searchsorted(received, sp)
+                            received = received[mask]
+
+                    if len(accepted_parts[g]) > 0 and len(received) > 0:
+                        mask = ~isin_via_searchsorted(received, accepted_parts[g])
+                        received = received[mask]
+
+                    if len(received) > 0:
+                        if len(accepted_parts[g]) == 0:
+                            accepted_parts[g] = received
+                        else:
+                            merged = torch.cat([accepted_parts[g], received])
+                            accepted_parts[g], _ = torch.sort(merged)
+
+            for g in range(ng):
+                streams[g].synchronize()
+
+        return accepted_parts
+
     def bfs(
         self,
         *,
@@ -257,16 +415,63 @@ class CayleyGraph:
         # This algorithm finds neighbors in batches and removes duplicates from batches before stacking them.
         do_batching = not return_all_edges and not disable_batching
 
-        # Stores hashes of previous layers, so BFS does not visit already visited states again.
-        # If generators are inverse closed, only 2 last layers are stored here.
-        seen_states_hashes = [layer1_hashes]
+        # Fully distributed BFS: hash-partition ALL data across GPUs.
+        # seen_parts[g]: list of sorted tensors of hashes owned by GPU g (hash % num_gpus == g).
+        # layer1_parts[g]: partition of current layer on GPU g (sorted).
+        use_distributed = self.num_gpus > 1 and do_batching
+        ng = self.num_gpus
+        _dist_streams: list = []
+        if use_distributed:
+            _dist_streams = [torch.cuda.Stream(device=self.gpu_devices[g]) for g in range(ng)]
+            seen_parts: list[list[torch.Tensor]] = [[] for _ in range(ng)]
+            layer1_parts: list[torch.Tensor] = []
+            for g in range(ng):
+                dev = self.gpu_devices[g]
+                mask = (layer1_hashes % ng) == g
+                part = layer1_hashes[mask].to(dev)
+                part, _ = torch.sort(part)
+                seen_parts[g].append(part)
+                layer1_parts.append(part.clone())
+
+        # Stores hashes of previous layers (single-GPU / non-distributed path only).
+        seen_states_hashes = []
+        if not use_distributed:
+            seen_states_hashes = [layer1_hashes]
 
         # Returns mask where 0s are at positions in `current_layer_hashes` that were seen previously.
         def _remove_seen_states(current_layer_hashes: torch.Tensor) -> torch.Tensor:
+            if use_distributed:
+                return _remove_seen_states_distributed(current_layer_hashes)
             ans = ~isin_via_searchsorted(current_layer_hashes, seen_states_hashes[-1])
             for h in seen_states_hashes[:-1]:
                 ans &= ~isin_via_searchsorted(current_layer_hashes, h)
             return ans
+
+        def _remove_seen_states_distributed(current_layer_hashes: torch.Tensor) -> torch.Tensor:
+            """Filter against distributed seen_parts using parallel searchsorted."""
+            device_masks = []
+            for g in range(ng):
+                if not seen_parts[g]:
+                    continue
+                dev = self.gpu_devices[g]
+                stream = _dist_streams[g]
+                with torch.cuda.stream(stream):
+                    h_on_dev = current_layer_hashes.to(dev, non_blocking=True)
+                    dev_mask = torch.ones(len(h_on_dev), dtype=torch.bool, device=dev)
+                    for sp in seen_parts[g]:
+                        dev_mask &= ~isin_via_searchsorted(h_on_dev, sp)
+                    device_masks.append((g, dev_mask))
+            for g in range(ng):
+                _dist_streams[g].synchronize()
+
+            if not device_masks:
+                return torch.ones(len(current_layer_hashes), dtype=torch.bool, device=self.device)
+            result = device_masks[0][1]
+            if self.gpu_devices[device_masks[0][0]] != self.device:
+                result = result.to(self.device)
+            for g, dev_mask in device_masks[1:]:
+                result &= dev_mask.to(self.device)
+            return result
 
         # Applies the same mask to states and hashes.
         # If states and hashes are the same thing, it will not create a copy.
@@ -275,9 +480,100 @@ class CayleyGraph:
             new_hashes = self.hasher.make_hashes(new_states) if self.hasher.is_identity else hashes[mask]
             return new_states, new_hashes
 
+        # Helper to update seen_parts and layer1_parts from layer2_hashes in non-distributed iterations.
+        def _update_distributed_from_layer(layer2_hashes_: torch.Tensor):
+            for g in range(ng):
+                dev = self.gpu_devices[g]
+                mask = (layer2_hashes_ % ng) == g
+                part = layer2_hashes_[mask].to(dev)
+                part, _ = torch.sort(part)
+                layer1_parts[g] = part
+                if self.definition.generators_inverse_closed:
+                    seen_parts[g] = [part] if len(part) > 0 else []
+                else:
+                    if len(part) > 0:
+                        seen_parts[g].append(part)
+
+        # Shared end-of-iteration logic for non-distributed paths.
+        def _end_of_iteration_non_distributed(layer2_, layer2_hashes_):
+            nonlocal layer1, layer1_hashes
+            layer1 = layer2_
+            layer1_hashes = layer2_hashes_
+            if not use_distributed:
+                seen_states_hashes.append(layer2_hashes_)
+                if self.definition.generators_inverse_closed:
+                    seen_states_hashes[:] = seen_states_hashes[-2:]
+            else:
+                _update_distributed_from_layer(layer2_hashes_)
+
+        _dist_last_iteration = False  # Track if last iteration was distributed.
+
         # BFS iteration: layer2 := neighbors(layer1)-layer0-layer1.
         for i in range(1, max_diameter + 1):
-            if do_batching and len(layer1) > self.batch_size:
+            if use_distributed and sum(len(p) for p in layer1_parts) > self.batch_size:
+                # Fully distributed path: all data partitioned across GPUs.
+                _dist_last_iteration = True
+                accepted_parts = [torch.empty(0, dtype=torch.int64, device=self.gpu_devices[g]) for g in range(ng)]
+                accepted_parts = self._bfs_layer_distributed(
+                    layer1_parts,
+                    seen_parts,
+                    accepted_parts,
+                    _dist_streams,
+                )
+
+                # Compute total layer size (sum across GPUs, no data movement).
+                layer2_size = sum(len(accepted_parts[g]) for g in range(ng))
+
+                if return_all_hashes:
+                    all_layers_hashes.append(torch.cat([p.to(self.device) for p in layer1_parts]).sort()[0])
+                if layer2_size == 0:
+                    full_graph_explored = True
+                    break
+                if self.verbose >= 2:
+                    print(f"Layer {i}: {layer2_size} states.")
+                layer_sizes.append(layer2_size)
+
+                # Only gather layer2 on primary GPU when it's small enough to store.
+                if layer2_size <= max_layer_size_to_store:
+                    layer2_hashes = torch.cat([p.to(self.device) for p in accepted_parts])
+                    layer2_hashes, _ = torch.sort(layer2_hashes)
+                    layer2 = layer2_hashes.reshape((-1, 1))
+                    layers[i] = self.decode_states(layer2)
+
+                # Update distributed data structures for next iteration.
+                old_layer1_parts = layer1_parts
+                layer1_parts = accepted_parts
+
+                if self.definition.generators_inverse_closed:
+                    for g in range(ng):
+                        seen_parts[g] = []
+                        if len(old_layer1_parts[g]) > 0:
+                            seen_parts[g].append(old_layer1_parts[g])
+                        if len(accepted_parts[g]) > 0:
+                            seen_parts[g].append(accepted_parts[g])
+                else:
+                    for g in range(ng):
+                        if len(accepted_parts[g]) > 0:
+                            seen_parts[g].append(accepted_parts[g])
+
+                self.free_memory()
+
+                if layer2_size >= max_layer_size_to_explore:
+                    break
+                if stop_condition is not None:
+                    _sc_hashes = torch.cat([p.to(self.device) for p in layer1_parts]).sort()[0]
+                    _sc_states = _sc_hashes.reshape(-1, 1)
+                    _should_stop = stop_condition(_sc_states, _sc_hashes)
+                    del _sc_hashes, _sc_states
+                    if _should_stop:
+                        break
+
+            elif do_batching and len(layer1) > self.batch_size:
+                # Rebuild layer1 from distributed parts if transitioning from distributed.
+                if use_distributed and _dist_last_iteration:
+                    layer1_hashes = torch.cat([p.to(self.device) for p in layer1_parts]).sort()[0]
+                    layer1 = layer1_hashes.reshape(-1, 1)
+                _dist_last_iteration = False
                 num_batches = int(math.ceil(layer1_hashes.shape[0] / self.batch_size))
                 layer2_batches = []  # type: list[torch.Tensor]
                 layer2_hashes_batches = []  # type: list[torch.Tensor]
@@ -293,7 +589,30 @@ class CayleyGraph:
                 layer2_hashes = torch.hstack(layer2_hashes_batches)
                 layer2_hashes, _ = torch.sort(layer2_hashes)
                 layer2 = layer2_hashes.reshape((-1, 1)) if self.hasher.is_identity else torch.vstack(layer2_batches)
+
+                if layer2.shape[0] * layer2.shape[1] * 8 > 0.1 * self.memory_limit_bytes:
+                    self.free_memory()
+                if return_all_hashes:
+                    all_layers_hashes.append(layer1_hashes)
+                if len(layer2) == 0:
+                    full_graph_explored = True
+                    break
+                if self.verbose >= 2:
+                    print(f"Layer {i}: {len(layer2)} states.")
+                layer_sizes.append(len(layer2))
+                if len(layer2) <= max_layer_size_to_store:
+                    layers[i] = self.decode_states(layer2)
+
+                _end_of_iteration_non_distributed(layer2, layer2_hashes)
+                if len(layer2) >= max_layer_size_to_explore:
+                    break
+                if stop_condition is not None and stop_condition(layer2, layer2_hashes):
+                    break
             else:
+                if use_distributed and _dist_last_iteration:
+                    layer1_hashes = torch.cat([p.to(self.device) for p in layer1_parts]).sort()[0]
+                    layer1 = layer1_hashes.reshape(-1, 1)
+                _dist_last_iteration = False
                 layer1_neighbors = self.get_neighbors(layer1)
                 layer1_neighbors_hashes = self.hasher.make_hashes(layer1_neighbors)
                 if return_all_edges:
@@ -304,29 +623,29 @@ class CayleyGraph:
                 mask = _remove_seen_states(layer2_hashes)
                 layer2, layer2_hashes = _apply_mask(layer2, layer2_hashes, mask)
 
-            if layer2.shape[0] * layer2.shape[1] * 8 > 0.1 * self.memory_limit_bytes:
-                self.free_memory()
-            if return_all_hashes:
-                all_layers_hashes.append(layer1_hashes)
-            if len(layer2) == 0:
-                full_graph_explored = True
-                break
-            if self.verbose >= 2:
-                print(f"Layer {i}: {len(layer2)} states.")
-            layer_sizes.append(len(layer2))
-            if len(layer2) <= max_layer_size_to_store:
-                layers[i] = self.decode_states(layer2)
+                if layer2.shape[0] * layer2.shape[1] * 8 > 0.1 * self.memory_limit_bytes:
+                    self.free_memory()
+                if return_all_hashes:
+                    all_layers_hashes.append(layer1_hashes)
+                if len(layer2) == 0:
+                    full_graph_explored = True
+                    break
+                if self.verbose >= 2:
+                    print(f"Layer {i}: {len(layer2)} states.")
+                layer_sizes.append(len(layer2))
+                if len(layer2) <= max_layer_size_to_store:
+                    layers[i] = self.decode_states(layer2)
 
-            layer1 = layer2
-            layer1_hashes = layer2_hashes
-            seen_states_hashes.append(layer2_hashes)
-            if self.definition.generators_inverse_closed:
-                # Only keep hashes for last 2 layers.
-                seen_states_hashes = seen_states_hashes[-2:]
-            if len(layer2) >= max_layer_size_to_explore:
-                break
-            if stop_condition is not None and stop_condition(layer2, layer2_hashes):
-                break
+                _end_of_iteration_non_distributed(layer2, layer2_hashes)
+                if len(layer2) >= max_layer_size_to_explore:
+                    break
+                if stop_condition is not None and stop_condition(layer2, layer2_hashes):
+                    break
+
+        # For distributed path: reconstruct layer1/layer1_hashes on primary GPU if needed.
+        if use_distributed and _dist_last_iteration:
+            layer1_hashes = torch.cat([p.to(self.device) for p in layer1_parts]).sort()[0]
+            layer1 = layer1_hashes.reshape(-1, 1)
 
         if return_all_hashes and not full_graph_explored:
             all_layers_hashes.append(layer1_hashes)
@@ -440,7 +759,9 @@ class CayleyGraph:
             print("Freeing memory...")
         gc.collect()
         if self.device.type == "cuda":
-            torch.cuda.empty_cache()
+            for dev in self.gpu_devices:
+                with torch.cuda.device(dev):
+                    torch.cuda.empty_cache()
             gc.collect()
 
     @property
@@ -462,6 +783,7 @@ class CayleyGraph:
             new_def,
             _hasher=self.hasher,
             bit_encoding_width=self.bit_encoding_width,
+            num_gpus=self.num_gpus,
         )
         ans.hasher = self.hasher
         ans.string_encoder = self.string_encoder
