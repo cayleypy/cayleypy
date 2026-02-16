@@ -16,6 +16,18 @@ def test_adjacency_matrix():
     assert np.array_equal(adj_mx_1, adj_mx_2)
 
 
+def test_laplacian_matrix():
+    graph = CayleyGraph(PermutationGroups.lrx(4))
+    bfs_result = graph.bfs(return_all_edges=True, return_all_hashes=True)
+
+    lapl_mx_1 = bfs_result.laplacian_matrix()
+    lapl_mx_2 = graph.laplacian_matrix()
+    assert (lapl_mx_1 == lapl_mx_2).all()
+    assert lapl_mx_1.shape == (24, 24)
+    assert np.sum(lapl_mx_1) == 0
+    assert np.array_equal(lapl_mx_1, lapl_mx_1.T)
+
+
 def test_bfs_result_eq():
     graph_1 = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
     graph_2 = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
