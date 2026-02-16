@@ -2,6 +2,7 @@ from .beam_search import BeamSearchAlgorithm
 from .beam_search_result import BeamSearchResult
 from .bfs_algo import BfsAlgorithm
 from .bfs_bitmask import bfs_bitmask
+from .bfs_distributed import BfsDistributed
 from .bfs_mitm import MeetInTheMiddle
 from .bfs_numpy import bfs_numpy
 from .bfs_result import BfsResult

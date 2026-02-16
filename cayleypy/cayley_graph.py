@@ -1,14 +1,16 @@
 import gc
 import math
+import warnings
 from functools import cached_property
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 import torch
 
-from cayleypy.algo.bfs_result import BfsResult
 from .algo.beam_search import BeamSearchAlgorithm
 from .algo.bfs_algo import BfsAlgorithm
+from .algo.bfs_distributed import BfsDistributed
 from .algo.random_walks import RandomWalksGenerator
+from .bfs_result import BfsResult
 from .cayley_graph_def import AnyStateType, CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
 from .string_encoder import StringEncoder
@@ -16,34 +18,7 @@ from .torch_utils import isin_via_searchsorted
 
 
 class CayleyGraph:
-    """Represents a Schreier coset graph for some group.
-
-    In this graph:
-      * Vertices (aka "states") are integer vectors or matrices.
-      * There is an outgoing edge for every vertex A and every generator G.
-      * On the other end of this edge, there is a vertex G(A).
-
-    When `definition.generator_type` is `PERMUTATION`:
-      * The group is the group of permutations S_n.
-      * Generators are permutations of n elements.
-      * States are vectors of integers of size n.
-
-    When `definition.generator_type` is `MATRIX`:
-      * The group is the group of n*n integer matrices under multiplication (usual or modular)
-      * Technically, it's a group only when all generators are invertible, but we don't require this.
-      * Generators are n*n integer matrices.
-      * States are n*m integers matrices.
-
-    In general case, this graph is directed. However, in the case when set of generators is closed under inversion,
-    every edge has and edge in other direction, so the graph can be viewed as undirected.
-
-    The graph is fully defined by list of generators and one selected state called "central state". The graph contains
-    all vertices reachable from the central state. This definition is encapsulated in :class:`cayleypy.CayleyGraphDef`.
-
-    In the case when the central state is a permutation itself, and generators fully generate S_n, this is a Cayley
-    graph, hence the name. In more general case, elements can have less than n distinct values, and we call
-    the set of vertices "coset".
-    """
+    """Represents a Schreier coset graph for some group."""
 
     def __init__(
         self,
@@ -56,48 +31,35 @@ class CayleyGraph:
         batch_size: int = 2**20,
         hash_chunk_size: int = 2**25,
         memory_limit_gb: float = 16,
+        num_gpus: Optional[int] = None,
+        specific_devices: Optional[Sequence[Union[int, str, torch.device]]] = None,
         _hasher: Optional[StateHasher] = None,
         **unused_kwargs,
     ):
-        """Initializes CayleyGraph.
-
-        :param definition: definition of the graph (as CayleyPyDef).
-        :param device: one of ['auto','cpu','cuda'] - PyTorch device to store all tensors.
-        :param random_seed: random seed for deterministic hashing.
-        :param bit_encoding_width: how many bits (between 1 and 63) to use to encode one element in a state.
-                 If 'auto', optimal width will be picked.
-                 If None, elements will be encoded by int64 numbers.
-        :param verbose: Level of logging. 0 means no logging.
-        :param batch_size: Size of batch for batch processing.
-        :param hash_chunk_size: Size of chunk for hashing.
-        :param memory_limit_gb: Approximate available memory, in GB.
-                 It is safe to set this to less than available on your machine, it will just cause more frequent calls
-                 to the "free memory" function.
-        """
+        """Initializes CayleyGraph."""
         self.definition = definition
         self.verbose = verbose
         self.batch_size = batch_size
         self.memory_limit_bytes = int(memory_limit_gb * (2**30))
         self.bit_encoding_width = bit_encoding_width
+        self._device_arg = device
+        self._num_gpus_arg = num_gpus
+        self._specific_devices_arg = list(specific_devices) if specific_devices is not None else None
 
-        # Pick device. It will be used to store all tensors.
-        assert device in ["auto", "cpu", "cuda"]
-        if device == "auto":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = torch.device(device)
+        self.device, self.gpu_devices = self._resolve_devices(device, num_gpus, specific_devices)
+        self.num_gpus = len(self.gpu_devices)
         if verbose > 0:
             print(f"Using device: {self.device}.")
 
         self.central_state = torch.as_tensor(definition.central_state, device=self.device, dtype=torch.int64)
         self.encoded_state_size: int = self.definition.state_size
         self.string_encoder: Optional[StringEncoder] = None
+        self._device_permutations: dict[torch.device, torch.Tensor] = {}
 
         if definition.is_permutation_group():
             self.permutations_torch = torch.tensor(
                 definition.generators_permutations, dtype=torch.int64, device=self.device
             )
-
-            # Prepare encoder in case we want to encode states using few bits per element.
             if bit_encoding_width == "auto":
                 bit_encoding_width = int(math.ceil(math.log2(int(self.central_state.max()) + 1)))
             if bit_encoding_width is not None:
@@ -113,6 +75,79 @@ class CayleyGraph:
             self.hasher = StateHasher(self, random_seed, chunk_size=hash_chunk_size)
         self.central_state_hash = self.hasher.make_hashes(self.encode_states(self.central_state))
 
+    @staticmethod
+    def _normalize_cuda_device(device: Union[int, str, torch.device]) -> torch.device:
+        if isinstance(device, int):
+            return torch.device(f"cuda:{device}")
+        normalized = torch.device(device)
+        if normalized.type == "cuda" and normalized.index is None:
+            return torch.device("cuda:0")
+        return normalized
+
+    def _resolve_devices(
+        self,
+        device: str,
+        num_gpus: Optional[int],
+        specific_devices: Optional[Sequence[Union[int, str, torch.device]]],
+    ) -> tuple[torch.device, list[torch.device]]:
+        if specific_devices is not None:
+            resolved = [self._normalize_cuda_device(dev) for dev in specific_devices]
+            if not resolved:
+                raise ValueError("specific_devices must not be empty.")
+            if not torch.cuda.is_available():
+                raise ValueError("specific_devices requires CUDA, but CUDA is not available.")
+            available = torch.cuda.device_count()
+            for dev in resolved:
+                if dev.type != "cuda":
+                    raise ValueError("specific_devices must contain only CUDA devices.")
+                if dev.index is None or dev.index >= available:
+                    raise ValueError(f"CUDA device {dev} is not available.")
+            return resolved[0], resolved
+
+        if device == "gpu":
+            device = "cuda"
+        if device not in ["auto", "cpu", "cuda"]:
+            raise ValueError("device must be one of 'auto', 'cpu', 'cuda', or 'gpu'.")
+
+        if device == "cpu":
+            if num_gpus not in [None, 0, 1]:
+                raise ValueError("device='cpu' only supports num_gpus=None, 0, or 1.")
+            if num_gpus == 1:
+                warnings.warn("num_gpus=1 was provided with device='cpu'; using the CPU single-device path.")
+            return torch.device("cpu"), []
+
+        if device == "auto":
+            if num_gpus == 0:
+                return torch.device("cpu"), []
+            if not torch.cuda.is_available():
+                if num_gpus not in [None, 1]:
+                    raise ValueError("num_gpus was requested, but CUDA is not available.")
+                return torch.device("cpu"), []
+            device = "cuda"
+
+        if not torch.cuda.is_available():
+            raise ValueError("CUDA was requested, but CUDA is not available.")
+
+        available = torch.cuda.device_count()
+        if num_gpus is None:
+            resolved_num_gpus = available
+        else:
+            if num_gpus <= 0:
+                raise ValueError("num_gpus must be positive when CUDA is selected.")
+            if num_gpus > available:
+                raise ValueError(f"Requested {num_gpus} GPUs, but only {available} are available.")
+            resolved_num_gpus = num_gpus
+
+        gpu_devices = [torch.device(f"cuda:{i}") for i in range(resolved_num_gpus)]
+        return gpu_devices[0], gpu_devices
+
+    def _get_permutations_for_device(self, device: torch.device) -> torch.Tensor:
+        if device == self.permutations_torch.device:
+            return self.permutations_torch
+        if device not in self._device_permutations:
+            self._device_permutations[device] = self.permutations_torch.to(device)
+        return self._device_permutations[device]
+
     def get_unique_states(
         self, states: torch.Tensor, hashes: Optional[torch.Tensor] = None
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -123,12 +158,9 @@ class CayleyGraph:
         if hashes is None:
             hashes = self.hasher.make_hashes(states)
         hashes_sorted, idx = torch.sort(hashes, stable=True)
-
-        # Compute mask of first occurrences for each unique value.
-        mask = torch.ones(hashes_sorted.size(0), dtype=torch.bool, device=self.device)
+        mask = torch.ones(hashes_sorted.size(0), dtype=torch.bool, device=hashes_sorted.device)
         if hashes_sorted.size(0) > 1:
             mask[1:] = hashes_sorted[1:] != hashes_sorted[:-1]
-
         unique_idx = idx[mask]
         return states[unique_idx], hashes[unique_idx]
 
@@ -144,7 +176,6 @@ class CayleyGraph:
         """Converts states from internal to human-readable representation."""
         if self.definition.generators_type == GeneratorType.MATRIX:
             n, m = self.definition.decoded_state_shape
-            # Internally states are vectors, but mathematically they are n*m matrices.
             return states.reshape((-1, n, m))
         if self.string_encoder is not None:
             return self.string_encoder.decode(states)
@@ -157,7 +188,8 @@ class CayleyGraph:
             if self.string_encoder is not None:
                 self.encoded_generators[i](src, dst)
             else:
-                move = self.permutations_torch[i].reshape((1, -1)).expand(states_num, -1)
+                perms = self._get_permutations_for_device(src.device)
+                move = perms[i].reshape((1, -1)).expand(states_num, -1)
                 dst[:, :] = torch.gather(src, 1, move)
         else:
             assert self.definition.is_matrix_group()
@@ -167,12 +199,7 @@ class CayleyGraph:
             dst[:, :] = mx.apply_batch_torch(src).reshape((states_num, n * m))
 
     def apply_path(self, states: AnyStateType, generator_ids: list[int]) -> torch.Tensor:
-        """Applies multiple generators to given state(s) in order.
-
-        :param states: one or more states (as torch.Tensor) to which to apply the states.
-        :param generator_ids: Indexes of generators to apply.
-        :return: States after applying specified generators in order.
-        """
+        """Applies multiple generators to given state(s) in order."""
         states = self.encode_states(states)
         for gen_id in generator_ids:
             assert 0 <= gen_id < self.definition.n_generators
@@ -190,7 +217,9 @@ class CayleyGraph:
         """Calculates all neighbors of `states` (in internal representation)."""
         states_num = states.shape[0]
         neighbors = torch.zeros(
-            (states_num * self.definition.n_generators, states.shape[1]), dtype=torch.int64, device=self.device
+            (states_num * self.definition.n_generators, states.shape[1]),
+            dtype=torch.int64,
+            device=states.device,
         )
         for i in range(self.definition.n_generators):
             dst = neighbors[i * states_num : (i + 1) * states_num, :]
@@ -202,44 +231,26 @@ class CayleyGraph:
         return self.decode_states(self.get_neighbors(self.encode_states(states)))
 
     def bfs(self, **kwargs) -> BfsResult:
-        """Runs bread-first search (BFS) algorithm from given `start_states`.
-
-        See :class:`cayleypy.algo.BfsAlgorithm` for more details, including arguments description.
-        """
+        """Runs bread-first search (BFS) algorithm from given `start_states`."""
+        if self.num_gpus > 1:
+            return BfsDistributed.bfs(self, **kwargs)
         return BfsAlgorithm.bfs(self, **kwargs)
 
     def random_walks(self, **kwargs):
-        """Generates random walks on this graph.
-
-        See :class:`cayleypy.algo.RandomWalksGenerator` for more details.
-        """
+        """Generates random walks on this graph."""
         return RandomWalksGenerator(self).generate(**kwargs)
 
     def beam_search(self, **kwargs):
-        """Tries to find a path from `start_state` to central state using Beam Search algorithm.
-
-        See :class:`cayleypy.algo.BeamSearchAlgorithm` for more details.
-        """
+        """Tries to find a path from `start_state` to central state using Beam Search algorithm."""
         return BeamSearchAlgorithm(self).search(**kwargs)
 
     def restore_path(self, hashes: list[torch.Tensor], to_state: AnyStateType) -> list[int]:
-        """Restores path from layers hashes.
-
-        Layers must be such that there is edge from state on previous layer to state on next layer.
-        The end of the path is to_state.
-        Last layer in `hashes` must contain a state from which there is a transition to `to_state`.
-        `to_state` must be in "decoded" format.
-        Length of returned path is equal to number of layers.
-        """
+        """Restores path from layers hashes."""
         inv_graph = self.with_inverted_generators
-        path = []  # type: list[int]
+        path = []
         cur_state = self.decode_states(self.encode_states(to_state))
 
         for i in range(len(hashes) - 1, -1, -1):
-            # Find hash in hashes[i] from which we could go to cur_state.
-            # Corresponding state will be new_cur_state.
-            # The generator index in inv_graph that moves cur_state->new_cur_state is the same as generator index
-            # in this graph that moves new_cur_state->cur_state - this is what we append to the answer.
             candidates = inv_graph.get_neighbors_decoded(cur_state)
             candidates_hashes = self.hasher.make_hashes(self.encode_states(candidates))
             mask = torch.isin(candidates_hashes, hashes[i])
@@ -250,12 +261,7 @@ class CayleyGraph:
         return path[::-1]
 
     def find_path_to(self, end_state: AnyStateType, bfs_result: BfsResult) -> Optional[list[int]]:
-        """Finds path from central_state to end_state using pre-computed BfsResult.
-
-        :param end_state: Final state of the path.
-        :param bfs_result: Pre-computed BFS result (call `bfs(return_all_hashes=True)` to get this).
-        :return: The found path (list of generator ids), or None if `end_state` is not reachable from `start_state`.
-        """
+        """Finds path from central_state to end_state using pre-computed BfsResult."""
         assert bfs_result.graph == self.definition
         end_state_hash = self.hasher.make_hashes(self.encode_states(end_state))
         bfs_result.check_has_layer_hashes()
@@ -266,14 +272,7 @@ class CayleyGraph:
         return None
 
     def find_path_from(self, start_state: AnyStateType, bfs_result: BfsResult) -> Optional[list[int]]:
-        """Finds path from start_state to central_state using pre-computed BfsResult.
-
-        This is possible only for inverse-closed generators.
-
-        :param start_state: First state of the path.
-        :param bfs_result: Pre-computed BFS result (call `bfs(return_all_hashes=True)` to get this).
-        :return: The found path (list of generator ids), or None if central_state is not reachable from start_state.
-        """
+        """Finds path from start_state to central_state using pre-computed BfsResult."""
         assert self.definition.generators_inverse_closed
         path_to = self.find_path_to(start_state, bfs_result)
         if path_to is None:
@@ -289,9 +288,11 @@ class CayleyGraph:
         if self.verbose >= 1:
             print("Freeing memory...")
         gc.collect()
-        if self.device.type == "cuda":
-            torch.cuda.empty_cache()
-            gc.collect()
+        for dev in self.gpu_devices or [self.device]:
+            if dev.type == "cuda":
+                with torch.cuda.device(dev):
+                    torch.cuda.empty_cache()
+        gc.collect()
 
     @property
     def generators(self):
@@ -304,14 +305,14 @@ class CayleyGraph:
         return self.modified_copy(self.definition.with_inverted_generators())
 
     def modified_copy(self, new_def: CayleyGraphDef) -> "CayleyGraph":
-        """Makes a copy of this graph with different definition but other parameters unchanged.
-
-        The new graph will use the same encoding and hashing for states as the original.
-        """
+        """Makes a copy of this graph with different definition but other parameters unchanged."""
         ans = CayleyGraph(
             new_def,
+            device=self._device_arg,
             _hasher=self.hasher,
             bit_encoding_width=self.bit_encoding_width,
+            num_gpus=self._num_gpus_arg,
+            specific_devices=self._specific_devices_arg,
         )
         ans.hasher = self.hasher
         ans.string_encoder = self.string_encoder
