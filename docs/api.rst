@@ -15,7 +15,6 @@ Core classes and functions
     cayleypy.CayleyGraphDef
     cayleypy.CayleyGraph
     cayleypy.CayleyPath
-    cayleypy.BfsResult
     cayleypy.find_path
 
 Graphs library
@@ -45,13 +44,15 @@ Beam search and ML
     cayleypy.algo.RandomWalksGenerator
     cayleypy.models.ModelConfig
 
-Special algorithms
+BFS algorithm and its variations
 ''''''''''''''''''
 
 
 .. autosummary::
     :toctree: generated/
 
+    cayleypy.algo.Bfs
+    cayleypy.algo.BfsResult
     cayleypy.algo.bfs_bitmask
     cayleypy.algo.bfs_numpy
     cayleypy.algo.InteractiveBfs

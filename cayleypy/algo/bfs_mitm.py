@@ -5,8 +5,8 @@ from typing import Union, Optional
 import numpy as np
 import torch
 
+from .bfs_result import BfsResult
 from .interactive_bfs import InteractiveBfs
-from ..bfs_result import BfsResult
 from ..cayley_graph import CayleyGraph
 from ..cayley_graph_def import AnyStateType
 from ..cayley_path import CayleyPath
