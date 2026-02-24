@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from .beam_search_result import BeamSearchResult
-from ..bfs_result import BfsResult
+from .bfs_result import BfsResult
 from ..cayley_graph_def import AnyStateType
 from ..predictor import Predictor
 from ..torch_utils import isin_via_searchsorted

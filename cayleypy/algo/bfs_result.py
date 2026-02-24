@@ -8,7 +8,7 @@ import torch
 from scipy.sparse import coo_array
 
 from cayleypy.permutation_utils import apply_permutation
-from .cayley_graph_def import CayleyGraphDef
+from cayleypy.cayley_graph_def import CayleyGraphDef
 
 
 @dataclass(frozen=True)

@@ -4,7 +4,7 @@ import time
 from typing import Optional
 
 from .bfs_mitm import MeetInTheMiddle
-from ..bfs_result import BfsResult
+from .bfs_result import BfsResult
 from ..cayley_graph import CayleyGraph
 from ..cayley_graph_def import AnyStateType
 from ..models.models_lib import PREDICTOR_MODELS
