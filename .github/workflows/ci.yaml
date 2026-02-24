@@ -49,6 +49,21 @@ jobs:
         run: pip install .[test]
       - name: Run tests
         run: RUN_SLOW_TESTS=1 pytest
+  pytest-ubuntu-cpp:
+    name: Tests (Ubuntu)(3.13)(C++ extensions)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: 'x64'
+      - name: Install build requirements
+        run: pip install -r cpp_ext_build_requirements.txt
+      - name: Install requirements
+        run: CAYLEYPY_BUILD_CPP=1 pip install --no-build-isolation -e.[test]
+      - name: Run tests
+        run: RUN_CPP_TESTS=1 RUN_SLOW_TESTS=1 pytest
   pytest-windows:
     name: Tests (Windows)
     runs-on: windows-latest

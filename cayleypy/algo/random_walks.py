@@ -6,6 +6,9 @@ import numpy as np
 import torch
 
 from ..torch_utils import TorchHashSet
+from ..import_utils import import_cpp_extension
+
+random_walks_classic_cpp = import_cpp_extension("random_walks_classic_cpp")
 
 if TYPE_CHECKING:
     from ..cayley_graph import CayleyGraph
@@ -35,6 +38,7 @@ class RandomWalksGenerator:
         mode="classic",
         start_state: Union[None, torch.Tensor, np.ndarray, list] = None,
         nbt_history_depth: int = 0,
+        num_threads: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generates random walks on the graph.
 
@@ -62,22 +66,37 @@ class RandomWalksGenerator:
             trajectories know about each other and avoid visiting states visited by any trajectory. Additionally,
             1-neighbors of current states are also banned to improve mixing. The `nbt_history_depth` parameter
             controls how many previous levels to remember and ban.
+          * "classic_cpp" - similar to "classic", but implemented in C++ for better performance.
+            Supports parallel execution on CPU powered with openMP. Will be installed only if CayleyPy
+            cpp extensions are enabled during installation.
+
 
         :param width: Number of random walks to generate.
         :param length: Length of each random walk.
         :param start_state: State from which to start random walk. Defaults to the central state.
         :param mode: Type of random walk (see above). Defaults to "classic".
         :param nbt_history_depth: For "nbt" mode, how many previous levels to remember and ban from revisiting.
+        :param num_threads: For "classic_cpp" mode, number of threads to use. Defaults to 0 (no parallelization).
         :return: Pair of tensors ``x, y``. ``x`` contains states. ``y[i]`` is the estimated distance from start state
           to state ``x[i]``.
         """
-        start_state = self.graph.encode_states(start_state or self.graph.central_state)
+
+        if start_state is not None:
+            start_state = torch.as_tensor(start_state, device=self.graph.device)
+        else:
+            start_state = self.graph.central_state
+
+        if mode != "classic_cpp":
+            start_state = self.graph.encode_states(start_state)
+
         if mode == "classic":
             return self.random_walks_classic(width, length, start_state)
         elif mode == "bfs":
             return self.random_walks_bfs(width, length, start_state)
         elif mode == "nbt":
             return self.random_walks_nbt(width, length, start_state, nbt_history_depth)
+        elif mode == "classic_cpp":
+            return self.random_walks_classic_cpp(width, length, start_state, num_threads)
         else:
             raise ValueError("Unknown mode:", mode)
 
@@ -102,9 +121,10 @@ class RandomWalksGenerator:
         y[:width] = 0
 
         # Main loop.
+        gen_idx_all = torch.randint(0, graph.definition.n_generators, (width, length), device=graph.device)
         for i_step in range(1, length):
             y[i_step * width : (i_step + 1) * width] = i_step
-            gen_idx = torch.randint(0, graph.definition.n_generators, (width,), device=graph.device)
+            gen_idx = gen_idx_all[:, i_step]
             src = x[(i_step - 1) * width : i_step * width, :]
             dst = x[i_step * width : (i_step + 1) * width, :]
             for j in range(graph.definition.n_generators):
@@ -233,3 +253,21 @@ class RandomWalksGenerator:
                 vec_hashes_current[:, i_cyclic_index_for_hash_storage] = vec_hashes_new
 
         return graph.decode_states(states), y
+
+    def random_walks_classic_cpp(
+        self, width: int, length: int, start_state: torch.Tensor, num_threads: int = 0
+    ) -> tuple[torch.Tensor, torch.Tensor]:
+
+        if random_walks_classic_cpp is None:
+            raise ImportError("random_walks_classic_cpp C++ extension is not available.")
+
+        # pylint: disable=E0606
+        rw_result = random_walks_classic_cpp(
+            torch.tensor(self.graph.generators).cpu(), start_state.cpu(), width, length, num_threads
+        )
+        # pylint: enable=E0606
+
+        # Permuting and flattening to match other modes output format
+        x = rw_result.states.to(self.graph.device).permute(1, 0, 2).flatten(0, 1).contiguous()
+        y = rw_result.distances.to(self.graph.device).permute(1, 0).flatten(0, 1).contiguous()
+        return x, y

@@ -9,6 +9,7 @@ htmlcov/
 .venv/
 venv/
 dist/
+*.so
 
 # Sphinx
 docs/_build
