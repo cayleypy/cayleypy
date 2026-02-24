@@ -45,13 +45,13 @@ Beam search and ML
     cayleypy.models.ModelConfig
 
 BFS algorithm and its variations
-''''''''''''''''''
+''''''''''''''''''''''''''''''''
 
 
 .. autosummary::
     :toctree: generated/
 
-    cayleypy.algo.Bfs
+    cayleypy.algo.BfsAlgorithm
     cayleypy.algo.BfsResult
     cayleypy.algo.bfs_bitmask
     cayleypy.algo.bfs_numpy
