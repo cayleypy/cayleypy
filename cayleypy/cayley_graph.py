@@ -1,5 +1,6 @@
 import gc
 import math
+import warnings
 from functools import cached_property
 from typing import Optional, Sequence, Union
 
@@ -111,6 +112,8 @@ class CayleyGraph:
         if device == "cpu":
             if num_gpus not in [None, 0, 1]:
                 raise ValueError("device='cpu' only supports num_gpus=None, 0, or 1.")
+            if num_gpus == 1:
+                warnings.warn("num_gpus=1 was provided with device='cpu'; using the CPU single-device path.")
             return torch.device("cpu"), []
 
         if device == "auto":
