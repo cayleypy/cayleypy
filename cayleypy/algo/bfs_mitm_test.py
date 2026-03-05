@@ -64,7 +64,7 @@ def test_mitm_lx10():
     path = MeetInTheMiddle.find_path_to(graph, dest_state, br17)
     assert path is not None
     assert len(path) == 36
-    assert torch.equal(graph.apply_path(graph.central_state, path)[0], dest_state)
+    assert torch.equal(graph.apply_path(graph.central_state, path)[0].cpu(), dest_state)
 
     path2 = MeetInTheMiddle.find_path_between(graph, graph.central_state, dest_state).edges
     assert len(path2) == 36
