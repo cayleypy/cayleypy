@@ -447,7 +447,7 @@ def test_modified_copy_preserves_hasher_and_encoder():
     assert new_graph.hasher is graph.hasher
     assert new_graph.string_encoder is graph.string_encoder
 
-    assert torch.equal(new_graph.central_state, torch.tensor([0, 1, 2, 1, 0]))
+    assert torch.equal(new_graph.central_state.cpu(), torch.tensor([0, 1, 2, 1, 0]))
     assert not torch.equal(new_graph.central_state, graph.central_state)
 
 
