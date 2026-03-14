@@ -10,7 +10,7 @@ from .algo.beam_search import BeamSearchAlgorithm
 from .algo.bfs_algo import BfsAlgorithm
 from .algo.bfs_distributed import BfsDistributed
 from .algo.random_walks import RandomWalksGenerator
-from .bfs_result import BfsResult
+from .algo.bfs_result import BfsResult
 from .cayley_graph_def import AnyStateType, CayleyGraphDef, GeneratorType
 from .hasher import StateHasher
 from .string_encoder import StringEncoder

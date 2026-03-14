@@ -4,7 +4,7 @@ from typing import Callable, Optional, TYPE_CHECKING, Union
 import numpy as np
 import torch
 
-from ..bfs_result import BfsResult
+from .bfs_result import BfsResult
 from ..torch_utils import isin_via_searchsorted
 from .bfs_algo import BfsAlgorithm
 
