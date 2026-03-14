@@ -214,9 +214,6 @@ class CayleyGraph:
         return_all_edges = kwargs.get("return_all_edges", False)
         disable_batching = kwargs.get("disable_batching", False)
         if self.num_gpus > 1 and not (return_all_edges or disable_batching):
-            kwargs = dict(kwargs)
-            kwargs.pop("return_all_edges", None)
-            kwargs.pop("disable_batching", None)
             return BfsDistributed.bfs(self, **kwargs)
         return BfsAlgorithm.bfs(self, **kwargs)
 

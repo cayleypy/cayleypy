@@ -192,6 +192,7 @@ class BfsDistributed:
         max_diameter: int = 1000000,
         return_all_hashes: bool = False,
         stop_condition: Optional[Callable[[torch.Tensor, torch.Tensor], bool]] = None,
+        **kwargs,
     ) -> BfsResult:
         """Runs breadth-first search (BFS) algorithm from given ``start_states``.
 
