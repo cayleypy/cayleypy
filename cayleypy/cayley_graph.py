@@ -188,6 +188,7 @@ class CayleyGraph:
             self.permutations_torch = CachedTensor(
                 torch.tensor(definition.generators_permutations, dtype=torch.int64, device=self.device)
             )
+            # Prepare encoder in case we want to encode states using few bits per element.
             if bit_encoding_width == "auto":
                 bit_encoding_width = int(math.ceil(math.log2(int(self.central_state.max()) + 1)))
             if bit_encoding_width is not None:
@@ -213,6 +214,7 @@ class CayleyGraph:
         if hashes is None:
             hashes = self.hasher.make_hashes(states)
         hashes_sorted, idx = torch.sort(hashes, stable=True)
+        # Compute mask of first occurrences for each unique value.
         mask = torch.ones(hashes_sorted.size(0), dtype=torch.bool, device=hashes_sorted.device)
         if hashes_sorted.size(0) > 1:
             mask[1:] = hashes_sorted[1:] != hashes_sorted[:-1]
@@ -231,6 +233,7 @@ class CayleyGraph:
         """Converts states from internal to human-readable representation."""
         if self.definition.generators_type == GeneratorType.MATRIX:
             n, m = self.definition.decoded_state_shape
+            # Internally states are vectors, but mathematically they are n*m matrices.
             return states.reshape((-1, n, m))
         if self.string_encoder is not None:
             return self.string_encoder.decode(states)
@@ -333,6 +336,10 @@ class CayleyGraph:
         cur_state = self.decode_states(self.encode_states(to_state))
 
         for i in range(len(hashes) - 1, -1, -1):
+            # Find hash in hashes[i] from which we could go to cur_state.
+            # Corresponding state will be new_cur_state.
+            # The generator index in inv_graph that moves cur_state->new_cur_state is the same as generator index
+            # in this graph that moves new_cur_state->cur_state - this is what we append to the answer.
             candidates = inv_graph.get_neighbors_decoded(cur_state)
             candidates_hashes = self.hasher.make_hashes(self.encode_states(candidates))
             mask = torch.isin(candidates_hashes, hashes[i])
