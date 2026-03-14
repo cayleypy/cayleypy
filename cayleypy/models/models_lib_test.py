@@ -11,5 +11,5 @@ def test_loads_predictor_models():
         graph_def = prepare_graph(graph_name)
         graph = CayleyGraph(graph_def)
         predictor = Predictor.pretrained(graph)
-        ans = predictor(torch.tensor(graph_def.central_state).reshape((1, -1)))
+        ans = predictor(torch.tensor(graph_def.central_state, device=graph.device).reshape((1, -1)))
         assert ans.shape == (1,)

@@ -225,7 +225,7 @@ def test_random_walks_matrix_group():
     x, y = graph.random_walks(width=20, length=10)
     assert x.shape == (200, 3, 3)
     assert y.shape == (200,)
-    assert np.array_equal(y, [i for i in range(10) for _ in range(20)])
+    assert np.array_equal(y.cpu().numpy(), [i for i in range(10) for _ in range(20)])
 
 
 def test_random_walks_start_state():
@@ -272,7 +272,7 @@ def test_path_to_from():
         path1 = graph.find_path_from(start_state, br)
         assert torch.equal(graph.apply_path(start_state, path1)[0], graph.central_state)
         path2 = graph.find_path_to(start_state, br)
-        assert torch.equal(start_state, graph.apply_path(graph.central_state, path2)[0])
+        assert torch.equal(start_state, graph.apply_path(graph.central_state, path2)[0].cpu())
 
 
 # Below is the benchmark code. To run: `BENCHMARK=1 pytest . -k benchmark`
@@ -310,7 +310,7 @@ def test_modified_copy_preserves_hasher_and_encoder():
     assert new_graph.hasher is graph.hasher
     assert new_graph.string_encoder is graph.string_encoder
 
-    assert torch.equal(new_graph.central_state, torch.tensor([0, 1, 2, 1, 0]))
+    assert torch.equal(new_graph.central_state.cpu(), torch.tensor([0, 1, 2, 1, 0]))
     assert not torch.equal(new_graph.central_state, graph.central_state)
 
 
