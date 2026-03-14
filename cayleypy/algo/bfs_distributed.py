@@ -191,23 +191,35 @@ class BfsDistributed:
         max_layer_size_to_store: Optional[int] = 1000,
         max_layer_size_to_explore: int = 10**12,
         max_diameter: int = 1000000,
-        return_all_edges: bool = False,
         return_all_hashes: bool = False,
         stop_condition: Optional[Callable[[torch.Tensor, torch.Tensor], bool]] = None,
-        disable_batching: bool = False,
     ) -> BfsResult:
-        if return_all_edges or disable_batching:
-            return BfsAlgorithm.bfs(
-                graph,
-                start_states=start_states,
-                max_layer_size_to_store=max_layer_size_to_store,
-                max_layer_size_to_explore=max_layer_size_to_explore,
-                max_diameter=max_diameter,
-                return_all_edges=return_all_edges,
-                return_all_hashes=return_all_hashes,
-                stop_condition=stop_condition,
-                disable_batching=disable_batching,
-            )
+        """Runs breadth-first search (BFS) algorithm from given ``start_states``.
+
+        BFS visits all vertices of the graph in layers, where next layer contains vertices adjacent to previous layer
+        that were not visited before. This distributed version shards the frontier and seen-state ownership across
+        GPUs by hash.
+
+        Depending on parameters below, it can be used to:
+          * Get growth function (number of vertices at each BFS layer).
+          * Get vertices at some first and last layers.
+          * Get all vertices.
+
+        :param graph: CayleyGraph object on which to run BFS.
+        :param start_states: states on 0-th layer of BFS. Defaults to destination state of the graph.
+        :param max_layer_size_to_store: maximal size of layer to store.
+               If None, all layers will be stored.
+               Defaults to 1000.
+               First and last layers are always stored.
+        :param max_layer_size_to_explore: if reaches layer of larger size, will stop the BFS.
+        :param max_diameter: maximal number of BFS iterations.
+        :param return_all_hashes: whether to return hashes for all vertices (uses more memory).
+        :param stop_condition: function to be called after each iteration. It takes 2 tensors: latest computed layer
+            and its hashes, and returns whether BFS must immediately terminate. If it returns True, the layer that was
+            passed to the function will be the last returned layer in the result. This function can also be used as a
+            "hook" to do some computations after BFS iteration (in which case it must always return False).
+        :return: BfsResult object with requested BFS results.
+        """
 
         if start_states is None:
             start_states = graph.central_state
@@ -291,18 +303,12 @@ class BfsDistributed:
         if return_all_hashes and not full_graph_explored:
             all_layers_hashes.append(layer1_hashes)
 
-        if not full_graph_explored and graph.verbose > 0:
-            print("BFS stopped before graph was fully explored.")
-
-        last_layer_id = len(layer_sizes) - 1
-        if full_graph_explored and last_layer_id not in layers:
-            layers[last_layer_id] = graph.decode_states(layer1)
-
-        return BfsResult(
+        return BfsAlgorithm._build_result(
+            graph,
             layer_sizes=layer_sizes,
             layers=layers,
             bfs_completed=full_graph_explored,
             layers_hashes=all_layers_hashes,
+            last_layer=layer1,
             edges_list_hashes=None,
-            graph=graph.definition,
         )

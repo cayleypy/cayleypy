@@ -4,6 +4,8 @@ from typing import Callable, Optional, TYPE_CHECKING
 
 import torch
 
+from .torch_utils import CachedTensor
+
 if TYPE_CHECKING:
     from cayleypy import CayleyGraph
 
@@ -39,27 +41,20 @@ class StateHasher:
             return
 
         torch.manual_seed(self.seed)
-        self.vec_hasher = torch.randint(
-            -MAX_INT, MAX_INT, size=(self.state_size, 1), device=graph.device, dtype=torch.int64
+        self.vec_hasher = CachedTensor(
+            torch.randint(-MAX_INT, MAX_INT, size=(self.state_size, 1), device=graph.device, dtype=torch.int64)
         )
-        self._vec_hasher_cache = {graph.device: self.vec_hasher}
 
         try:
             trial_states = torch.zeros((2, self.state_size), device=graph.device, dtype=torch.int64)
             _ = self._make_hashes_cpu_and_modern_gpu(trial_states)
             self.make_hashes = self._make_hashes_cpu_and_modern_gpu
         except RuntimeError:
-            self.vec_hasher = self.vec_hasher.reshape((self.state_size,))
-            self._vec_hasher_cache = {graph.device: self.vec_hasher}
+            self.vec_hasher = CachedTensor(self.vec_hasher.to(graph.device).reshape((self.state_size,)))
             self.make_hashes = self._make_hashes_older_gpu
 
-    def _get_vec_hasher(self, device: torch.device) -> torch.Tensor:
-        if device not in self._vec_hasher_cache:
-            self._vec_hasher_cache[device] = self.vec_hasher.to(device)
-        return self._vec_hasher_cache[device]
-
     def _make_hashes_cpu_and_modern_gpu(self, states: torch.Tensor) -> torch.Tensor:
-        vec_hasher = self._get_vec_hasher(states.device)
+        vec_hasher = self.vec_hasher.to(states.device)
         if states.shape[0] <= self.chunk_size:
             return (states @ vec_hasher).reshape(-1)
         else:
@@ -67,7 +62,7 @@ class StateHasher:
             return torch.vstack([z @ vec_hasher for z in torch.tensor_split(states, parts)]).reshape(-1)
 
     def _make_hashes_older_gpu(self, states: torch.Tensor) -> torch.Tensor:
-        vec_hasher = self._get_vec_hasher(states.device)
+        vec_hasher = self.vec_hasher.to(states.device)
         if states.shape[0] <= self.chunk_size:
             return torch.sum(states * vec_hasher, dim=1)
         else:

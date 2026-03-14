@@ -15,6 +15,33 @@ class BfsAlgorithm:
     """Basic version of the bread-first search (BFS) algorithm."""
 
     @staticmethod
+    def _build_result(
+        graph: "CayleyGraph",
+        *,
+        layer_sizes: list[int],
+        layers: dict[int, torch.Tensor],
+        bfs_completed: bool,
+        layers_hashes: list[torch.Tensor],
+        last_layer: torch.Tensor,
+        edges_list_hashes: Optional[torch.Tensor],
+    ) -> BfsResult:
+        if not bfs_completed and graph.verbose > 0:
+            print("BFS stopped before graph was fully explored.")
+
+        last_layer_id = len(layer_sizes) - 1
+        if bfs_completed and last_layer_id not in layers:
+            layers[last_layer_id] = graph.decode_states(last_layer)
+
+        return BfsResult(
+            layer_sizes=layer_sizes,
+            layers=layers,
+            bfs_completed=bfs_completed,
+            layers_hashes=layers_hashes,
+            edges_list_hashes=edges_list_hashes,
+            graph=graph.definition,
+        )
+
+    @staticmethod
     def bfs(
         graph: "CayleyGraph",
         *,
@@ -146,9 +173,6 @@ class BfsAlgorithm:
         if return_all_hashes and not full_graph_explored:
             all_layers_hashes.append(layer1_hashes)
 
-        if not full_graph_explored and graph.verbose > 0:
-            print("BFS stopped before graph was fully explored.")
-
         edges_list_hashes: Optional[torch.Tensor] = None
         if return_all_edges:
             if not full_graph_explored:
@@ -159,16 +183,12 @@ class BfsAlgorithm:
                 edges_list_ends.append(v1)
             edges_list_hashes = torch.vstack([torch.hstack(edges_list_starts), torch.hstack(edges_list_ends)]).T
 
-        # Always store the last layer.
-        last_layer_id = len(layer_sizes) - 1
-        if full_graph_explored and last_layer_id not in layers:
-            layers[last_layer_id] = graph.decode_states(layer1)
-
-        return BfsResult(
+        return BfsAlgorithm._build_result(
+            graph,
             layer_sizes=layer_sizes,
             layers=layers,
             bfs_completed=full_graph_explored,
             layers_hashes=all_layers_hashes,
+            last_layer=layer1,
             edges_list_hashes=edges_list_hashes,
-            graph=graph.definition,
         )
