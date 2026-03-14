@@ -1,7 +1,5 @@
 import gc
 import math
-import warnings
-from dataclasses import dataclass
 from functools import cached_property
 from typing import Optional, Sequence, Union
 
@@ -13,97 +11,10 @@ from .algo.bfs_distributed import BfsDistributed
 from .algo.random_walks import RandomWalksGenerator
 from .algo.bfs_result import BfsResult
 from .cayley_graph_def import AnyStateType, CayleyGraphDef, GeneratorType
+from .device_config import DeviceConfig
 from .hasher import StateHasher
 from .string_encoder import StringEncoder
 from .torch_utils import CachedTensor, isin_via_searchsorted
-
-
-@dataclass(frozen=True)
-class DeviceConfig:
-    """Normalized device configuration for CayleyGraph."""
-
-    devices: tuple[torch.device, ...]
-
-    def __init__(
-        self,
-        device: str = "auto",
-        num_gpus: Optional[int] = None,
-        specific_devices: Optional[Sequence[Union[int, str, torch.device]]] = None,
-    ):
-        object.__setattr__(self, "devices", self._resolve_devices(device, num_gpus, specific_devices))
-
-    @property
-    def device(self) -> torch.device:
-        return self.devices[0]
-
-    @property
-    def gpu_devices(self) -> list[torch.device]:
-        return [device for device in self.devices if device.type == "cuda"]
-
-    @staticmethod
-    def _normalize_cuda_device(device: Union[int, str, torch.device]) -> torch.device:
-        if isinstance(device, int):
-            return torch.device(f"cuda:{device}")
-        normalized = torch.device(device)
-        if normalized.type == "cuda" and normalized.index is None:
-            return torch.device("cuda:0")
-        return normalized
-
-    @staticmethod
-    def _resolve_devices(
-        device: str,
-        num_gpus: Optional[int],
-        specific_devices: Optional[Sequence[Union[int, str, torch.device]]],
-    ) -> tuple[torch.device, ...]:
-        if specific_devices is not None:
-            resolved = tuple(DeviceConfig._normalize_cuda_device(dev) for dev in specific_devices)
-            if not resolved:
-                raise ValueError("specific_devices must not be empty.")
-            if not torch.cuda.is_available():
-                raise ValueError("specific_devices requires CUDA, but CUDA is not available.")
-            available = torch.cuda.device_count()
-            for cuda_device in resolved:
-                if cuda_device.type != "cuda":
-                    raise ValueError("specific_devices must contain only CUDA devices.")
-                if cuda_device.index is None or cuda_device.index >= available:
-                    raise ValueError(f"CUDA device {cuda_device} is not available.")
-            return resolved
-
-        if device == "gpu":
-            device = "cuda"
-        if device not in ["auto", "cpu", "cuda"]:
-            raise ValueError("device must be one of 'auto', 'cpu', 'cuda', or 'gpu'.")
-
-        if device == "cpu":
-            if num_gpus not in [None, 0, 1]:
-                raise ValueError("device='cpu' only supports num_gpus=None, 0, or 1.")
-            if num_gpus == 1:
-                warnings.warn("num_gpus=1 was provided with device='cpu'; using the CPU single-device path.")
-            return (torch.device("cpu"),)
-
-        if device == "auto":
-            if num_gpus == 0:
-                return (torch.device("cpu"),)
-            if not torch.cuda.is_available():
-                if num_gpus not in [None, 1]:
-                    raise ValueError("num_gpus was requested, but CUDA is not available.")
-                return (torch.device("cpu"),)
-            device = "cuda"
-
-        if not torch.cuda.is_available():
-            raise ValueError("CUDA was requested, but CUDA is not available.")
-
-        available = torch.cuda.device_count()
-        if num_gpus is None:
-            resolved_num_gpus = available
-        else:
-            if num_gpus <= 0:
-                raise ValueError("num_gpus must be positive when CUDA is selected.")
-            if num_gpus > available:
-                raise ValueError(f"Requested {num_gpus} GPUs, but only {available} are available.")
-            resolved_num_gpus = num_gpus
-
-        return tuple(torch.device(f"cuda:{i}") for i in range(resolved_num_gpus))
 
 
 class CayleyGraph:
@@ -167,16 +78,18 @@ class CayleyGraph:
         :param memory_limit_gb: Approximate available memory, in GB.
                  It is safe to set this to less than available on your machine, it will just cause more frequent calls
                  to the "free memory" function.
+        :param num_gpus: Number of GPUs to use when CUDA is selected.
+                 If None, all available GPUs are used.
+        :param specific_devices: Specific CUDA devices to use. If provided, overrides `device` and `num_gpus`.
+        :param device_config: Pre-normalized device configuration. If provided, overrides `device`, `num_gpus`,
+                 and `specific_devices`.
         """
         self.definition = definition
         self.verbose = verbose
         self.batch_size = batch_size
         self.memory_limit_bytes = int(memory_limit_gb * (2**30))
         self.bit_encoding_width = bit_encoding_width
-        self.device_config = device_config or DeviceConfig(device, num_gpus, specific_devices)
-        self.device = self.device_config.device
-        self.gpu_devices = self.device_config.gpu_devices
-        self.num_gpus = len(self.gpu_devices)
+        self.device_config = device_config or DeviceConfig.create(device, num_gpus, specific_devices)
         if verbose > 0:
             print(f"Using device: {self.device}.")
 
@@ -294,10 +207,9 @@ class CayleyGraph:
         return self.decode_states(self.get_neighbors(self.encode_states(states)))
 
     def bfs(self, **kwargs) -> BfsResult:
-        """Runs bread-first search (BFS) algorithm from given `start_states`.
+        """Runs breadth-first search (BFS) algorithm from given `start_states`.
 
-        See :class:`cayleypy.algo.BfsAlgorithm` and :class:`cayleypy.algo.BfsDistributed`
-        for more details, including arguments description.
+        See :class:`cayleypy.algo.BfsAlgorithm` for more details, including arguments description.
         """
         return_all_edges = kwargs.get("return_all_edges", False)
         disable_batching = kwargs.get("disable_batching", False)
@@ -389,11 +301,22 @@ class CayleyGraph:
         if self.verbose >= 1:
             print("Freeing memory...")
         gc.collect()
-        for dev in self.gpu_devices or [self.device]:
-            if dev.type == "cuda":
-                with torch.cuda.device(dev):
-                    torch.cuda.empty_cache()
+        for dev in self.gpu_devices:
+            with torch.cuda.device(dev):
+                torch.cuda.empty_cache()
         gc.collect()
+
+    @property
+    def device(self) -> torch.device:
+        return self.device_config.device
+
+    @property
+    def gpu_devices(self) -> tuple[torch.device, ...]:
+        return self.device_config.gpu_devices
+
+    @property
+    def num_gpus(self) -> int:
+        return self.device_config.num_gpus
 
     @property
     def generators(self):

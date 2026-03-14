@@ -6,7 +6,6 @@ import torch
 
 from .bfs_result import BfsResult
 from ..torch_utils import isin_via_searchsorted
-from .bfs_algo import BfsAlgorithm
 
 if TYPE_CHECKING:
     from ..cayley_graph import CayleyGraph
@@ -303,12 +302,18 @@ class BfsDistributed:
         if return_all_hashes and not full_graph_explored:
             all_layers_hashes.append(layer1_hashes)
 
-        return BfsAlgorithm._build_result(
-            graph,
+        if not full_graph_explored and graph.verbose > 0:
+            print("BFS stopped before graph was fully explored.")
+
+        last_layer_id = len(layer_sizes) - 1
+        if full_graph_explored and last_layer_id not in layers:
+            layers[last_layer_id] = graph.decode_states(layer1)
+
+        return BfsResult(
             layer_sizes=layer_sizes,
             layers=layers,
             bfs_completed=full_graph_explored,
             layers_hashes=all_layers_hashes,
-            last_layer=layer1,
             edges_list_hashes=None,
+            graph=graph.definition,
         )
