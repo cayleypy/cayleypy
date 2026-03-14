@@ -107,5 +107,12 @@ disable = [
     "too-many-statements",
 ]
 
+[tool.pylint.SIMILARITIES]
+ignore-comments = true
+ignore-docstrings = true
+ignore-imports = true
+ignore-signatures = true
+min-similarity-lines = 10
+
 [tool.black]
 line-length = 120

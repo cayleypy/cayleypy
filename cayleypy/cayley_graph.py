@@ -1,18 +1,20 @@
 import gc
 import math
 from functools import cached_property
-from typing import Optional, Union
+from typing import Optional, Sequence, Union
 
 import torch
 
-from cayleypy.algo.bfs_result import BfsResult
 from .algo.beam_search import BeamSearchAlgorithm
 from .algo.bfs_algo import BfsAlgorithm
+from .algo.bfs_distributed import BfsDistributed
 from .algo.random_walks import RandomWalksGenerator
+from .algo.bfs_result import BfsResult
 from .cayley_graph_def import AnyStateType, CayleyGraphDef, GeneratorType
+from .device_config import DeviceConfig
 from .hasher import StateHasher
 from .string_encoder import StringEncoder
-from .torch_utils import isin_via_searchsorted
+from .torch_utils import CachedTensor, isin_via_searchsorted
 
 
 class CayleyGraph:
@@ -56,6 +58,9 @@ class CayleyGraph:
         batch_size: int = 2**20,
         hash_chunk_size: int = 2**25,
         memory_limit_gb: float = 16,
+        num_gpus: Optional[int] = None,
+        specific_devices: Optional[Sequence[Union[int, str, torch.device]]] = None,
+        device_config: Optional[DeviceConfig] = None,
         _hasher: Optional[StateHasher] = None,
         **unused_kwargs,
     ):
@@ -73,18 +78,18 @@ class CayleyGraph:
         :param memory_limit_gb: Approximate available memory, in GB.
                  It is safe to set this to less than available on your machine, it will just cause more frequent calls
                  to the "free memory" function.
+        :param num_gpus: Number of GPUs to use when CUDA is selected.
+                 If None, all available GPUs are used.
+        :param specific_devices: Specific CUDA devices to use. If provided, overrides `device` and `num_gpus`.
+        :param device_config: Pre-normalized device configuration. If provided, overrides `device`, `num_gpus`,
+                 and `specific_devices`.
         """
         self.definition = definition
         self.verbose = verbose
         self.batch_size = batch_size
         self.memory_limit_bytes = int(memory_limit_gb * (2**30))
         self.bit_encoding_width = bit_encoding_width
-
-        # Pick device. It will be used to store all tensors.
-        assert device in ["auto", "cpu", "cuda"]
-        if device == "auto":
-            device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = torch.device(device)
+        self.device_config = device_config or DeviceConfig.create(device, num_gpus, specific_devices)
         if verbose > 0:
             print(f"Using device: {self.device}.")
 
@@ -93,10 +98,9 @@ class CayleyGraph:
         self.string_encoder: Optional[StringEncoder] = None
 
         if definition.is_permutation_group():
-            self.permutations_torch = torch.tensor(
-                definition.generators_permutations, dtype=torch.int64, device=self.device
+            self.permutations_torch = CachedTensor(
+                torch.tensor(definition.generators_permutations, dtype=torch.int64, device=self.device)
             )
-
             # Prepare encoder in case we want to encode states using few bits per element.
             if bit_encoding_width == "auto":
                 bit_encoding_width = int(math.ceil(math.log2(int(self.central_state.max()) + 1)))
@@ -123,12 +127,10 @@ class CayleyGraph:
         if hashes is None:
             hashes = self.hasher.make_hashes(states)
         hashes_sorted, idx = torch.sort(hashes, stable=True)
-
         # Compute mask of first occurrences for each unique value.
-        mask = torch.ones(hashes_sorted.size(0), dtype=torch.bool, device=self.device)
+        mask = torch.ones(hashes_sorted.size(0), dtype=torch.bool, device=hashes_sorted.device)
         if hashes_sorted.size(0) > 1:
             mask[1:] = hashes_sorted[1:] != hashes_sorted[:-1]
-
         unique_idx = idx[mask]
         return states[unique_idx], hashes[unique_idx]
 
@@ -157,7 +159,8 @@ class CayleyGraph:
             if self.string_encoder is not None:
                 self.encoded_generators[i](src, dst)
             else:
-                move = self.permutations_torch[i].reshape((1, -1)).expand(states_num, -1)
+                perms = self.permutations_torch.to(src.device)
+                move = perms[i].reshape((1, -1)).expand(states_num, -1)
                 dst[:, :] = torch.gather(src, 1, move)
         else:
             assert self.definition.is_matrix_group()
@@ -190,7 +193,9 @@ class CayleyGraph:
         """Calculates all neighbors of `states` (in internal representation)."""
         states_num = states.shape[0]
         neighbors = torch.zeros(
-            (states_num * self.definition.n_generators, states.shape[1]), dtype=torch.int64, device=self.device
+            (states_num * self.definition.n_generators, states.shape[1]),
+            dtype=torch.int64,
+            device=states.device,
         )
         for i in range(self.definition.n_generators):
             dst = neighbors[i * states_num : (i + 1) * states_num, :]
@@ -202,10 +207,14 @@ class CayleyGraph:
         return self.decode_states(self.get_neighbors(self.encode_states(states)))
 
     def bfs(self, **kwargs) -> BfsResult:
-        """Runs bread-first search (BFS) algorithm from given `start_states`.
+        """Runs breadth-first search (BFS) algorithm from given `start_states`.
 
         See :class:`cayleypy.algo.BfsAlgorithm` for more details, including arguments description.
         """
+        return_all_edges = kwargs.get("return_all_edges", False)
+        disable_batching = kwargs.get("disable_batching", False)
+        if self.num_gpus > 1 and not (return_all_edges or disable_batching):
+            return BfsDistributed.bfs(self, **kwargs)
         return BfsAlgorithm.bfs(self, **kwargs)
 
     def random_walks(self, **kwargs):
@@ -232,7 +241,7 @@ class CayleyGraph:
         Length of returned path is equal to number of layers.
         """
         inv_graph = self.with_inverted_generators
-        path = []  # type: list[int]
+        path = []
         cur_state = self.decode_states(self.encode_states(to_state))
 
         for i in range(len(hashes) - 1, -1, -1):
@@ -289,9 +298,22 @@ class CayleyGraph:
         if self.verbose >= 1:
             print("Freeing memory...")
         gc.collect()
-        if self.device.type == "cuda":
-            torch.cuda.empty_cache()
-            gc.collect()
+        for dev in self.gpu_devices:
+            with torch.cuda.device(dev):
+                torch.cuda.empty_cache()
+        gc.collect()
+
+    @property
+    def device(self) -> torch.device:
+        return self.device_config.device
+
+    @property
+    def gpu_devices(self) -> tuple[torch.device, ...]:
+        return self.device_config.gpu_devices
+
+    @property
+    def num_gpus(self) -> int:
+        return self.device_config.num_gpus
 
     @property
     def generators(self):
@@ -310,6 +332,7 @@ class CayleyGraph:
         """
         ans = CayleyGraph(
             new_def,
+            device_config=self.device_config,
             _hasher=self.hasher,
             bit_encoding_width=self.bit_encoding_width,
         )

@@ -146,9 +146,6 @@ class BfsAlgorithm:
         if return_all_hashes and not full_graph_explored:
             all_layers_hashes.append(layer1_hashes)
 
-        if not full_graph_explored and graph.verbose > 0:
-            print("BFS stopped before graph was fully explored.")
-
         edges_list_hashes: Optional[torch.Tensor] = None
         if return_all_edges:
             if not full_graph_explored:
@@ -159,7 +156,9 @@ class BfsAlgorithm:
                 edges_list_ends.append(v1)
             edges_list_hashes = torch.vstack([torch.hstack(edges_list_starts), torch.hstack(edges_list_ends)]).T
 
-        # Always store the last layer.
+        if not full_graph_explored and graph.verbose > 0:
+            print("BFS stopped before graph was fully explored.")
+
         last_layer_id = len(layer_sizes) - 1
         if full_graph_explored and last_layer_id not in layers:
             layers[last_layer_id] = graph.decode_states(layer1)
