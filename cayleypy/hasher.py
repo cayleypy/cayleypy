@@ -28,6 +28,7 @@ class StateHasher:
         self.state_size = graph.encoded_state_size
         self.chunk_size = chunk_size
 
+        # If states are already encoded by a single int64, use identity function as hash function.
         self.make_hashes: Callable[[torch.Tensor], torch.Tensor] = lambda x: x.reshape(-1)
         self.is_identity = True
         if self.state_size == 1:
@@ -36,6 +37,7 @@ class StateHasher:
         self.is_identity = False
         self.seed = random_seed or random.randint(-MAX_INT, MAX_INT)
 
+        # Dot product is not safe for bit-encoded states, it has high probability of collisions.
         if graph.string_encoder is not None:
             self.make_hashes = self._hash_splitmix64
             return
