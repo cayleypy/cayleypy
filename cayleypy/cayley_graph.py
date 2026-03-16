@@ -308,7 +308,7 @@ class CayleyGraph:
         return self.device_config.device
 
     @property
-    def gpu_devices(self) -> tuple[torch.device, ...]:
+    def gpu_devices(self) -> list[torch.device]:
         return self.device_config.gpu_devices
 
     @property

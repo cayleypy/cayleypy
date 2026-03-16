@@ -25,8 +25,8 @@ class DeviceConfig:
         return self.devices[0]
 
     @cached_property
-    def gpu_devices(self) -> tuple[torch.device, ...]:
-        return tuple(device for device in self.devices if device.type == "cuda")
+    def gpu_devices(self) -> list[torch.device]:
+        return [device for device in self.devices if device.type == "cuda"]
 
     @cached_property
     def num_gpus(self) -> int:
