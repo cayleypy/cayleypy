@@ -52,6 +52,7 @@ BFS algorithm and its variations
     :toctree: generated/
 
     cayleypy.algo.BfsAlgorithm
+    cayleypy.algo.BfsDistributed
     cayleypy.algo.BfsResult
     cayleypy.algo.bfs_bitmask
     cayleypy.algo.bfs_numpy

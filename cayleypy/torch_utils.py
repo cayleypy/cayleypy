@@ -10,6 +10,20 @@ def isin_via_searchsorted(elements: torch.Tensor, test_elements_sorted: torch.Te
     return test_elements_sorted[ts] == elements
 
 
+class CachedTensor:
+    """Stores a tensor and lazily caches copies of it on requested devices."""
+
+    def __init__(self, tensor: torch.Tensor):
+        self.tensor = tensor
+        self.cache = {tensor.device: tensor}
+
+    def to(self, device: torch.device) -> torch.Tensor:
+        device = torch.device(device)
+        if device not in self.cache:
+            self.cache[device] = self.tensor.to(device)
+        return self.cache[device]
+
+
 class TorchHashSet:
     """A set of int64 numbers, backed by one or more sorted tensors."""
 

@@ -4,6 +4,8 @@ from typing import Callable, Optional, TYPE_CHECKING
 
 import torch
 
+from .torch_utils import CachedTensor
+
 if TYPE_CHECKING:
     from cayleypy import CayleyGraph
 
@@ -41,8 +43,8 @@ class StateHasher:
             return
 
         torch.manual_seed(self.seed)
-        self.vec_hasher = torch.randint(
-            -MAX_INT, MAX_INT, size=(self.state_size, 1), device=graph.device, dtype=torch.int64
+        self.vec_hasher = CachedTensor(
+            torch.randint(-MAX_INT, MAX_INT, size=(self.state_size, 1), device=graph.device, dtype=torch.int64)
         )
 
         try:
@@ -50,22 +52,24 @@ class StateHasher:
             _ = self._make_hashes_cpu_and_modern_gpu(trial_states)
             self.make_hashes = self._make_hashes_cpu_and_modern_gpu
         except RuntimeError:
-            self.vec_hasher = self.vec_hasher.reshape((self.state_size,))
+            self.vec_hasher = CachedTensor(self.vec_hasher.to(graph.device).reshape((self.state_size,)))
             self.make_hashes = self._make_hashes_older_gpu
 
     def _make_hashes_cpu_and_modern_gpu(self, states: torch.Tensor) -> torch.Tensor:
+        vec_hasher = self.vec_hasher.to(states.device)
         if states.shape[0] <= self.chunk_size:
-            return (states @ self.vec_hasher).reshape(-1)
+            return (states @ vec_hasher).reshape(-1)
         else:
             parts = int(math.ceil(states.shape[0] / self.chunk_size))
-            return torch.vstack([z @ self.vec_hasher for z in torch.tensor_split(states, parts)]).reshape(-1)
+            return torch.vstack([z @ vec_hasher for z in torch.tensor_split(states, parts)]).reshape(-1)
 
     def _make_hashes_older_gpu(self, states: torch.Tensor) -> torch.Tensor:
+        vec_hasher = self.vec_hasher.to(states.device)
         if states.shape[0] <= self.chunk_size:
-            return torch.sum(states * self.vec_hasher, dim=1)
+            return torch.sum(states * vec_hasher, dim=1)
         else:
             parts = int(math.ceil(states.shape[0] / self.chunk_size))
-            return torch.hstack([torch.sum(z * self.vec_hasher, dim=1) for z in torch.tensor_split(states, parts)])
+            return torch.hstack([torch.sum(z * vec_hasher, dim=1) for z in torch.tensor_split(states, parts)])
 
     def _hash_splitmix64(self, x: torch.Tensor) -> torch.Tensor:
         n, m = x.shape
