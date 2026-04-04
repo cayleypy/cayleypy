@@ -264,6 +264,19 @@ class BfsDistributed:
             mask &= ~isin_via_searchsorted(hashes, seen_hashes)
         return mask
 
+    @staticmethod
+    def _encode_states_to_device(graph: "CayleyGraph", states: Union[torch.Tensor, np.ndarray, list], device: torch.device) -> torch.Tensor:
+        """Encode states directly onto the target device.
+
+        This avoids depending on graph.device, which may not match LOCAL_RANK
+        under torchrun if CayleyGraph was constructed with a broad device config.
+        """
+        states_t = torch.as_tensor(states, device=device, dtype=torch.int64)
+        states_t = states_t.reshape((-1, graph.definition.state_size))
+        if graph.string_encoder is not None:
+            return graph.string_encoder.encode(states_t)
+        return states_t
+
     @classmethod
     def _exchange_by_owner(
         cls,
@@ -274,6 +287,7 @@ class BfsDistributed:
         """Exchange states to owner ranks via all_to_all_single.
 
         Each process owns hashes such that hash % world_size == rank.
+        All ranks must call this the same number of times and in the same order.
         """
         device = hashes.device
         width = states.shape[1]
@@ -321,14 +335,16 @@ class BfsDistributed:
         local_hashes: torch.Tensor,
     ) -> LayerPart:
         """Gather full layer to every rank when really needed."""
+        target_device = local_states.device
+
         if not dist.is_initialized() or dist.get_world_size() == 1:
             if local_hashes.numel() == 0:
                 return (
-                    torch.empty((0, graph.encoded_state_size), dtype=torch.int64, device=graph.device),
-                    torch.empty(0, dtype=torch.int64, device=graph.device),
+                    torch.empty((0, graph.encoded_state_size), dtype=torch.int64, device=target_device),
+                    torch.empty(0, dtype=torch.int64, device=target_device),
                 )
             local_hashes, idx = torch.sort(local_hashes, stable=True)
-            return local_states[idx].to(graph.device), local_hashes.to(graph.device)
+            return local_states[idx].to(target_device), local_hashes.to(target_device)
 
         payload = (
             local_states.detach().cpu(),
@@ -345,13 +361,13 @@ class BfsDistributed:
             part_states, part_hashes = item
             if part_hashes.numel() == 0:
                 continue
-            states_parts.append(part_states.to(graph.device))
-            hashes_parts.append(part_hashes.to(graph.device))
+            states_parts.append(part_states.to(target_device))
+            hashes_parts.append(part_hashes.to(target_device))
 
         if not hashes_parts:
             return (
-                torch.empty((0, graph.encoded_state_size), dtype=torch.int64, device=graph.device),
-                torch.empty(0, dtype=torch.int64, device=graph.device),
+                torch.empty((0, graph.encoded_state_size), dtype=torch.int64, device=target_device),
+                torch.empty(0, dtype=torch.int64, device=target_device),
             )
 
         all_states = torch.cat(states_parts, dim=0)
@@ -371,6 +387,12 @@ class BfsDistributed:
         t = torch.tensor([1 if flag else 0], dtype=torch.int64, device=device)
         dist.all_reduce(t, op=dist.ReduceOp.MAX)
         return bool(t.item())
+
+    @staticmethod
+    def _global_max_int(value: int, device: torch.device) -> int:
+        t = torch.tensor([int(value)], dtype=torch.int64, device=device)
+        dist.all_reduce(t, op=dist.ReduceOp.MAX)
+        return int(t.item())
 
     @classmethod
     def _update_local_seen_chunks(
@@ -409,7 +431,7 @@ class BfsDistributed:
             start_states = graph.central_state
 
         if rank == 0:
-            start_states_t = graph.encode_states(start_states).to(device)
+            start_states_t = cls._encode_states_to_device(graph, start_states, device)
             start_states_t, start_hashes_t = graph.get_unique_states(start_states_t)
         else:
             start_states_t = cls._dist_empty_states(device, width)
@@ -436,46 +458,51 @@ class BfsDistributed:
 
         for layer_id in range(1, max_diameter + 1):
             frontier_size_local = layer_states.shape[0]
+            num_local_batches = (frontier_size_local + graph.batch_size - 1) // graph.batch_size
+            num_batches = cls._global_max_int(num_local_batches, device)
 
             accepted_state_chunks: list[torch.Tensor] = []
             accepted_hash_chunks: list[torch.Tensor] = []
 
-            if frontier_size_local > 0:
-                for start in range(0, frontier_size_local, graph.batch_size):
-                    batch_states = layer_states[start : start + graph.batch_size]
-                    if batch_states.numel() == 0:
-                        continue
+            for batch_id in range(num_batches):
+                start = batch_id * graph.batch_size
+                end = min(start + graph.batch_size, frontier_size_local)
 
+                if start < frontier_size_local:
+                    batch_states = layer_states[start:end]
                     neighbors = graph.get_neighbors(batch_states)
                     cand_states, cand_hashes = graph.get_unique_states(neighbors)
+                else:
+                    cand_states = cls._dist_empty_states(device, width)
+                    cand_hashes = cls._dist_empty_hashes(device)
 
-                    recv_states, recv_hashes = cls._exchange_by_owner(cand_states, cand_hashes, world_size)
-                    if recv_hashes.numel() == 0:
-                        continue
+                recv_states, recv_hashes = cls._exchange_by_owner(cand_states, cand_hashes, world_size)
+                if recv_hashes.numel() == 0:
+                    continue
 
-                    recv_states, recv_hashes = graph.get_unique_states(recv_states, hashes=recv_hashes)
+                recv_states, recv_hashes = graph.get_unique_states(recv_states, hashes=recv_hashes)
 
-                    mask = cls._filter_hashes_against_chunks(recv_hashes, seen_chunks)
+                mask = cls._filter_hashes_against_chunks(recv_hashes, seen_chunks)
+                recv_states, recv_hashes = cls._apply_mask(recv_states, recv_hashes, mask)
+                if recv_hashes.numel() == 0:
+                    continue
+
+                if accepted_hash_chunks:
+                    tmp_chunks = cls._compact_seen_chunks(accepted_hash_chunks, threshold=8)
+                    mask = cls._filter_hashes_against_chunks(recv_hashes, tmp_chunks)
                     recv_states, recv_hashes = cls._apply_mask(recv_states, recv_hashes, mask)
                     if recv_hashes.numel() == 0:
                         continue
 
-                    if accepted_hash_chunks:
-                        tmp_chunks = cls._compact_seen_chunks(accepted_hash_chunks, threshold=8)
-                        mask = cls._filter_hashes_against_chunks(recv_hashes, tmp_chunks)
-                        recv_states, recv_hashes = cls._apply_mask(recv_states, recv_hashes, mask)
-                        if recv_hashes.numel() == 0:
-                            continue
+                accepted_state_chunks.append(recv_states)
+                accepted_hash_chunks.append(recv_hashes)
 
-                    accepted_state_chunks.append(recv_states)
-                    accepted_hash_chunks.append(recv_hashes)
-
-                    if len(accepted_hash_chunks) > 16:
-                        merged_states = torch.cat(accepted_state_chunks, dim=0)
-                        merged_hashes = torch.cat(accepted_hash_chunks, dim=0)
-                        merged_states, merged_hashes = graph.get_unique_states(merged_states, hashes=merged_hashes)
-                        accepted_state_chunks = [merged_states]
-                        accepted_hash_chunks = [merged_hashes]
+                if len(accepted_hash_chunks) > 16:
+                    merged_states = torch.cat(accepted_state_chunks, dim=0)
+                    merged_hashes = torch.cat(accepted_hash_chunks, dim=0)
+                    merged_states, merged_hashes = graph.get_unique_states(merged_states, hashes=merged_hashes)
+                    accepted_state_chunks = [merged_states]
+                    accepted_hash_chunks = [merged_hashes]
 
             if accepted_hash_chunks:
                 next_states = torch.cat(accepted_state_chunks, dim=0)
@@ -543,7 +570,8 @@ class BfsDistributed:
             gathered_last_states, _ = cls._gather_layer_all_ranks(graph, layer_states, layer_hashes)
             layers[last_layer_id] = graph.decode_states(gathered_last_states)
 
-        dist.barrier()
+        if dist.is_initialized():
+            dist.barrier()
 
         return BfsResult(
             layer_sizes=layer_sizes,
