@@ -189,18 +189,14 @@ class PermutationGroups:
         assert n >=2
         generator_names = []
         generators = np.repeat([np.arange(2*n, dtype=np.long)], n, axis=0)
-
         generator_names.append(f"(0,{n})")
         generators[0][[0,n]] = generators[0][[n,0]]
-        
         for i in range(0, n-1):
             generators[i+1][[i+1,i]] = generators[i+1][[i,i+1]]
             generators[i+1][[n+i+1,n+i]] = generators[i+1][[n+i,n+i+1]]
             generator_names.append(f"({i},{i+1})({n+i},{n+i+1})")
-    
         central_state = np.arange(2*n)
         name = f"coxeter b_{n}"
-
         return CayleyGraphDef.create(
             generators, central_state=central_state, generator_names=generator_names, name=name
         )
@@ -214,19 +210,15 @@ class PermutationGroups:
         assert n >= 2
         generator_names = []
         generators = np.repeat([np.arange(2*n, dtype=np.long)], n, axis=0)
-
         generator_names.append(f"(0,{n+1})(1,{n})")
         generators[0][[0,n+1]] = generators[0][[n+1,0]]
         generators[0][[1,n]] = generators[0][[n,1]]
-        
         for i in range(0, n-1):
             generators[i+1][[i+1,i]] = generators[i+1][[i,i+1]]
             generators[i+1][[n+i+1,n+i]] = generators[i+1][[n+i,n+i+1]]
             generator_names.append(f"({i},{i+1})({n+i},{n+i+1})")
-        
         central_state = np.arange(2*n)
         name = f"coxeter d_{n}"
-        
         return CayleyGraphDef.create(
             generators, central_state=central_state, generator_names=generator_names, name=name
         )
