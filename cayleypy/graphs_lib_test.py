@@ -247,6 +247,19 @@ def test_signed_reversals():
         ],
     )
 
+def test_coxeter_b():
+    graph = PermutationGroups.coxeter_b(3)
+    assert graph.n_generators == 3
+    assert graph.generator_names == ["(0,3)", "(0,1)(3,4)", "(1,2)(4,5)"]
+    assert np.array_equal(graph.generators, [[3,1,2,0,4,5],[1,0,2,4,3,5],[0,2,1,3,5,4]])
+
+
+def test_coxeter_d():
+    graph = PermutationGroups.coxeter_d(3)
+    assert graph.n_generators == 3
+    assert graph.generator_names == ["(0,4)(1,3)", "(0,1)(3,4)", "(1,2)(4,5)"]
+    assert np.array_equal(graph.generators, [[4,3,2,1,0,5],[1,0,2,4,3,5],[0,2,1,3,5,4]])
+
 
 def test_cyclic_coxeter():
     graph = PermutationGroups.cyclic_coxeter(4)
