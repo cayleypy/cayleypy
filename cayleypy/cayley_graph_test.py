@@ -12,6 +12,7 @@ from .graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 
 
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
+RUN_CPP_TESTS = os.getenv("RUN_CPP_TESTS") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
 
 
@@ -261,6 +262,52 @@ def test_random_walks_bfs_matrix_groups():
     x, y = graph.random_walks(width=100, length=50, mode="bfs")
     assert x.shape == (4635, 3, 3)
     assert y.shape == (4635,)
+
+
+@pytest.mark.skipif(not RUN_CPP_TESTS, reason="cpp test")
+def test_random_walks_cpp_single_walk():
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    x, y = graph.random_walks(width=1, length=5, mode="classic_cpp")
+    assert x.shape == (5, 5)
+    assert y.shape == (5,)
+    assert _state_to_str(x[0]) == "01234"
+    assert _state_to_str(x[1]) in ["12340", "40123", "10234"]
+    assert np.array_equal(y.cpu().numpy(), [0, 1, 2, 3, 4])
+
+
+@pytest.mark.skipif(not RUN_CPP_TESTS, reason="cpp test")
+def test_random_walks_cpp_start_state():
+    graph = CayleyGraph(PermutationGroups.lx(5))
+    x, y = graph.random_walks(width=10, length=5, start_state=[1, 0, 0, 0, 0], mode="classic_cpp")
+    assert x.shape == (50, 5)
+    assert y.shape == (50,)
+    for i in range(10):
+        assert _state_to_str(x[i]) == "10000"
+    for i in range(10, 20):
+        assert _state_to_str(x[i]) in ["01000", "00001"]
+
+
+@pytest.mark.skipif(not RUN_CPP_TESTS, reason="cpp test")
+def test_random_walks_cpp_parallel_single_walk():
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    x, y = graph.random_walks(width=1, length=5, mode="classic_cpp", num_threads=4)
+    assert x.shape == (5, 5)
+    assert y.shape == (5,)
+    assert _state_to_str(x[0]) == "01234"
+    assert _state_to_str(x[1]) in ["12340", "40123", "10234"]
+    assert np.array_equal(y.cpu().numpy(), [0, 1, 2, 3, 4])
+
+
+@pytest.mark.skipif(not RUN_CPP_TESTS, reason="cpp test")
+def test_random_walks_cpp_parallel_start_state():
+    graph = CayleyGraph(PermutationGroups.lx(5))
+    x, y = graph.random_walks(width=10, length=5, start_state=[1, 0, 0, 0, 0], mode="classic_cpp", num_threads=4)
+    assert x.shape == (50, 5)
+    assert y.shape == (50,)
+    for i in range(10):
+        assert _state_to_str(x[i]) == "10000"
+    for i in range(10, 20):
+        assert _state_to_str(x[i]) in ["01000", "00001"]
 
 
 def test_path_to_from():
