@@ -247,6 +247,7 @@ def test_signed_reversals():
         ],
     )
 
+
 def test_coxeter_b():
     graph = PermutationGroups.coxeter_b(3)
     assert graph.n_generators == 3
