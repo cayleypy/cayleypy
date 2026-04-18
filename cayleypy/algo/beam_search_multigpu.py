@@ -550,16 +550,28 @@ def _infer_expand_chunk_size(
     return int(inferred)
 
 
-def _sync_shrunk_chunk_size(
+
+def _sync_expand_chunk_size_step(
     local_chunk_size: int,
-    local_oom: bool,
+    local_had_oom: bool,
+    base_chunk_size: int,
     device: torch.device,
 ) -> tuple[int, bool]:
     size_t = torch.tensor([int(local_chunk_size)], dtype=torch.int64, device=device)
-    oom_t = torch.tensor([int(local_oom)], dtype=torch.int64, device=device)
+    oom_t = torch.tensor([int(local_had_oom)], dtype=torch.int64, device=device)
+
     dist.all_reduce(size_t, op=dist.ReduceOp.MIN)
     dist.all_reduce(oom_t, op=dist.ReduceOp.MAX)
-    return int(size_t.item()), bool(int(oom_t.item()))
+
+    synced_size = int(size_t.item())
+    any_oom = bool(int(oom_t.item()))
+
+    if base_chunk_size > 0:
+        synced_size = min(int(base_chunk_size), synced_size)
+
+    synced_size = max(1, synced_size)
+    return synced_size, any_oom
+
 
 
 def _maybe_grow_chunk_size(
@@ -666,11 +678,11 @@ def _owner_partitioned_streaming_candidates(
     device: torch.device,
     verbose: int = 0,
     rank: int = 0,
-) -> tuple[list[torch.Tensor], list[torch.Tensor], bool, int]:
+) -> tuple[list[torch.Tensor], list[torch.Tensor], bool, int, bool]:
     width = graph.encoded_state_size
     owner_states, owner_scores = _split_owner_buffers(world_size, device, width)
     found_local = False
-
+    
     if local_beam_states.numel() == 0:
         inferred_chunk = _infer_expand_chunk_size(
             graph,
@@ -679,15 +691,7 @@ def _owner_partitioned_streaming_candidates(
             predictor_batch_size,
             0,
         )
-    
-        # Важно: все rank-ы обязаны пройти через тот же sync,
-        # который проходят непустые rank-ы.
-        synced_chunk_size, _ = _sync_shrunk_chunk_size(
-            inferred_chunk,
-            False,
-            device,
-        )
-        return owner_states, owner_scores, False, synced_chunk_size
+        return owner_states, owner_scores, False, inferred_chunk, False
 
     base_chunk_size = _infer_expand_chunk_size(
         graph,
@@ -710,9 +714,9 @@ def _owner_partitioned_streaming_candidates(
 
     beam_offset = 0
     success_streak = 0
+    had_local_oom = False
 
     while beam_offset < local_beam_states.shape[0]:
-        local_oom = False
         local_parts: list[tuple[int, torch.Tensor, torch.Tensor]] = []
         local_found = False
         upper = min(local_beam_states.shape[0], beam_offset + current_chunk_size)
@@ -733,17 +737,10 @@ def _owner_partitioned_streaming_candidates(
         except RuntimeError as exc:
             if not _is_cuda_oom(exc):
                 raise
-            local_oom = True
+            had_local_oom = True
             _cleanup_after_oom(device)
             current_chunk_size = max(1, current_chunk_size // 2)
-
-        synced_chunk_size, any_oom = _sync_shrunk_chunk_size(current_chunk_size, local_oom, device)
-        current_chunk_size = max(1, synced_chunk_size)
-
-        if any_oom:
             success_streak = 0
-            if verbose >= 2 and rank == 0:
-                print(f"OOM shrink: new_expand_chunk_size={current_chunk_size}.")
             continue
 
         for owner_rank, owner_chunk_states, owner_chunk_scores in local_parts:
@@ -762,7 +759,7 @@ def _owner_partitioned_streaming_candidates(
         success_streak += 1
         current_chunk_size = _maybe_grow_chunk_size(current_chunk_size, base_chunk_size, success_streak)
 
-    return owner_states, owner_scores, found_local, current_chunk_size
+    return owner_states, owner_scores, found_local, current_chunk_size, had_local_oom
 
 
 def search_multigpu(
@@ -888,7 +885,13 @@ def search_multigpu_owner_partitioned(
     adaptive_expand_chunk_size = expand_chunk_size
 
     for step in range(1, max_steps + 1):
-        send_states_parts, send_scores_parts, found_local, used_chunk_size = _owner_partitioned_streaming_candidates(
+        (
+            send_states_parts,
+            send_scores_parts,
+            found_local,
+            used_chunk_size,
+            had_local_oom,
+        ) = _owner_partitioned_streaming_candidates(
             graph,
             local_beam_states=local_beam_states,
             destination_encoded=destination_encoded,
@@ -903,7 +906,17 @@ def search_multigpu_owner_partitioned(
             verbose=verbose,
             rank=rank,
         )
-        adaptive_expand_chunk_size = used_chunk_size
+
+        adaptive_expand_chunk_size, any_oom_this_step = _sync_expand_chunk_size_step(
+            used_chunk_size,
+            had_local_oom,
+            adaptive_expand_chunk_size,
+            device,
+        )
+
+        if verbose >= 2 and rank == 0 and any_oom_this_step:
+            print(f"OOM shrink: new_expand_chunk_size={adaptive_expand_chunk_size}.")
+
 
         send_states, send_scores, send_counts = _prepare_send_buffers(
             send_states_parts,
@@ -911,7 +924,7 @@ def search_multigpu_owner_partitioned(
             width,
             device,
         )
-
+      
         send_counts_t = torch.tensor(send_counts, dtype=torch.int64, device=device)
         gathered_counts = torch.empty((world_size * world_size,), dtype=torch.int64, device=device)
         dist.all_gather_into_tensor(gathered_counts, send_counts_t)
