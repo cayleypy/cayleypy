@@ -679,7 +679,15 @@ def _owner_partitioned_streaming_candidates(
             predictor_batch_size,
             0,
         )
-        return owner_states, owner_scores, False, inferred_chunk
+    
+        # Важно: все rank-ы обязаны пройти через тот же sync,
+        # который проходят непустые rank-ы.
+        synced_chunk_size, _ = _sync_shrunk_chunk_size(
+            inferred_chunk,
+            False,
+            device,
+        )
+        return owner_states, owner_scores, False, synced_chunk_size
 
     base_chunk_size = _infer_expand_chunk_size(
         graph,
