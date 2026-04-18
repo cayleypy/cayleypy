@@ -1,5 +1,6 @@
 import gc
 import math
+import os
 from functools import cached_property
 from typing import Optional, Sequence, Union
 
@@ -82,15 +83,23 @@ class CayleyGraph:
                  If None, all available GPUs are used.
         :param specific_devices: Specific CUDA devices to use. If provided, overrides `device` and `num_gpus`.
         :param device_config: Pre-normalized device configuration. If provided, overrides `device`, `num_gpus`,
-                 and `specific_devices`.
+                 and `specific_devices`. Under ``torchrun`` with ``WORLD_SIZE > 1`` and CUDA available, configuration
+                 is forced to a single GPU ``cuda:{LOCAL_RANK}`` so each process only allocates on its own card
+                 (matches :meth:`~cayleypy.algo.BfsDistributed.bfs` torch.distributed path).
         """
         self.definition = definition
         self.verbose = verbose
         self.batch_size = batch_size
         self.memory_limit_bytes = int(memory_limit_gb * (2**30))
         self.bit_encoding_width = bit_encoding_width
-        self.device_config = device_config or DeviceConfig.create(device, num_gpus, specific_devices)
-        if verbose > 0:
+        if BfsDistributed._use_torchrun_backend() and torch.cuda.is_available():
+            local_rank = int(os.environ["LOCAL_RANK"])
+            self.device_config = DeviceConfig.create("cuda", num_gpus=1, specific_devices=[local_rank])
+        elif device_config is not None:
+            self.device_config = device_config
+        else:
+            self.device_config = DeviceConfig.create(device, num_gpus, specific_devices)
+        if verbose > 0 and int(os.environ.get("RANK", "0")) == 0:
             print(f"Using device: {self.device}.")
 
         self.central_state = torch.as_tensor(definition.central_state, device=self.device, dtype=torch.int64)

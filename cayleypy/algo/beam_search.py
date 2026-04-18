@@ -55,6 +55,8 @@ class BeamSearchAlgorithm:
           * "advanced" - enhanced beam search with non-backtracking capabilities.
             Supports configurable history depth to avoid revisiting states.
             Uses PyTorch for efficient batch processing.
+          * "multigpu" / "distributed" / "torchrun" - torchrun-aware distributed beam search.
+            Single-process execution falls back to "advanced" mode.
 
         :param start_state: State from which to start search.
         :param destination_state: Target state to find. Defaults to central state for "simple" mode.
@@ -81,6 +83,19 @@ class BeamSearchAlgorithm:
             )
         elif beam_mode == "advanced":
             return self.search_advanced(
+                start_state=start_state,
+                destination_state=destination_state,
+                beam_width=beam_width,
+                max_steps=max_steps,
+                history_depth=history_depth,
+                predictor=predictor,
+                verbose=verbose,
+            )
+        elif beam_mode in {"multigpu", "distributed", "torchrun"}:
+            from .beam_search_multigpu import search_multigpu
+
+            return search_multigpu(
+                self.graph,
                 start_state=start_state,
                 destination_state=destination_state,
                 beam_width=beam_width,

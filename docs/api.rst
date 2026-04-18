@@ -41,6 +41,7 @@ Beam search and ML
     cayleypy.Predictor
     cayleypy.algo.BeamSearchAlgorithm
     cayleypy.algo.BeamSearchResult
+    cayleypy.algo.search_multigpu
     cayleypy.algo.RandomWalksGenerator
     cayleypy.models.ModelConfig
 

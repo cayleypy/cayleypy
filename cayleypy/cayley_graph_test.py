@@ -14,9 +14,44 @@ from .graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
 
+HAS_CUDA = torch.cuda.is_available()
+HAS_MULTI_GPU = HAS_CUDA and torch.cuda.device_count() >= 2
+
 
 def _layer_to_set(layer: np.ndarray) -> set[str]:
     return set("".join(str(x) for x in state) for state in layer)
+
+
+@pytest.mark.skipif(not HAS_CUDA, reason="requires CUDA")
+def test_torchrun_forces_single_gpu_matching_local_rank(monkeypatch):
+    """Under torchrun (WORLD_SIZE>1), graph tensors must live on cuda:LOCAL_RANK only."""
+    monkeypatch.setenv("RANK", "0")
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="auto")
+    assert graph.device == torch.device("cuda:0")
+    assert graph.gpu_devices == [torch.device("cuda:0")]
+    assert graph.num_gpus == 1
+
+
+@pytest.mark.skipif(not HAS_MULTI_GPU, reason="requires 2+ CUDA GPUs")
+def test_torchrun_local_rank_1(monkeypatch):
+    monkeypatch.setenv("RANK", "1")
+    monkeypatch.setenv("WORLD_SIZE", "2")
+    monkeypatch.setenv("LOCAL_RANK", "1")
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="auto")
+    assert graph.device == torch.device("cuda:1")
+    assert graph.gpu_devices == [torch.device("cuda:1")]
+
+
+@pytest.mark.skipif(not HAS_MULTI_GPU, reason="requires 2+ CUDA GPUs")
+def test_torchrun_not_active_when_world_size_1(monkeypatch):
+    monkeypatch.setenv("RANK", "0")
+    monkeypatch.setenv("WORLD_SIZE", "1")
+    monkeypatch.setenv("LOCAL_RANK", "0")
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="auto")
+    assert graph.num_gpus == torch.cuda.device_count()
 
 
 def test_generators_format():
