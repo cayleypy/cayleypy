@@ -34,6 +34,13 @@ STOP_CONTINUE = 0
 STOP_EMPTY = 1
 STOP_FOUND = 2
 
+_DISTRIBUTED_CONTEXT_OWNS_PG = False
+
+# Signed int64 equivalents of 64-bit MurmurHash3 fmix64 constants.
+_OWNER_MIX_C1 = -49064778989728563
+_OWNER_MIX_C2 = -4265267296055464877
+_OWNER_MIX_TENSORS: dict[tuple[torch.device, torch.dtype], tuple[torch.Tensor, torch.Tensor]] = {}
+
 
 def _is_torchrun_env() -> bool:
     return "RANK" in os.environ and "WORLD_SIZE" in os.environ and "LOCAL_RANK" in os.environ
@@ -55,6 +62,8 @@ def _select_rank_device(graph: "CayleyGraph", rank: int) -> torch.device:
 
 
 def _ensure_distributed_context(graph: "CayleyGraph") -> tuple[int, int, torch.device]:
+    global _DISTRIBUTED_CONTEXT_OWNS_PG
+
     if dist.is_available() and dist.is_initialized():
         rank = dist.get_rank()
         world_size = dist.get_world_size()
@@ -71,8 +80,25 @@ def _ensure_distributed_context(graph: "CayleyGraph") -> tuple[int, int, torch.d
     device = _select_rank_device(graph, rank)
     if device.type != "cuda":
         raise RuntimeError("Distributed beam search in this module is CUDA/NCCL-only.")
+
     dist.init_process_group(backend="nccl", init_method="env://")
+    _DISTRIBUTED_CONTEXT_OWNS_PG = True
     return rank, world_size, device
+
+
+def _cleanup_distributed_context() -> None:
+    global _DISTRIBUTED_CONTEXT_OWNS_PG
+
+    if not _DISTRIBUTED_CONTEXT_OWNS_PG:
+        return
+    if not dist.is_available() or not dist.is_initialized():
+        _DISTRIBUTED_CONTEXT_OWNS_PG = False
+        return
+
+    try:
+        dist.destroy_process_group()
+    finally:
+        _DISTRIBUTED_CONTEXT_OWNS_PG = False
 
 
 def _encode_states_to_device(graph: "CayleyGraph", states: AnyStateType, device: torch.device) -> torch.Tensor:
@@ -418,16 +444,25 @@ def _fallback_advanced(
     )
 
 
+def _get_owner_mix_tensors(device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
+    key = (device, torch.int64)
+    cached = _OWNER_MIX_TENSORS.get(key)
+    if cached is None:
+        cached = (
+            torch.tensor(_OWNER_MIX_C1, dtype=torch.int64, device=device),
+            torch.tensor(_OWNER_MIX_C2, dtype=torch.int64, device=device),
+        )
+        _OWNER_MIX_TENSORS[key] = cached
+    return cached
 
-_OWNER_MIX_C1 = -49064778989728563
-_OWNER_MIX_C2 = -4265267296055464877
 
 def _owner_mix_hashes(hashes: torch.Tensor) -> torch.Tensor:
     x = hashes.to(torch.int64)
+    c1, c2 = _get_owner_mix_tensors(hashes.device)
     x = x ^ (x >> 33)
-    x = x * torch.tensor(_OWNER_MIX_C1, dtype=torch.int64, device=hashes.device)
+    x = x * c1
     x = x ^ (x >> 33)
-    x = x * torch.tensor(_OWNER_MIX_C2, dtype=torch.int64, device=hashes.device)
+    x = x * c2
     x = x ^ (x >> 33)
     return x
 
@@ -550,7 +585,6 @@ def _infer_expand_chunk_size(
     return int(inferred)
 
 
-
 def _sync_expand_chunk_size_step(
     local_chunk_size: int,
     local_had_oom: bool,
@@ -571,7 +605,6 @@ def _sync_expand_chunk_size_step(
 
     synced_size = max(1, synced_size)
     return synced_size, any_oom
-
 
 
 def _maybe_grow_chunk_size(
@@ -599,9 +632,6 @@ def _process_beam_chunk_once(
     predictor_batch_size: int,
     device: torch.device,
 ) -> tuple[list[tuple[int, torch.Tensor, torch.Tensor]], bool]:
-    width = graph.encoded_state_size
-    _ = width
-
     result_parts: list[tuple[int, torch.Tensor, torch.Tensor]] = []
     found_local = False
 
@@ -676,13 +706,11 @@ def _owner_partitioned_streaming_candidates(
     expand_chunk_size: int,
     predictor_batch_size: int,
     device: torch.device,
-    verbose: int = 0,
-    rank: int = 0,
 ) -> tuple[list[torch.Tensor], list[torch.Tensor], bool, int, bool]:
     width = graph.encoded_state_size
     owner_states, owner_scores = _split_owner_buffers(world_size, device, width)
     found_local = False
-    
+
     if local_beam_states.numel() == 0:
         inferred_chunk = _infer_expand_chunk_size(
             graph,
@@ -847,186 +875,191 @@ def search_multigpu_owner_partitioned(
             verbose=verbose,
         )
 
-    width = graph.encoded_state_size
-    start_encoded = _encode_states_to_device(graph, start_state, device)
+    try:
+        width = graph.encoded_state_size
+        start_encoded = _encode_states_to_device(graph, start_state, device)
 
-    destination_effective = destination_state if destination_state is not None else graph.central_state
-    destination_encoded = _encode_states_to_device(graph, destination_effective, device)
+        destination_effective = destination_state if destination_state is not None else graph.central_state
+        destination_encoded = _encode_states_to_device(graph, destination_effective, device)
 
-    start_found_local = bool(torch.any(torch.all(start_encoded == destination_encoded, dim=1)).item())
-    start_found = torch.tensor([int(start_found_local)], dtype=torch.int64, device=device)
-    dist.all_reduce(start_found, op=dist.ReduceOp.MAX)
-    if int(start_found.item()) > 0:
-        return BeamSearchResult(True, 0, [], {}, graph.definition)
+        start_found_local = bool(torch.any(torch.all(start_encoded == destination_encoded, dim=1)).item())
+        start_found = torch.tensor([int(start_found_local)], dtype=torch.int64, device=device)
+        dist.all_reduce(start_found, op=dist.ReduceOp.MAX)
+        if int(start_found.item()) > 0:
+            return BeamSearchResult(True, 0, [], {}, graph.definition)
 
-    start_states, start_hashes = graph.get_unique_states(start_encoded)
-    start_owners = _owners_from_hashes(start_hashes, world_size)
-    start_mask = start_owners == rank
+        start_states, start_hashes = graph.get_unique_states(start_encoded)
+        start_owners = _owners_from_hashes(start_hashes, world_size)
+        start_mask = start_owners == rank
 
-    local_beam_states = start_states[start_mask].contiguous()
-    local_beam_hashes = start_hashes[start_mask].contiguous()
+        local_beam_states = start_states[start_mask].contiguous()
+        local_beam_hashes = start_hashes[start_mask].contiguous()
 
-    local_target = _compute_per_rank_beam(beam_width, world_size, rank)
-    if local_beam_states.shape[0] > local_target > 0:
-        seed_scores = _score_states_oom_safe(
-            graph,
-            local_beam_states,
-            predictor,
-            device,
-            predictor_batch_size=predictor_batch_size,
+        local_target = _compute_per_rank_beam(beam_width, world_size, rank)
+        if local_beam_states.shape[0] > local_target > 0:
+            seed_scores = _score_states_oom_safe(
+                graph,
+                local_beam_states,
+                predictor,
+                device,
+                predictor_batch_size=predictor_batch_size,
+            )
+            local_beam_states, _ = _topk_by_score(local_beam_states, seed_scores, local_target)
+            local_beam_hashes = graph.hasher.make_hashes(local_beam_states)
+        elif local_beam_states.shape[0] == 0:
+            local_beam_hashes = _empty_hashes(device)
+
+        history_hashes = (
+            [_sorted_unique_hashes(local_beam_hashes.detach())]
+            if history_depth > 0 and local_beam_hashes.numel() > 0
+            else []
         )
-        local_beam_states, _ = _topk_by_score(local_beam_states, seed_scores, local_target)
-        local_beam_hashes = graph.hasher.make_hashes(local_beam_states)
-    elif local_beam_states.shape[0] == 0:
-        local_beam_hashes = _empty_hashes(device)
+        debug_scores: dict[int, float] = {}
+        adaptive_expand_chunk_size = expand_chunk_size
 
-    history_hashes = [_sorted_unique_hashes(local_beam_hashes.detach())] if history_depth > 0 and local_beam_hashes.numel() > 0 else []
-    debug_scores: dict[int, float] = {}
-    adaptive_expand_chunk_size = expand_chunk_size
-
-    for step in range(1, max_steps + 1):
-        (
-            send_states_parts,
-            send_scores_parts,
-            found_local,
-            used_chunk_size,
-            had_local_oom,
-        ) = _owner_partitioned_streaming_candidates(
-            graph,
-            local_beam_states=local_beam_states,
-            destination_encoded=destination_encoded,
-            beam_width=beam_width,
-            world_size=world_size,
-            history_hashes=history_hashes,
-            predictor=predictor,
-            oversubscription_factor=oversubscription_factor,
-            expand_chunk_size=adaptive_expand_chunk_size,
-            predictor_batch_size=predictor_batch_size,
-            device=device,
-            verbose=verbose,
-            rank=rank,
-        )
-
-        adaptive_expand_chunk_size, any_oom_this_step = _sync_expand_chunk_size_step(
-            used_chunk_size,
-            had_local_oom,
-            adaptive_expand_chunk_size,
-            device,
-        )
-
-        if verbose >= 2 and rank == 0 and any_oom_this_step:
-            print(f"OOM shrink: new_expand_chunk_size={adaptive_expand_chunk_size}.")
-
-
-        send_states, send_scores, send_counts = _prepare_send_buffers(
-            send_states_parts,
-            send_scores_parts,
-            width,
-            device,
-        )
-      
-        send_counts_t = torch.tensor(send_counts, dtype=torch.int64, device=device)
-        gathered_counts = torch.empty((world_size * world_size,), dtype=torch.int64, device=device)
-        dist.all_gather_into_tensor(gathered_counts, send_counts_t)
-
-        count_matrix = gathered_counts.view(world_size, world_size)
-        recv_counts_t = count_matrix[:, rank].contiguous()
-        recv_counts = [int(x) for x in recv_counts_t.tolist()]
-        total_recv = int(recv_counts_t.sum().item())
-
-        recv_states = torch.empty((total_recv, width), dtype=torch.int64, device=device)
-        recv_scores = torch.empty((total_recv,), dtype=torch.float32, device=device)
-
-        dist.all_to_all_single(
-            recv_states,
-            send_states,
-            output_split_sizes=recv_counts,
-            input_split_sizes=send_counts,
-        )
-        dist.all_to_all_single(
-            recv_scores,
-            send_scores,
-            output_split_sizes=recv_counts,
-            input_split_sizes=send_counts,
-        )
-
-        unique_states, unique_hashes, unique_scores = _deduplicate_keep_best_score(
-            graph,
-            recv_states,
-            recv_scores,
-        )
-
-        if history_depth > 0:
-            unique_states, unique_hashes, unique_scores = _filter_history(
-                unique_states,
-                unique_hashes,
-                unique_scores,
-                history_hashes,
+        for step in range(1, max_steps + 1):
+            (
+                send_states_parts,
+                send_scores_parts,
+                found_local,
+                used_chunk_size,
+                had_local_oom,
+            ) = _owner_partitioned_streaming_candidates(
+                graph,
+                local_beam_states=local_beam_states,
+                destination_encoded=destination_encoded,
+                beam_width=beam_width,
+                world_size=world_size,
+                history_hashes=history_hashes,
+                predictor=predictor,
+                oversubscription_factor=oversubscription_factor,
+                expand_chunk_size=adaptive_expand_chunk_size,
+                predictor_batch_size=predictor_batch_size,
+                device=device,
             )
 
-        local_beam_states, next_scores = _topk_by_score(unique_states, unique_scores, local_target)
+            adaptive_expand_chunk_size, any_oom_this_step = _sync_expand_chunk_size_step(
+                used_chunk_size,
+                had_local_oom,
+                adaptive_expand_chunk_size,
+                device,
+            )
 
-        if local_beam_states.numel() == 0:
-            local_beam_hashes = _empty_hashes(device)
-        else:
-            local_beam_hashes = graph.hasher.make_hashes(local_beam_states)
+            if verbose >= 2 and rank == 0 and any_oom_this_step:
+                print(f"OOM shrink: new_expand_chunk_size={adaptive_expand_chunk_size}.")
 
-        history_hashes = _update_history(history_hashes, local_beam_hashes, history_depth)
+            send_states, send_scores, send_counts = _prepare_send_buffers(
+                send_states_parts,
+                send_scores_parts,
+                width,
+                device,
+            )
 
-        local_best = float(next_scores.min().item()) if next_scores.numel() > 0 else float("inf")
-        stop_code, best_score = _reduce_step_status(
-            found_local,
-            local_beam_states.shape[0] > 0,
-            local_best,
-            device,
-        )
+            send_counts_t = torch.tensor(send_counts, dtype=torch.int64, device=device)
+            gathered_counts = torch.empty((world_size * world_size,), dtype=torch.int64, device=device)
+            dist.all_gather_into_tensor(gathered_counts, send_counts_t)
 
-        if math.isfinite(best_score):
-            debug_scores[step] = best_score
+            count_matrix = gathered_counts.view(world_size, world_size)
+            recv_counts_t = count_matrix[:, rank].contiguous()
+            recv_counts = [int(x) for x in recv_counts_t.tolist()]
+            total_recv = int(recv_counts_t.sum().item())
 
-        if verbose >= 2:
-            local_count_t = torch.tensor([int(local_beam_states.shape[0])], dtype=torch.int64, device=device)
-            global_count_t = local_count_t.clone()
-            dist.all_reduce(global_count_t, op=dist.ReduceOp.SUM)
+            recv_states = torch.empty((total_recv, width), dtype=torch.int64, device=device)
+            recv_scores = torch.empty((total_recv,), dtype=torch.float32, device=device)
 
-            send_count_total_t = torch.tensor([sum(send_counts)], dtype=torch.int64, device=device)
-            global_send_total_t = send_count_total_t.clone()
-            dist.all_reduce(global_send_total_t, op=dist.ReduceOp.SUM)
+            dist.all_to_all_single(
+                recv_states,
+                send_states,
+                output_split_sizes=recv_counts,
+                input_split_sizes=send_counts,
+            )
+            dist.all_to_all_single(
+                recv_scores,
+                send_scores,
+                output_split_sizes=recv_counts,
+                input_split_sizes=send_counts,
+            )
 
-            owner_load_t = torch.tensor([int(local_beam_states.shape[0])], dtype=torch.int64, device=device)
-            owner_load_max_t = owner_load_t.clone()
-            owner_load_min_t = owner_load_t.clone()
-            dist.all_reduce(owner_load_max_t, op=dist.ReduceOp.MAX)
-            dist.all_reduce(owner_load_min_t, op=dist.ReduceOp.MIN)
+            unique_states, unique_hashes, unique_scores = _deduplicate_keep_best_score(
+                graph,
+                recv_states,
+                recv_scores,
+            )
 
-            if rank == 0:
-                min_load = int(owner_load_min_t.item())
-                max_load = int(owner_load_max_t.item())
-                imbalance = (max_load / max(1, min_load)) if min_load > 0 else float("inf")
-                print(
-                    f"Step {step}: "
-                    f"beam={int(global_count_t.item())}, "
-                    f"best_score={best_score:.6f}, "
-                    f"sent_preprune={int(global_send_total_t.item())}, "
-                    f"owner_load_min={min_load}, "
-                    f"owner_load_max={max_load}, "
-                    f"owner_imbalance={imbalance:.3f}, "
-                    f"expand_chunk_size={adaptive_expand_chunk_size}."
+            if history_depth > 0:
+                unique_states, unique_hashes, unique_scores = _filter_history(
+                    unique_states,
+                    unique_hashes,
+                    unique_scores,
+                    history_hashes,
                 )
 
-        if stop_code == STOP_FOUND:
-            if verbose >= 1 and rank == 0:
-                print(f"Destination found at step {step}.")
-            return BeamSearchResult(True, step, None, debug_scores, graph.definition)
+            local_beam_states, next_scores = _topk_by_score(unique_states, unique_scores, local_target)
 
-        if stop_code == STOP_EMPTY:
-            if verbose >= 1 and rank == 0:
-                print(f"No beam candidates remain at step {step}.")
-            return BeamSearchResult(False, step, None, debug_scores, graph.definition)
+            if local_beam_states.numel() == 0:
+                local_beam_hashes = _empty_hashes(device)
+            else:
+                local_beam_hashes = graph.hasher.make_hashes(local_beam_states)
 
-    if verbose >= 1 and rank == 0:
-        print(f"Beam search did not converge within {max_steps} steps.")
-    return BeamSearchResult(False, max_steps, None, debug_scores, graph.definition)
+            history_hashes = _update_history(history_hashes, local_beam_hashes, history_depth)
+
+            local_best = float(next_scores.min().item()) if next_scores.numel() > 0 else float("inf")
+            stop_code, best_score = _reduce_step_status(
+                found_local,
+                local_beam_states.shape[0] > 0,
+                local_best,
+                device,
+            )
+
+            if math.isfinite(best_score):
+                debug_scores[step] = best_score
+
+            if verbose >= 2:
+                local_count_t = torch.tensor([int(local_beam_states.shape[0])], dtype=torch.int64, device=device)
+                global_count_t = local_count_t.clone()
+                dist.all_reduce(global_count_t, op=dist.ReduceOp.SUM)
+
+                send_count_total_t = torch.tensor([sum(send_counts)], dtype=torch.int64, device=device)
+                global_send_total_t = send_count_total_t.clone()
+                dist.all_reduce(global_send_total_t, op=dist.ReduceOp.SUM)
+
+                owner_load_t = torch.tensor([int(local_beam_states.shape[0])], dtype=torch.int64, device=device)
+                owner_load_max_t = owner_load_t.clone()
+                owner_load_min_t = owner_load_t.clone()
+                dist.all_reduce(owner_load_max_t, op=dist.ReduceOp.MAX)
+                dist.all_reduce(owner_load_min_t, op=dist.ReduceOp.MIN)
+
+                if rank == 0:
+                    min_load = int(owner_load_min_t.item())
+                    max_load = int(owner_load_max_t.item())
+                    imbalance = (max_load / max(1, min_load)) if min_load > 0 else float("inf")
+                    print(
+                        f"Step {step}: "
+                        f"beam={int(global_count_t.item())}, "
+                        f"best_score={best_score:.6f}, "
+                        f"sent_preprune={int(global_send_total_t.item())}, "
+                        f"owner_load_min={min_load}, "
+                        f"owner_load_max={max_load}, "
+                        f"owner_imbalance={imbalance:.3f}, "
+                        f"expand_chunk_size={adaptive_expand_chunk_size}."
+                    )
+
+            if stop_code == STOP_FOUND:
+                if verbose >= 1 and rank == 0:
+                    print(f"Destination found at step {step}.")
+                return BeamSearchResult(True, step, None, debug_scores, graph.definition)
+
+            if stop_code == STOP_EMPTY:
+                if verbose >= 1 and rank == 0:
+                    print(f"No beam candidates remain at step {step}.")
+                return BeamSearchResult(False, step, None, debug_scores, graph.definition)
+
+        if verbose >= 1 and rank == 0:
+            print(f"Beam search did not converge within {max_steps} steps.")
+        return BeamSearchResult(False, max_steps, None, debug_scores, graph.definition)
+
+    finally:
+        _cleanup_distributed_context()
 
 
 __all__ = [
