@@ -418,12 +418,16 @@ def _fallback_advanced(
     )
 
 
+
+_OWNER_MIX_C1 = -49064778989728563
+_OWNER_MIX_C2 = -4265267296055464877
+
 def _owner_mix_hashes(hashes: torch.Tensor) -> torch.Tensor:
     x = hashes.to(torch.int64)
     x = x ^ (x >> 33)
-    x = x * torch.tensor(-49064778989728563, dtype=torch.int64, device=hashes.device)
+    x = x * torch.tensor(_OWNER_MIX_C1, dtype=torch.int64, device=hashes.device)
     x = x ^ (x >> 33)
-    x = x * torch.tensor(-4265267296055464877, dtype=torch.int64, device=hashes.device)
+    x = x * torch.tensor(_OWNER_MIX_C2, dtype=torch.int64, device=hashes.device)
     x = x ^ (x >> 33)
     return x
 
