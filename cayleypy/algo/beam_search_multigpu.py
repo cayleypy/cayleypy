@@ -421,9 +421,9 @@ def _fallback_advanced(
 def _owner_mix_hashes(hashes: torch.Tensor) -> torch.Tensor:
     x = hashes.to(torch.int64)
     x = x ^ (x >> 33)
-    x = x * torch.tensor(0xFF51AFD7ED558CCD, dtype=torch.int64, device=hashes.device)
+    x = x * torch.tensor(-49064778989728563, dtype=torch.int64, device=hashes.device)
     x = x ^ (x >> 33)
-    x = x * torch.tensor(0xC4CEB9FE1A85EC53, dtype=torch.int64, device=hashes.device)
+    x = x * torch.tensor(-4265267296055464877, dtype=torch.int64, device=hashes.device)
     x = x ^ (x >> 33)
     return x
 
