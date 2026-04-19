@@ -1170,15 +1170,20 @@ def search_multigpu_owner_partitioned(
         elif local_beam_states.shape[0] == 0:
             local_beam_hashes = _empty_hashes(device)
 
-        history_hashes = (
+        seed_history_hashes = (
             [_sorted_unique_hashes(local_beam_hashes.detach())]
             if history_depth > 0 and local_beam_hashes.numel() > 0
             else []
         )
+        history_hashes: list[torch.Tensor] = []
         debug_scores: dict[int, float] = {}
         adaptive_expand_chunk_size = expand_chunk_size
-
+        
         for step in range(1, max_steps + 1):
+            # На шаге 1 не баним по стартовому batch/history.
+            # Иначе при широком старте можно уничтожить весь первый фронтир.
+            history_for_expansion = history_hashes
+        
             (
                 send_states_parts,
                 send_scores_parts,
@@ -1191,7 +1196,7 @@ def search_multigpu_owner_partitioned(
                 destination_encoded=destination_encoded,
                 beam_width=beam_width,
                 world_size=world_size,
-                history_hashes=history_hashes,
+                history_hashes=history_for_expansion,
                 predictor=predictor,
                 oversubscription_factor=oversubscription_factor,
                 expand_chunk_size=adaptive_expand_chunk_size,
@@ -1250,12 +1255,12 @@ def search_multigpu_owner_partitioned(
                 recv_scores[:total_recv],
             )
 
-            if history_depth > 0:
+            if history_depth > 0 and history_for_expansion:
                 unique_states, unique_hashes, unique_scores = _filter_history(
                     unique_states,
                     unique_hashes,
                     unique_scores,
-                    history_hashes,
+                    history_for_expansion,
                 )
 
             local_beam_states, next_scores = _topk_by_score(unique_states, unique_scores, local_target)
@@ -1264,8 +1269,15 @@ def search_multigpu_owner_partitioned(
                 local_beam_hashes = _empty_hashes(device)
             else:
                 local_beam_hashes = graph.hasher.make_hashes(local_beam_states)
-
-            history_hashes = _update_history(history_hashes, local_beam_hashes, history_depth)
+            
+            if history_depth <= 0:
+                history_hashes = []
+            else:
+                next_hist = [_sorted_unique_hashes(local_beam_hashes.detach())]
+                if step == 1:
+                    history_hashes = (seed_history_hashes + next_hist)[-history_depth:]
+                else:
+                    history_hashes = (history_hashes + next_hist)[-history_depth:]
 
             local_best = float(_topk_scores_only(next_scores, 1).min().item()) if next_scores.numel() > 0 else float("inf")
             stop_code, best_score = _reduce_step_status(
