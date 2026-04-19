@@ -4,18 +4,29 @@ CUDA-focused implementation notes:
 
 - `search_multigpu_owner_partitioned` is the only distributed production path.
 - Owner-partitioned search uses streaming expansion, chunked predictor scoring,
-  bounded per-owner GPU buffers, partial top-k, and owner-local history.
+  bounded per-owner GPU candidate accumulation, partial top-k, and owner-local history.
 - CPU / Gloo distributed execution is intentionally not supported here.
 - Multi-GPU scaling target:
     - memory scales approximately with world size because each rank stores only
-      owner-local beam/history plus bounded per-owner send buffers;
+      owner-local beam/history plus bounded pre-pruned owner-local candidate buffers;
     - larger world size therefore permits substantially larger global beam width.
+
+Memory-oriented design changes relative to the original version:
+
+- repeated incremental `torch.cat(...)` inside the chunk loop is removed;
+- predictor scoring uses a single preallocated output tensor instead of list+cat;
+- top-k selection no longer performs an unnecessary second full sort;
+- send/recv tensors are reused via a simple workspace allocator;
+- dedup performs a single sort by hash and only gathers surviving rows;
+- large `.contiguous()` copies are avoided unless actually useful;
+- adaptive chunk sizing uses a more realistic temporary-memory model.
 """
 
 from __future__ import annotations
 
 import math
 import os
+from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
 import torch
@@ -105,12 +116,13 @@ def _encode_states_to_device(graph: "CayleyGraph", states: AnyStateType, device:
     states_t = torch.as_tensor(states, device=device, dtype=torch.int64)
     states_t = states_t.reshape((-1, graph.definition.state_size))
     if graph.string_encoder is not None:
-        return graph.string_encoder.encode(states_t)
+        encoded = graph.string_encoder.encode(states_t)
+        return encoded.reshape((-1, graph.encoded_state_size))
     return states_t
 
 
-def _empty_states(device: torch.device, width: int) -> torch.Tensor:
-    return torch.empty((0, width), dtype=torch.int64, device=device)
+def _empty_states(device: torch.device, width: int, dtype: torch.dtype = torch.int64) -> torch.Tensor:
+    return torch.empty((0, width), dtype=dtype, device=device)
 
 
 def _empty_scores(device: torch.device) -> torch.Tensor:
@@ -186,13 +198,57 @@ def _cleanup_after_oom(device: torch.device) -> None:
             pass
 
 
-def _safe_score_states(
+@dataclass
+class _SearchWorkspace:
+    device: torch.device
+    state_dtype: torch.dtype
+    width: int
+
+    _send_states: Optional[torch.Tensor] = None
+    _send_scores: Optional[torch.Tensor] = None
+    _recv_states: Optional[torch.Tensor] = None
+    _recv_scores: Optional[torch.Tensor] = None
+    _score_out: Optional[torch.Tensor] = None
+
+    def _ensure_state_buffer(self, attr: str, rows: int) -> torch.Tensor:
+        rows = max(0, int(rows))
+        buf = getattr(self, attr)
+        if buf is None or buf.shape[0] < rows:
+            new_rows = max(rows, int(math.ceil(max(1, rows) * 1.25)))
+            buf = torch.empty((new_rows, self.width), dtype=self.state_dtype, device=self.device)
+            setattr(self, attr, buf)
+        return buf[:rows]
+
+    def _ensure_score_buffer(self, attr: str, rows: int) -> torch.Tensor:
+        rows = max(0, int(rows))
+        buf = getattr(self, attr)
+        if buf is None or buf.shape[0] < rows:
+            new_rows = max(rows, int(math.ceil(max(1, rows) * 1.25)))
+            buf = torch.empty((new_rows,), dtype=torch.float32, device=self.device)
+            setattr(self, attr, buf)
+        return buf[:rows]
+
+    def get_send_states(self, rows: int) -> torch.Tensor:
+        return self._ensure_state_buffer("_send_states", rows)
+
+    def get_send_scores(self, rows: int) -> torch.Tensor:
+        return self._ensure_score_buffer("_send_scores", rows)
+
+    def get_recv_states(self, rows: int) -> torch.Tensor:
+        return self._ensure_state_buffer("_recv_states", rows)
+
+    def get_recv_scores(self, rows: int) -> torch.Tensor:
+        return self._ensure_score_buffer("_recv_scores", rows)
+
+    def get_score_out(self, rows: int) -> torch.Tensor:
+        return self._ensure_score_buffer("_score_out", rows)
+
+
+def _score_states_single_batch(
     graph: "CayleyGraph",
     states: torch.Tensor,
     predictor: Optional[Predictor],
     device: torch.device,
-    *,
-    predictor_batch_size: int,
 ) -> torch.Tensor:
     if states.numel() == 0:
         return _empty_scores(device)
@@ -207,20 +263,34 @@ def _safe_score_states(
     if direct_scores is not None:
         return direct_scores
 
-    if predictor_batch_size <= 0 or states.shape[0] <= predictor_batch_size:
-        scores = predictor(graph.decode_states(states))
-        return _as_score_tensor(scores, device=device, expected_size=states.shape[0])
+    decoded_scores = predictor(graph.decode_states(states))
+    return _as_score_tensor(decoded_scores, device=device, expected_size=states.shape[0])
 
-    score_parts: list[torch.Tensor] = []
+
+def _safe_score_states(
+    graph: "CayleyGraph",
+    states: torch.Tensor,
+    predictor: Optional[Predictor],
+    device: torch.device,
+    *,
+    predictor_batch_size: int,
+    workspace: _SearchWorkspace,
+) -> torch.Tensor:
+    if states.numel() == 0:
+        return _empty_scores(device)
+
+    n = states.shape[0]
+    if predictor_batch_size <= 0 or n <= predictor_batch_size:
+        return _score_states_single_batch(graph, states, predictor, device)
+
+    out = workspace.get_score_out(n)
+    offset = 0
     for batch in states.split(predictor_batch_size, dim=0):
-        batch_direct_scores = _predictor_score_encoded_if_available(predictor, batch, device)
-        if batch_direct_scores is not None:
-            score_parts.append(batch_direct_scores)
-            continue
-
-        batch_scores = predictor(graph.decode_states(batch))
-        score_parts.append(_as_score_tensor(batch_scores, device=device, expected_size=batch.shape[0]))
-    return torch.cat(score_parts, dim=0)
+        batch_scores = _score_states_single_batch(graph, batch, predictor, device)
+        batch_n = batch.shape[0]
+        out[offset : offset + batch_n].copy_(batch_scores)
+        offset += batch_n
+    return out[:n]
 
 
 def _score_states_oom_safe(
@@ -230,6 +300,7 @@ def _score_states_oom_safe(
     device: torch.device,
     *,
     predictor_batch_size: int,
+    workspace: _SearchWorkspace,
 ) -> torch.Tensor:
     if states.numel() == 0:
         return _empty_scores(device)
@@ -242,6 +313,7 @@ def _score_states_oom_safe(
                 predictor,
                 device,
                 predictor_batch_size=predictor_batch_size,
+                workspace=workspace,
             )
         except RuntimeError as exc:
             if not _is_cuda_oom(exc):
@@ -262,6 +334,7 @@ def _score_states_oom_safe(
                 predictor,
                 device,
                 predictor_batch_size=current_batch,
+                workspace=workspace,
             )
         except RuntimeError as exc:
             if not _is_cuda_oom(exc):
@@ -292,21 +365,50 @@ def _compute_owner_pre_k(
 
 def _topk_by_score(states: torch.Tensor, scores: torch.Tensor, k: int) -> tuple[torch.Tensor, torch.Tensor]:
     if k <= 0:
-        return _empty_states(states.device, states.shape[1]), _empty_scores(scores.device)
+        return _empty_states(states.device, states.shape[1], states.dtype), _empty_scores(scores.device)
 
     n = states.shape[0]
     if n == 0:
-        return _empty_states(states.device, states.shape[1]), _empty_scores(scores.device)
+        return _empty_states(states.device, states.shape[1], states.dtype), _empty_scores(scores.device)
 
     if n <= k:
-        order = torch.argsort(scores, stable=True)
-        return states[order].contiguous(), scores[order].contiguous()
+        return states, scores
 
-    vals, idx = torch.topk(scores, k, largest=False, sorted=False)
-    order = torch.argsort(vals, stable=True)
-    idx = idx[order]
-    vals = vals[order]
-    return states[idx].contiguous(), vals.contiguous()
+    _, idx = torch.topk(scores, k, largest=False, sorted=False)
+    return states[idx], scores[idx]
+
+
+def _topk_scores_only(scores: torch.Tensor, k: int) -> torch.Tensor:
+    if k <= 0:
+        return _empty_scores(scores.device)
+    if scores.numel() <= k:
+        return scores
+    return torch.topk(scores, k, largest=False, sorted=False).values
+
+
+def _deduplicate_keep_best_score_fallback(
+    order: torch.Tensor,
+    sorted_hashes: torch.Tensor,
+    sorted_scores: torch.Tensor,
+) -> torch.Tensor:
+    n = sorted_hashes.shape[0]
+    if n == 0:
+        return order[:0]
+
+    keep_positions: list[int] = []
+    start = 0
+    while start < n:
+        end = start + 1
+        hash_value = sorted_hashes[start]
+        while end < n and sorted_hashes[end] == hash_value:
+            end += 1
+        local_scores = sorted_scores[start:end]
+        rel = int(torch.argmin(local_scores).item())
+        keep_positions.append(start + rel)
+        start = end
+
+    keep_pos_t = torch.tensor(keep_positions, dtype=torch.int64, device=order.device)
+    return order[keep_pos_t]
 
 
 def _deduplicate_keep_best_score(
@@ -318,32 +420,50 @@ def _deduplicate_keep_best_score(
         return states, graph.hasher.make_hashes(states), scores
 
     hashes = graph.hasher.make_hashes(states)
+    order = torch.argsort(hashes)
+    sorted_hashes = hashes[order]
+    sorted_scores = scores[order]
 
-    score_order = torch.argsort(scores, stable=True)
-    states = states[score_order]
-    scores = scores[score_order]
-    hashes = hashes[score_order]
+    if sorted_hashes.shape[0] <= 1:
+        keep_order = order
+    else:
+        try:
+            unique_hashes, inverse = torch.unique_consecutive(sorted_hashes, return_inverse=True)
+            min_scores = torch.full(
+                (unique_hashes.shape[0],),
+                float("inf"),
+                dtype=sorted_scores.dtype,
+                device=sorted_scores.device,
+            )
+            min_scores.scatter_reduce_(0, inverse, sorted_scores, reduce="amin", include_self=True)
 
-    hash_order = torch.argsort(hashes, stable=True)
-    states = states[hash_order]
-    scores = scores[hash_order]
-    hashes = hashes[hash_order]
+            is_best = sorted_scores == min_scores[inverse]
+            best_positions = torch.nonzero(is_best, as_tuple=False).reshape(-1)
 
-    keep = torch.ones(hashes.shape[0], dtype=torch.bool, device=hashes.device)
-    if hashes.shape[0] > 1:
-        keep[1:] = hashes[1:] != hashes[:-1]
+            # Keep only the first "best" row inside each hash-group.
+            best_group_ids = inverse[best_positions]
+            first_best = torch.ones(best_positions.shape[0], dtype=torch.bool, device=best_positions.device)
+            if best_positions.shape[0] > 1:
+                first_best[1:] = best_group_ids[1:] != best_group_ids[:-1]
 
-    return states[keep].contiguous(), hashes[keep].contiguous(), scores[keep].contiguous()
+            keep_order = order[best_positions[first_best]]
+        except Exception:
+            keep_order = _deduplicate_keep_best_score_fallback(order, sorted_hashes, sorted_scores)
+
+    kept_states = states[keep_order]
+    kept_hashes = hashes[keep_order]
+    kept_scores = scores[keep_order]
+    return kept_states, kept_hashes, kept_scores
 
 
 def _sorted_unique_hashes(hashes: torch.Tensor) -> torch.Tensor:
     if hashes.numel() == 0:
         return hashes
-    hashes = torch.sort(hashes).values
-    keep = torch.ones(hashes.shape[0], dtype=torch.bool, device=hashes.device)
-    if hashes.shape[0] > 1:
-        keep[1:] = hashes[1:] != hashes[:-1]
-    return hashes[keep].contiguous()
+    sorted_hashes = torch.sort(hashes).values
+    keep = torch.ones(sorted_hashes.shape[0], dtype=torch.bool, device=sorted_hashes.device)
+    if sorted_hashes.shape[0] > 1:
+        keep[1:] = sorted_hashes[1:] != sorted_hashes[:-1]
+    return sorted_hashes[keep]
 
 
 def _contains_sorted_hashes(sorted_haystack: torch.Tensor, needles: torch.Tensor) -> torch.Tensor:
@@ -368,6 +488,8 @@ def _filter_hashes_against_history(
     for old_hashes in history_hashes:
         if old_hashes.numel() > 0:
             mask &= ~_contains_sorted_hashes(old_hashes, hashes)
+            if not torch.any(mask):
+                break
     return mask
 
 
@@ -381,7 +503,9 @@ def _filter_history(
         return states, hashes, scores
 
     mask = _filter_hashes_against_history(hashes, history_hashes)
-    return states[mask].contiguous(), hashes[mask].contiguous(), scores[mask].contiguous()
+    if torch.all(mask):
+        return states, hashes, scores
+    return states[mask], hashes[mask], scores[mask]
 
 
 def _update_history(
@@ -472,58 +596,6 @@ def _owners_from_hashes(hashes: torch.Tensor, world_size: int) -> torch.Tensor:
     return torch.remainder(mixed, world_size)
 
 
-def _split_owner_buffers(
-    world_size: int,
-    device: torch.device,
-    width: int,
-) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
-    owner_states = [_empty_states(device, width) for _ in range(world_size)]
-    owner_scores = [_empty_scores(device) for _ in range(world_size)]
-    return owner_states, owner_scores
-
-
-def _merge_owner_buffer(
-    buf_states: torch.Tensor,
-    buf_scores: torch.Tensor,
-    add_states: torch.Tensor,
-    add_scores: torch.Tensor,
-    keep_k: int,
-    width: int,
-    device: torch.device,
-) -> tuple[torch.Tensor, torch.Tensor]:
-    if keep_k <= 0:
-        return _empty_states(device, width), _empty_scores(device)
-
-    if add_states.numel() == 0:
-        if buf_states.shape[0] <= keep_k:
-            return buf_states, buf_scores
-        return _topk_by_score(buf_states, buf_scores, keep_k)
-
-    if buf_states.numel() == 0:
-        return _topk_by_score(add_states, add_scores, keep_k)
-
-    merged_states = torch.cat([buf_states, add_states], dim=0)
-    merged_scores = torch.cat([buf_scores, add_scores], dim=0)
-    return _topk_by_score(merged_states, merged_scores, keep_k)
-
-
-def _prepare_send_buffers(
-    send_states_parts: list[torch.Tensor],
-    send_scores_parts: list[torch.Tensor],
-    width: int,
-    device: torch.device,
-) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
-    send_counts = [int(part.shape[0]) for part in send_states_parts]
-    total_send = sum(send_counts)
-
-    if total_send == 0:
-        return _empty_states(device, width), _empty_scores(device), send_counts
-
-    send_states = torch.cat(send_states_parts, dim=0).contiguous()
-    send_scores = torch.cat(send_scores_parts, dim=0).contiguous()
-    return send_states, send_scores, send_counts
-
-
 def _owner_sorted_spans(owners_sorted: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     n = owners_sorted.shape[0]
     if n == 0:
@@ -559,6 +631,7 @@ def _infer_expand_chunk_size(
     requested_expand_chunk_size: int,
     predictor_batch_size: int,
     local_beam_size: int,
+    state_dtype: torch.dtype,
 ) -> int:
     if requested_expand_chunk_size > 0:
         return requested_expand_chunk_size
@@ -570,10 +643,23 @@ def _infer_expand_chunk_size(
         return max(1024, local_beam_size)
 
     state_width = max(1, int(graph.encoded_state_size))
-    approx_bytes_per_state = max(32, state_width * 8)
+    state_bytes = state_width * torch.tensor([], dtype=state_dtype).element_size()
 
-    safe_budget = max(64 << 20, int(free_bytes * 0.20))
-    inferred = safe_budget // approx_bytes_per_state
+    # More realistic temporary-memory approximation per expanded state:
+    # state + hash + score + owner + temporary permutation/index/mask overhead.
+    approx_bytes_per_state = (
+        state_bytes  # candidate state storage
+        + 8          # hash
+        + 4          # score
+        + 8          # owner / temp int64
+        + 8          # index / permutation
+        + 1          # mask
+        + state_bytes  # extra gather / reorder / staging overhead
+    )
+    approx_bytes_per_state = max(64, int(approx_bytes_per_state * 1.5))
+
+    safe_budget = max(64 << 20, int(free_bytes * 0.15))
+    inferred = safe_budget // max(1, approx_bytes_per_state)
     inferred = max(1024, inferred)
 
     if predictor_batch_size > 0:
@@ -620,6 +706,84 @@ def _maybe_grow_chunk_size(
     return min(base_chunk_size, max(current_chunk_size + 1, grown))
 
 
+def _append_owner_part(
+    owner_states_parts: list[list[torch.Tensor]],
+    owner_scores_parts: list[list[torch.Tensor]],
+    owner_rank: int,
+    states: torch.Tensor,
+    scores: torch.Tensor,
+) -> None:
+    if states.numel() == 0:
+        return
+    owner_states_parts[owner_rank].append(states)
+    owner_scores_parts[owner_rank].append(scores)
+
+
+def _finalize_owner_parts(
+    owner_states_parts: list[list[torch.Tensor]],
+    owner_scores_parts: list[list[torch.Tensor]],
+    owner_budgets: list[int],
+    width: int,
+    device: torch.device,
+    state_dtype: torch.dtype,
+) -> tuple[list[torch.Tensor], list[torch.Tensor]]:
+    world_size = len(owner_budgets)
+    final_states = [_empty_states(device, width, state_dtype) for _ in range(world_size)]
+    final_scores = [_empty_scores(device) for _ in range(world_size)]
+
+    for owner_rank in range(world_size):
+        budget = owner_budgets[owner_rank]
+        if budget <= 0:
+            continue
+
+        state_parts = owner_states_parts[owner_rank]
+        if not state_parts:
+            continue
+
+        score_parts = owner_scores_parts[owner_rank]
+        if len(state_parts) == 1:
+            merged_states = state_parts[0]
+            merged_scores = score_parts[0]
+        else:
+            merged_states = torch.cat(state_parts, dim=0)
+            merged_scores = torch.cat(score_parts, dim=0)
+
+        kept_states, kept_scores = _topk_by_score(merged_states, merged_scores, budget)
+        final_states[owner_rank] = kept_states
+        final_scores[owner_rank] = kept_scores
+
+    return final_states, final_scores
+
+
+def _prepare_send_buffers(
+    send_states_parts: list[torch.Tensor],
+    send_scores_parts: list[torch.Tensor],
+    width: int,
+    device: torch.device,
+    state_dtype: torch.dtype,
+    workspace: _SearchWorkspace,
+) -> tuple[torch.Tensor, torch.Tensor, list[int]]:
+    send_counts = [int(part.shape[0]) for part in send_states_parts]
+    total_send = sum(send_counts)
+
+    if total_send == 0:
+        return _empty_states(device, width, state_dtype), _empty_scores(device), send_counts
+
+    send_states = workspace.get_send_states(total_send)
+    send_scores = workspace.get_send_scores(total_send)
+
+    offset = 0
+    for states_part, scores_part in zip(send_states_parts, send_scores_parts):
+        n = states_part.shape[0]
+        if n == 0:
+            continue
+        send_states[offset : offset + n].copy_(states_part)
+        send_scores[offset : offset + n].copy_(scores_part)
+        offset += n
+
+    return send_states[:total_send], send_scores[:total_send], send_counts
+
+
 def _process_beam_chunk_once(
     graph: "CayleyGraph",
     *,
@@ -631,6 +795,7 @@ def _process_beam_chunk_once(
     owner_budgets: list[int],
     predictor_batch_size: int,
     device: torch.device,
+    workspace: _SearchWorkspace,
 ) -> tuple[list[tuple[int, torch.Tensor, torch.Tensor]], bool]:
     result_parts: list[tuple[int, torch.Tensor, torch.Tensor]] = []
     found_local = False
@@ -657,7 +822,7 @@ def _process_beam_chunk_once(
         return result_parts, found_local
 
     owners = _owners_from_hashes(hashes, world_size)
-    owner_order = torch.argsort(owners, stable=True)
+    owner_order = torch.argsort(owners)
 
     owners = owners[owner_order]
     neighbors = neighbors[owner_order]
@@ -682,6 +847,7 @@ def _process_beam_chunk_once(
             predictor,
             device,
             predictor_batch_size=predictor_batch_size,
+            workspace=workspace,
         )
         owner_chunk_states, owner_chunk_scores = _topk_by_score(
             owner_chunk_states,
@@ -706,9 +872,10 @@ def _owner_partitioned_streaming_candidates(
     expand_chunk_size: int,
     predictor_batch_size: int,
     device: torch.device,
+    workspace: _SearchWorkspace,
 ) -> tuple[list[torch.Tensor], list[torch.Tensor], bool, int, bool]:
     width = graph.encoded_state_size
-    owner_states, owner_scores = _split_owner_buffers(world_size, device, width)
+    state_dtype = local_beam_states.dtype if local_beam_states.numel() > 0 else workspace.state_dtype
     found_local = False
 
     if local_beam_states.numel() == 0:
@@ -718,8 +885,11 @@ def _owner_partitioned_streaming_candidates(
             expand_chunk_size,
             predictor_batch_size,
             0,
+            state_dtype,
         )
-        return owner_states, owner_scores, False, inferred_chunk, False
+        empty_states = [_empty_states(device, width, state_dtype) for _ in range(world_size)]
+        empty_scores = [_empty_scores(device) for _ in range(world_size)]
+        return empty_states, empty_scores, False, inferred_chunk, False
 
     base_chunk_size = _infer_expand_chunk_size(
         graph,
@@ -727,6 +897,7 @@ def _owner_partitioned_streaming_candidates(
         expand_chunk_size,
         predictor_batch_size,
         local_beam_states.shape[0],
+        state_dtype,
     )
     current_chunk_size = base_chunk_size
 
@@ -739,6 +910,9 @@ def _owner_partitioned_streaming_candidates(
         )
         for owner_rank in range(world_size)
     ]
+
+    owner_states_parts: list[list[torch.Tensor]] = [[] for _ in range(world_size)]
+    owner_scores_parts: list[list[torch.Tensor]] = [[] for _ in range(world_size)]
 
     beam_offset = 0
     success_streak = 0
@@ -761,6 +935,7 @@ def _owner_partitioned_streaming_candidates(
                 owner_budgets=owner_budgets,
                 predictor_batch_size=predictor_batch_size,
                 device=device,
+                workspace=workspace,
             )
         except RuntimeError as exc:
             if not _is_cuda_oom(exc):
@@ -772,14 +947,12 @@ def _owner_partitioned_streaming_candidates(
             continue
 
         for owner_rank, owner_chunk_states, owner_chunk_scores in local_parts:
-            owner_states[owner_rank], owner_scores[owner_rank] = _merge_owner_buffer(
-                owner_states[owner_rank],
-                owner_scores[owner_rank],
+            _append_owner_part(
+                owner_states_parts,
+                owner_scores_parts,
+                owner_rank,
                 owner_chunk_states,
                 owner_chunk_scores,
-                owner_budgets[owner_rank],
-                width,
-                device,
             )
 
         found_local = found_local or local_found
@@ -787,7 +960,15 @@ def _owner_partitioned_streaming_candidates(
         success_streak += 1
         current_chunk_size = _maybe_grow_chunk_size(current_chunk_size, base_chunk_size, success_streak)
 
-    return owner_states, owner_scores, found_local, current_chunk_size, had_local_oom
+    final_states, final_scores = _finalize_owner_parts(
+        owner_states_parts,
+        owner_scores_parts,
+        owner_budgets,
+        width,
+        device,
+        state_dtype,
+    )
+    return final_states, final_scores, found_local, current_chunk_size, had_local_oom
 
 
 def search_multigpu(
@@ -878,6 +1059,13 @@ def search_multigpu_owner_partitioned(
     try:
         width = graph.encoded_state_size
         start_encoded = _encode_states_to_device(graph, start_state, device)
+        state_dtype = start_encoded.dtype
+
+        workspace = _SearchWorkspace(
+            device=device,
+            state_dtype=state_dtype,
+            width=width,
+        )
 
         destination_effective = destination_state if destination_state is not None else graph.central_state
         destination_encoded = _encode_states_to_device(graph, destination_effective, device)
@@ -892,8 +1080,8 @@ def search_multigpu_owner_partitioned(
         start_owners = _owners_from_hashes(start_hashes, world_size)
         start_mask = start_owners == rank
 
-        local_beam_states = start_states[start_mask].contiguous()
-        local_beam_hashes = start_hashes[start_mask].contiguous()
+        local_beam_states = start_states[start_mask]
+        local_beam_hashes = start_hashes[start_mask]
 
         local_target = _compute_per_rank_beam(beam_width, world_size, rank)
         if local_beam_states.shape[0] > local_target > 0:
@@ -903,6 +1091,7 @@ def search_multigpu_owner_partitioned(
                 predictor,
                 device,
                 predictor_batch_size=predictor_batch_size,
+                workspace=workspace,
             )
             local_beam_states, _ = _topk_by_score(local_beam_states, seed_scores, local_target)
             local_beam_hashes = graph.hasher.make_hashes(local_beam_states)
@@ -936,6 +1125,7 @@ def search_multigpu_owner_partitioned(
                 expand_chunk_size=adaptive_expand_chunk_size,
                 predictor_batch_size=predictor_batch_size,
                 device=device,
+                workspace=workspace,
             )
 
             adaptive_expand_chunk_size, any_oom_this_step = _sync_expand_chunk_size_step(
@@ -953,6 +1143,8 @@ def search_multigpu_owner_partitioned(
                 send_scores_parts,
                 width,
                 device,
+                state_dtype,
+                workspace,
             )
 
             send_counts_t = torch.tensor(send_counts, dtype=torch.int64, device=device)
@@ -964,8 +1156,8 @@ def search_multigpu_owner_partitioned(
             recv_counts = [int(x) for x in recv_counts_t.tolist()]
             total_recv = int(recv_counts_t.sum().item())
 
-            recv_states = torch.empty((total_recv, width), dtype=torch.int64, device=device)
-            recv_scores = torch.empty((total_recv,), dtype=torch.float32, device=device)
+            recv_states = workspace.get_recv_states(total_recv)
+            recv_scores = workspace.get_recv_scores(total_recv)
 
             dist.all_to_all_single(
                 recv_states,
@@ -982,8 +1174,8 @@ def search_multigpu_owner_partitioned(
 
             unique_states, unique_hashes, unique_scores = _deduplicate_keep_best_score(
                 graph,
-                recv_states,
-                recv_scores,
+                recv_states[:total_recv],
+                recv_scores[:total_recv],
             )
 
             if history_depth > 0:
@@ -1003,7 +1195,7 @@ def search_multigpu_owner_partitioned(
 
             history_hashes = _update_history(history_hashes, local_beam_hashes, history_depth)
 
-            local_best = float(next_scores.min().item()) if next_scores.numel() > 0 else float("inf")
+            local_best = float(_topk_scores_only(next_scores, 1).min().item()) if next_scores.numel() > 0 else float("inf")
             stop_code, best_score = _reduce_step_status(
                 found_local,
                 local_beam_states.shape[0] > 0,
