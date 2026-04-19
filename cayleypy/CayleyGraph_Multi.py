@@ -162,13 +162,12 @@ class CayleyGraph_Multi(CayleyGraph):
         states: torch.Tensor,
         hashes: Optional[torch.Tensor] = None,
     ) -> tuple[torch.Tensor, torch.Tensor]:
-        """Removes duplicates from states.
-
-        Differences from CayleyGraph.get_unique_states:
-        - no stable sort requirement;
-        - no extra sorting of the returned hashes after gather;
-        - same semantic contract for downstream distributed beam search:
-          return one representative per hash.
+        """Removes duplicates from `states` and returns one representative per hash.
+    
+        Properties:
+        - single sort by hash
+        - no stable sort
+        - no extra reorder beyond survivor gather
         """
         if states.numel() == 0:
             width = self.encoded_state_size if states.dim() != 2 else states.shape[1]
@@ -176,26 +175,23 @@ class CayleyGraph_Multi(CayleyGraph):
                 torch.empty((0, width), dtype=states.dtype, device=states.device),
                 torch.empty((0,), dtype=torch.int64, device=states.device),
             )
-
+    
         if self.hasher.is_identity:
-            # Identity-hash case from base class assumes scalar-state semantics.
-            # Preserve equivalent behavior for safety.
             unique_hashes = torch.unique(states.reshape(-1), sorted=True)
             return unique_hashes.reshape((-1, 1)), unique_hashes
-
+    
         if hashes is None:
             hashes = self.hasher.make_hashes(states)
-
+    
         if hashes.numel() <= 1:
             return states, hashes
-
-        # Один sort по hash. stable=False: меньше overhead.
+    
         order = torch.argsort(hashes)
         hashes_sorted = hashes[order]
-
+    
         keep = torch.ones(hashes_sorted.shape[0], dtype=torch.bool, device=hashes_sorted.device)
         keep[1:] = hashes_sorted[1:] != hashes_sorted[:-1]
-
+    
         unique_idx = order[keep]
         return states[unique_idx], hashes[unique_idx]
 
