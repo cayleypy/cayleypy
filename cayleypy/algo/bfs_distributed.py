@@ -1,8 +1,10 @@
 import math
+import os
 from typing import Callable, Optional, TYPE_CHECKING, Union
 
 import numpy as np
 import torch
+import torch.distributed as dist
 
 from .bfs_result import BfsResult
 from ..torch_utils import isin_via_searchsorted
@@ -15,7 +17,18 @@ LayerPart = tuple[torch.Tensor, torch.Tensor]
 
 
 class BfsDistributed:
-    """Multi-GPU breadth-first search implementation."""
+    """Multi-GPU breadth-first search implementation.
+
+    Public interface is preserved.
+
+    Behavior:
+      - plain python: existing single-process multi-GPU implementation;
+      - torchrun with WORLD_SIZE > 1: torch.distributed multi-process implementation.
+    """
+
+    # -------------------------------------------------------------------------
+    # Common small helpers
+    # -------------------------------------------------------------------------
 
     @staticmethod
     def _empty_part(device: torch.device, state_width: int) -> LayerPart:
@@ -27,6 +40,22 @@ class BfsDistributed:
     @staticmethod
     def _apply_mask(states: torch.Tensor, hashes: torch.Tensor, mask: torch.Tensor) -> LayerPart:
         return states[mask], hashes[mask]
+
+    @staticmethod
+    def _is_torchrun_env() -> bool:
+        return (
+            "RANK" in os.environ
+            and "WORLD_SIZE" in os.environ
+            and "LOCAL_RANK" in os.environ
+        )
+
+    @classmethod
+    def _use_torchrun_backend(cls) -> bool:
+        return cls._is_torchrun_env() and int(os.environ["WORLD_SIZE"]) > 1
+
+    # -------------------------------------------------------------------------
+    # Existing single-process helpers
+    # -------------------------------------------------------------------------
 
     @classmethod
     def _partition_states(cls, graph: "CayleyGraph", states: torch.Tensor, hashes: torch.Tensor) -> list[LayerPart]:
@@ -181,8 +210,209 @@ class BfsDistributed:
 
         return accepted_parts
 
+    # -------------------------------------------------------------------------
+    # torch.distributed helpers
+    # -------------------------------------------------------------------------
+
     @classmethod
-    def bfs(
+    def _ensure_dist_initialized(cls) -> tuple[int, int, int]:
+        if dist.is_initialized():
+            rank = dist.get_rank()
+            world_size = dist.get_world_size()
+            local_rank = int(os.environ.get("LOCAL_RANK", rank))
+            if torch.cuda.is_available():
+                torch.cuda.set_device(local_rank)
+            return rank, world_size, local_rank
+
+        rank = int(os.environ["RANK"])
+        world_size = int(os.environ["WORLD_SIZE"])
+        local_rank = int(os.environ["LOCAL_RANK"])
+
+        if torch.cuda.is_available():
+            torch.cuda.set_device(local_rank)
+
+        dist.init_process_group(backend="nccl")
+        return rank, world_size, local_rank
+
+    @staticmethod
+    def _dist_empty_states(device: torch.device, width: int) -> torch.Tensor:
+        return torch.empty((0, width), dtype=torch.int64, device=device)
+
+    @staticmethod
+    def _dist_empty_hashes(device: torch.device) -> torch.Tensor:
+        return torch.empty((0,), dtype=torch.int64, device=device)
+
+    @classmethod
+    def _compact_seen_chunks(cls, chunks: list[torch.Tensor], *, threshold: int = 16) -> list[torch.Tensor]:
+        non_empty = [chunk for chunk in chunks if chunk.numel() > 0]
+        if len(non_empty) <= threshold:
+            return non_empty
+        merged = torch.unique(torch.cat(non_empty, dim=0), sorted=True)
+        return [merged]
+
+    @classmethod
+    def _filter_hashes_against_chunks(cls, hashes: torch.Tensor, chunks: list[torch.Tensor]) -> torch.Tensor:
+        if hashes.numel() == 0:
+            return torch.empty(0, dtype=torch.bool, device=hashes.device)
+        if not chunks:
+            return torch.ones(hashes.shape[0], dtype=torch.bool, device=hashes.device)
+
+        mask = torch.ones(hashes.shape[0], dtype=torch.bool, device=hashes.device)
+        for seen_hashes in chunks:
+            if seen_hashes.numel() == 0:
+                continue
+            mask &= ~isin_via_searchsorted(hashes, seen_hashes)
+        return mask
+
+    @staticmethod
+    def _encode_states_to_device(graph: "CayleyGraph", states: Union[torch.Tensor, np.ndarray, list], device: torch.device) -> torch.Tensor:
+        """Encode states directly onto the target device.
+
+        This avoids depending on graph.device, which may not match LOCAL_RANK
+        under torchrun if CayleyGraph was constructed with a broad device config.
+        """
+        states_t = torch.as_tensor(states, device=device, dtype=torch.int64)
+        states_t = states_t.reshape((-1, graph.definition.state_size))
+        if graph.string_encoder is not None:
+            return graph.string_encoder.encode(states_t)
+        return states_t
+
+    @classmethod
+    def _exchange_by_owner(
+        cls,
+        states: torch.Tensor,
+        hashes: torch.Tensor,
+        world_size: int,
+    ) -> LayerPart:
+        """Exchange states to owner ranks via all_to_all_single.
+
+        Each process owns hashes such that hash % world_size == rank.
+        All ranks must call this the same number of times and in the same order.
+        """
+        device = hashes.device
+        width = states.shape[1]
+
+        if hashes.numel() > 0:
+            owners = torch.remainder(hashes, world_size)
+            perm = torch.argsort(owners, stable=True)
+            owners = owners[perm]
+            hashes = hashes[perm]
+            states = states[perm]
+            send_counts_hashes = torch.bincount(owners, minlength=world_size).to(torch.int64)
+        else:
+            send_counts_hashes = torch.zeros(world_size, dtype=torch.int64, device=device)
+
+        recv_counts_hashes = torch.empty(world_size, dtype=torch.int64, device=device)
+        dist.all_to_all_single(recv_counts_hashes, send_counts_hashes)
+
+        recv_hashes = torch.empty(int(recv_counts_hashes.sum().item()), dtype=torch.int64, device=device)
+        dist.all_to_all_single(
+            recv_hashes,
+            hashes,
+            output_split_sizes=[int(x) for x in recv_counts_hashes.tolist()],
+            input_split_sizes=[int(x) for x in send_counts_hashes.tolist()],
+        )
+
+        send_counts_states = (send_counts_hashes * width).to(torch.int64)
+        recv_counts_states = (recv_counts_hashes * width).to(torch.int64)
+
+        recv_states_flat = torch.empty(int(recv_counts_states.sum().item()), dtype=torch.int64, device=device)
+        dist.all_to_all_single(
+            recv_states_flat,
+            states.reshape(-1),
+            output_split_sizes=[int(x) for x in recv_counts_states.tolist()],
+            input_split_sizes=[int(x) for x in send_counts_states.tolist()],
+        )
+
+        recv_states = recv_states_flat.view(-1, width)
+        return recv_states, recv_hashes
+
+    @classmethod
+    def _gather_layer_all_ranks(
+        cls,
+        graph: "CayleyGraph",
+        local_states: torch.Tensor,
+        local_hashes: torch.Tensor,
+    ) -> LayerPart:
+        """Gather full layer to every rank when really needed."""
+        target_device = local_states.device
+
+        if not dist.is_initialized() or dist.get_world_size() == 1:
+            if local_hashes.numel() == 0:
+                return (
+                    torch.empty((0, graph.encoded_state_size), dtype=torch.int64, device=target_device),
+                    torch.empty(0, dtype=torch.int64, device=target_device),
+                )
+            local_hashes, idx = torch.sort(local_hashes, stable=True)
+            return local_states[idx].to(target_device), local_hashes.to(target_device)
+
+        payload = (
+            local_states.detach().cpu(),
+            local_hashes.detach().cpu(),
+        )
+        gathered: list[tuple[torch.Tensor, torch.Tensor] | None] = [None] * dist.get_world_size()
+        dist.all_gather_object(gathered, payload)
+
+        states_parts = []
+        hashes_parts = []
+        for item in gathered:
+            if item is None:
+                continue
+            part_states, part_hashes = item
+            if part_hashes.numel() == 0:
+                continue
+            states_parts.append(part_states.to(target_device))
+            hashes_parts.append(part_hashes.to(target_device))
+
+        if not hashes_parts:
+            return (
+                torch.empty((0, graph.encoded_state_size), dtype=torch.int64, device=target_device),
+                torch.empty(0, dtype=torch.int64, device=target_device),
+            )
+
+        all_states = torch.cat(states_parts, dim=0)
+        all_hashes = torch.cat(hashes_parts, dim=0)
+        all_hashes, idx = torch.sort(all_hashes, stable=True)
+        all_states = all_states[idx]
+        return all_states, all_hashes
+
+    @staticmethod
+    def _global_layer_size(local_hashes: torch.Tensor) -> int:
+        size_t = torch.tensor([int(local_hashes.numel())], dtype=torch.int64, device=local_hashes.device)
+        dist.all_reduce(size_t, op=dist.ReduceOp.SUM)
+        return int(size_t.item())
+
+    @staticmethod
+    def _global_any_true(flag: bool, device: torch.device) -> bool:
+        t = torch.tensor([1 if flag else 0], dtype=torch.int64, device=device)
+        dist.all_reduce(t, op=dist.ReduceOp.MAX)
+        return bool(t.item())
+
+    @staticmethod
+    def _global_max_int(value: int, device: torch.device) -> int:
+        t = torch.tensor([int(value)], dtype=torch.int64, device=device)
+        dist.all_reduce(t, op=dist.ReduceOp.MAX)
+        return int(t.item())
+
+    @classmethod
+    def _update_local_seen_chunks(
+        cls,
+        graph: "CayleyGraph",
+        previous_hashes: torch.Tensor,
+        next_hashes: torch.Tensor,
+        existing_chunks: list[torch.Tensor],
+    ) -> list[torch.Tensor]:
+        if graph.definition.generators_inverse_closed:
+            chunks = [part for part in [previous_hashes, next_hashes] if part.numel() > 0]
+            return cls._compact_seen_chunks(chunks)
+
+        chunks = list(existing_chunks)
+        if next_hashes.numel() > 0:
+            chunks.append(next_hashes)
+        return cls._compact_seen_chunks(chunks)
+
+    @classmethod
+    def _bfs_torchrun(
         cls,
         graph: "CayleyGraph",
         *,
@@ -193,33 +423,181 @@ class BfsDistributed:
         return_all_hashes: bool = False,
         stop_condition: Optional[Callable[[torch.Tensor, torch.Tensor], bool]] = None,
     ) -> BfsResult:
-        """Runs breadth-first search (BFS) algorithm from given ``start_states``.
+        rank, world_size, local_rank = cls._ensure_dist_initialized()
+        device = torch.device(f"cuda:{local_rank}") if torch.cuda.is_available() else graph.device
+        width = graph.encoded_state_size
 
-        BFS visits all vertices of the graph in layers, where next layer contains vertices adjacent to previous layer
-        that were not visited before. This distributed version shards the frontier and seen-state ownership across
-        GPUs by hash.
+        if start_states is None:
+            start_states = graph.central_state
 
-        Depending on parameters below, it can be used to:
-          * Get growth function (number of vertices at each BFS layer).
-          * Get vertices at some first and last layers.
-          * Get all vertices.
+        if rank == 0:
+            start_states_t = cls._encode_states_to_device(graph, start_states, device)
+            start_states_t, start_hashes_t = graph.get_unique_states(start_states_t)
+        else:
+            start_states_t = cls._dist_empty_states(device, width)
+            start_hashes_t = cls._dist_empty_hashes(device)
 
-        :param graph: CayleyGraph object on which to run BFS.
-        :param start_states: states on 0-th layer of BFS. Defaults to destination state of the graph.
-        :param max_layer_size_to_store: maximal size of layer to store.
-               If None, all layers will be stored.
-               Defaults to 1000.
-               First and last layers are always stored.
-        :param max_layer_size_to_explore: if reaches layer of larger size, will stop the BFS.
-        :param max_diameter: maximal number of BFS iterations.
-        :param return_all_hashes: whether to return hashes for all vertices (uses more memory).
-        :param stop_condition: function to be called after each iteration. It takes 2 tensors: latest computed layer
-            and its hashes, and returns whether BFS must immediately terminate. If it returns True, the layer that was
-            passed to the function will be the last returned layer in the result. This function can also be used as a
-            "hook" to do some computations after BFS iteration (in which case it must always return False).
-        :return: BfsResult object with requested BFS results.
-        """
+        layer_states, layer_hashes = cls._exchange_by_owner(start_states_t, start_hashes_t, world_size)
+        if layer_hashes.numel() > 0:
+            layer_states, layer_hashes = graph.get_unique_states(layer_states, hashes=layer_hashes)
 
+        seen_chunks = [layer_hashes] if layer_hashes.numel() > 0 else []
+
+        first_layer_size = cls._global_layer_size(layer_hashes)
+        gathered0_states, gathered0_hashes = cls._gather_layer_all_ranks(graph, layer_states, layer_hashes)
+
+        layer_sizes = [first_layer_size]
+        layers = {0: graph.decode_states(gathered0_states)}
+        full_graph_explored = False
+        all_layers_hashes = []
+
+        max_layer_size_to_store = max_layer_size_to_store or 10**15
+
+        if return_all_hashes:
+            all_layers_hashes.append(gathered0_hashes)
+
+        for layer_id in range(1, max_diameter + 1):
+            frontier_size_local = layer_states.shape[0]
+            num_local_batches = (frontier_size_local + graph.batch_size - 1) // graph.batch_size
+            num_batches = cls._global_max_int(num_local_batches, device)
+
+            accepted_state_chunks: list[torch.Tensor] = []
+            accepted_hash_chunks: list[torch.Tensor] = []
+
+            for batch_id in range(num_batches):
+                start = batch_id * graph.batch_size
+                end = min(start + graph.batch_size, frontier_size_local)
+
+                if start < frontier_size_local:
+                    batch_states = layer_states[start:end]
+                    neighbors = graph.get_neighbors(batch_states)
+                    cand_states, cand_hashes = graph.get_unique_states(neighbors)
+                else:
+                    cand_states = cls._dist_empty_states(device, width)
+                    cand_hashes = cls._dist_empty_hashes(device)
+
+                recv_states, recv_hashes = cls._exchange_by_owner(cand_states, cand_hashes, world_size)
+                if recv_hashes.numel() == 0:
+                    continue
+
+                recv_states, recv_hashes = graph.get_unique_states(recv_states, hashes=recv_hashes)
+
+                mask = cls._filter_hashes_against_chunks(recv_hashes, seen_chunks)
+                recv_states, recv_hashes = cls._apply_mask(recv_states, recv_hashes, mask)
+                if recv_hashes.numel() == 0:
+                    continue
+
+                if accepted_hash_chunks:
+                    tmp_chunks = cls._compact_seen_chunks(accepted_hash_chunks, threshold=8)
+                    mask = cls._filter_hashes_against_chunks(recv_hashes, tmp_chunks)
+                    recv_states, recv_hashes = cls._apply_mask(recv_states, recv_hashes, mask)
+                    if recv_hashes.numel() == 0:
+                        continue
+
+                accepted_state_chunks.append(recv_states)
+                accepted_hash_chunks.append(recv_hashes)
+
+                if len(accepted_hash_chunks) > 16:
+                    merged_states = torch.cat(accepted_state_chunks, dim=0)
+                    merged_hashes = torch.cat(accepted_hash_chunks, dim=0)
+                    merged_states, merged_hashes = graph.get_unique_states(merged_states, hashes=merged_hashes)
+                    accepted_state_chunks = [merged_states]
+                    accepted_hash_chunks = [merged_hashes]
+
+            if accepted_hash_chunks:
+                next_states = torch.cat(accepted_state_chunks, dim=0)
+                next_hashes = torch.cat(accepted_hash_chunks, dim=0)
+                next_states, next_hashes = graph.get_unique_states(next_states, hashes=next_hashes)
+
+                mask = cls._filter_hashes_against_chunks(next_hashes, seen_chunks)
+                next_states, next_hashes = cls._apply_mask(next_states, next_hashes, mask)
+            else:
+                next_states = cls._dist_empty_states(device, width)
+                next_hashes = cls._dist_empty_hashes(device)
+
+            next_layer_size = cls._global_layer_size(next_hashes)
+
+            if next_layer_size == 0:
+                full_graph_explored = True
+                break
+
+            if graph.verbose >= 2 and rank == 0:
+                print(f"Layer {layer_id}: {next_layer_size} states.")
+
+            layer_sizes.append(next_layer_size)
+
+            need_gather = (
+                next_layer_size <= max_layer_size_to_store
+                or return_all_hashes
+                or stop_condition is not None
+            )
+
+            gathered_states = None
+            gathered_hashes = None
+            if need_gather:
+                gathered_states, gathered_hashes = cls._gather_layer_all_ranks(graph, next_states, next_hashes)
+
+            if next_layer_size <= max_layer_size_to_store:
+                assert gathered_states is not None
+                layers[layer_id] = graph.decode_states(gathered_states)
+
+            if return_all_hashes:
+                assert gathered_hashes is not None
+                all_layers_hashes.append(gathered_hashes)
+
+            previous_hashes = layer_hashes
+            layer_states, layer_hashes = next_states, next_hashes
+            seen_chunks = cls._update_local_seen_chunks(graph, previous_hashes, layer_hashes, seen_chunks)
+
+            if layer_hashes.shape[0] * width * 8 > 0.1 * graph.memory_limit_bytes:
+                graph.free_memory()
+
+            if next_layer_size >= max_layer_size_to_explore:
+                break
+
+            if stop_condition is not None:
+                assert gathered_states is not None and gathered_hashes is not None
+                stop_now_local = bool(stop_condition(gathered_states, gathered_hashes))
+                stop_now = cls._global_any_true(stop_now_local, device)
+                if stop_now:
+                    break
+
+        if not full_graph_explored and graph.verbose > 0 and rank == 0:
+            print("BFS stopped before graph was fully explored.")
+
+        last_layer_id = len(layer_sizes) - 1
+        if full_graph_explored and last_layer_id not in layers:
+            gathered_last_states, _ = cls._gather_layer_all_ranks(graph, layer_states, layer_hashes)
+            layers[last_layer_id] = graph.decode_states(gathered_last_states)
+
+        if dist.is_initialized():
+            dist.barrier()
+
+        return BfsResult(
+            layer_sizes=layer_sizes,
+            layers=layers,
+            bfs_completed=full_graph_explored,
+            layers_hashes=all_layers_hashes,
+            edges_list_hashes=None,
+            graph=graph.definition,
+        )
+
+    # -------------------------------------------------------------------------
+    # Existing implementation preserved as single-process path
+    # -------------------------------------------------------------------------
+
+    @classmethod
+    def _bfs_single_process(
+        cls,
+        graph: "CayleyGraph",
+        *,
+        start_states: Union[None, torch.Tensor, np.ndarray, list] = None,
+        max_layer_size_to_store: Optional[int] = 1000,
+        max_layer_size_to_explore: int = 10**12,
+        max_diameter: int = 1000000,
+        return_all_hashes: bool = False,
+        stop_condition: Optional[Callable[[torch.Tensor, torch.Tensor], bool]] = None,
+    ) -> BfsResult:
         if start_states is None:
             start_states = graph.central_state
         start_states = graph.encode_states(start_states)
@@ -316,4 +694,47 @@ class BfsDistributed:
             layers_hashes=all_layers_hashes,
             edges_list_hashes=None,
             graph=graph.definition,
+        )
+
+    # -------------------------------------------------------------------------
+    # Public entry point
+    # -------------------------------------------------------------------------
+
+    @classmethod
+    def bfs(
+        cls,
+        graph: "CayleyGraph",
+        *,
+        start_states: Union[None, torch.Tensor, np.ndarray, list] = None,
+        max_layer_size_to_store: Optional[int] = 1000,
+        max_layer_size_to_explore: int = 10**12,
+        max_diameter: int = 1000000,
+        return_all_hashes: bool = False,
+        stop_condition: Optional[Callable[[torch.Tensor, torch.Tensor], bool]] = None,
+    ) -> BfsResult:
+        """Runs breadth-first search (BFS) algorithm from given ``start_states``.
+
+        Behavior is selected automatically:
+          * plain python -> existing single-process implementation;
+          * torchrun with WORLD_SIZE > 1 -> torch.distributed implementation.
+        """
+        if cls._use_torchrun_backend():
+            return cls._bfs_torchrun(
+                graph,
+                start_states=start_states,
+                max_layer_size_to_store=max_layer_size_to_store,
+                max_layer_size_to_explore=max_layer_size_to_explore,
+                max_diameter=max_diameter,
+                return_all_hashes=return_all_hashes,
+                stop_condition=stop_condition,
+            )
+
+        return cls._bfs_single_process(
+            graph,
+            start_states=start_states,
+            max_layer_size_to_store=max_layer_size_to_store,
+            max_layer_size_to_explore=max_layer_size_to_explore,
+            max_diameter=max_diameter,
+            return_all_hashes=return_all_hashes,
+            stop_condition=stop_condition,
         )

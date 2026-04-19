@@ -1,4 +1,5 @@
 from .beam_search import BeamSearchAlgorithm
+from .beam_search_multigpu import search_multigpu, search_multigpu_owner_partitioned
 from .beam_search_result import BeamSearchResult
 from .bfs_algo import BfsAlgorithm
 from .bfs_bitmask import bfs_bitmask
