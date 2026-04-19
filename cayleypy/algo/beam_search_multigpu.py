@@ -983,8 +983,8 @@ def _owner_partitioned_streaming_candidates(
         for owner_rank in range(world_size)
     ]
 
-    owner_states_parts: list[list[torch.Tensor]] = [[] for _ in range(world_size)]
-    owner_scores_parts: list[list[torch.Tensor]] = [[] for _ in range(world_size)]
+    owner_states = [_empty_states(device, width, state_dtype) for _ in range(world_size)]
+    owner_scores = [_empty_scores(device) for _ in range(world_size)]
 
     beam_offset = 0
     success_streak = 0
@@ -1019,29 +1019,45 @@ def _owner_partitioned_streaming_candidates(
             continue
 
         for owner_rank, owner_chunk_states, owner_chunk_scores in local_parts:
-            _append_owner_part(
-                owner_states_parts,
-                owner_scores_parts,
-                owner_rank,
-                owner_chunk_states,
-                owner_chunk_scores,
-            )
+            if owner_chunk_states.numel() == 0:
+                continue
+
+            budget = owner_budgets[owner_rank]
+            if budget <= 0:
+                continue
+
+            # ОТРЫВ ОТ REUSABLE BUFFERS
+            chunk_states = owner_chunk_states.clone()
+            chunk_scores = owner_chunk_scores.clone()
+
+            cur_states = owner_states[owner_rank]
+            cur_scores = owner_scores[owner_rank]
+
+            if cur_states.numel() == 0:
+                if chunk_states.shape[0] <= budget:
+                    owner_states[owner_rank] = chunk_states
+                    owner_scores[owner_rank] = chunk_scores
+                else:
+                    owner_states[owner_rank], owner_scores[owner_rank] = _topk_by_score(
+                        chunk_states,
+                        chunk_scores,
+                        budget,
+                    )
+            else:
+                merged_states = torch.cat([cur_states, chunk_states], dim=0)
+                merged_scores = torch.cat([cur_scores, chunk_scores], dim=0)
+                owner_states[owner_rank], owner_scores[owner_rank] = _topk_by_score(
+                    merged_states,
+                    merged_scores,
+                    budget,
+                )
 
         found_local = found_local or local_found
         beam_offset = upper
         success_streak += 1
         current_chunk_size = _maybe_grow_chunk_size(current_chunk_size, base_chunk_size, success_streak)
 
-    final_states, final_scores = _finalize_owner_parts(
-        owner_states_parts,
-        owner_scores_parts,
-        owner_budgets,
-        width,
-        device,
-        state_dtype,
-    )
-    return final_states, final_scores, found_local, current_chunk_size, had_local_oom
-
+    return owner_states, owner_scores, found_local, current_chunk_size, had_local_oom
 
 def search_multigpu(
     graph: "CayleyGraph",
