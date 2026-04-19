@@ -11,17 +11,21 @@ CUDA-focused implementation notes:
       owner-local beam/history plus bounded pre-pruned owner-local candidate buffers;
     - larger world size therefore permits substantially larger global beam width.
 
-Memory-oriented design changes:
+Throughput-oriented design changes in this version:
 
-- repeated incremental `torch.cat(...)` inside the chunk loop is removed;
-- predictor scoring uses a single preallocated output tensor instead of list+cat;
-- top-k selection no longer performs an unnecessary second full sort;
-- send/recv tensors are reused via a simple workspace allocator;
+- owner-local candidate accumulation uses fixed-capacity buffers with reusable
+  scratch storage instead of repeated `torch.cat(...)` in the hot path;
+- predictor scoring is performed on larger post-filter survivor batches before
+  owner splitting when possible, which improves GPU compute density for heavy
+  learned heuristics while remaining compatible with light heuristics;
+- send/recv tensors and merge scratch tensors are reused via a workspace allocator;
 - dedup performs a single sort by hash and only gathers surviving rows;
-- large `.contiguous()` copies are avoided unless actually useful;
-- adaptive chunk sizing uses a more realistic temporary-memory model;
-- if graph exposes `get_neighbors_chunked(...)`, neighbor expansion is streamed
-  in generator chunks instead of materializing the full neighborhood tensor.
+- adaptive chunk sizing continues to shrink on OOM and regrow conservatively.
+
+Practical note:
+- with a trivial heuristic such as Hamming distance, the search remains largely
+  memory/communication bound; the module is nevertheless structured so that a
+  heavier batched neural predictor can saturate GPU compute far better.
 """
 
 from __future__ import annotations
@@ -94,7 +98,10 @@ def _ensure_distributed_context(graph: "CayleyGraph") -> tuple[int, int, torch.d
     if device.type != "cuda":
         raise RuntimeError("Distributed beam search in this module is CUDA/NCCL-only.")
 
-    dist.init_process_group(backend="nccl", init_method="env://")
+    try:
+        dist.init_process_group(backend="nccl", init_method="env://", device_id=device)
+    except TypeError:
+        dist.init_process_group(backend="nccl", init_method="env://")
     _DISTRIBUTED_CONTEXT_OWNS_PG = True
     return rank, world_size, device
 
@@ -211,6 +218,8 @@ class _SearchWorkspace:
     _recv_states: Optional[torch.Tensor] = None
     _recv_scores: Optional[torch.Tensor] = None
     _score_out: Optional[torch.Tensor] = None
+    _temp_states: Optional[torch.Tensor] = None
+    _temp_scores: Optional[torch.Tensor] = None
 
     def _ensure_state_buffer(self, attr: str, rows: int) -> torch.Tensor:
         rows = max(0, int(rows))
@@ -244,6 +253,104 @@ class _SearchWorkspace:
 
     def get_score_out(self, rows: int) -> torch.Tensor:
         return self._ensure_score_buffer("_score_out", rows)
+
+    def get_temp_states(self, rows: int) -> torch.Tensor:
+        return self._ensure_state_buffer("_temp_states", rows)
+
+    def get_temp_scores(self, rows: int) -> torch.Tensor:
+        return self._ensure_score_buffer("_temp_scores", rows)
+
+
+@dataclass
+class _OwnerTopKBuffer:
+    capacity: int
+    width: int
+    device: torch.device
+    state_dtype: torch.dtype
+    workspace: _SearchWorkspace
+
+    states: Optional[torch.Tensor] = None
+    scores: Optional[torch.Tensor] = None
+    size: int = 0
+    threshold: float = float("inf")
+
+    def __post_init__(self) -> None:
+        if self.capacity > 0:
+            self.states = torch.empty((self.capacity, self.width), dtype=self.state_dtype, device=self.device)
+            self.scores = torch.empty((self.capacity,), dtype=torch.float32, device=self.device)
+
+    def _update_threshold(self) -> None:
+        if self.size <= 0 or self.scores is None:
+            self.threshold = float("inf")
+            return
+        self.threshold = float(torch.max(self.scores[: self.size]).item())
+
+    def is_empty(self) -> bool:
+        return self.size <= 0 or self.states is None or self.scores is None
+
+    def push(self, states_in: torch.Tensor, scores_in: torch.Tensor) -> None:
+        if self.capacity <= 0 or states_in.numel() == 0 or self.states is None or self.scores is None:
+            return
+
+        n_in = int(states_in.shape[0])
+        if n_in <= 0:
+            return
+
+        states = states_in
+        scores = scores_in
+
+        if self.size >= self.capacity:
+            keep_mask = scores < self.threshold
+            if not torch.any(keep_mask).item():
+                return
+            states = states[keep_mask]
+            scores = scores[keep_mask]
+            n_in = int(states.shape[0])
+            if n_in <= 0:
+                return
+
+        free = self.capacity - self.size
+        if free > 0:
+            take = min(free, n_in)
+            self.states[self.size : self.size + take].copy_(states[:take])
+            self.scores[self.size : self.size + take].copy_(scores[:take])
+            self.size += take
+            if take == n_in:
+                self._update_threshold()
+                return
+            states = states[take:]
+            scores = scores[take:]
+            n_in = int(states.shape[0])
+
+        if n_in <= 0:
+            self._update_threshold()
+            return
+
+        merged_n = self.size + n_in
+        scratch_states = self.workspace.get_temp_states(merged_n)
+        scratch_scores = self.workspace.get_temp_scores(merged_n)
+
+        scratch_states[: self.size].copy_(self.states[: self.size])
+        scratch_scores[: self.size].copy_(self.scores[: self.size])
+        scratch_states[self.size : merged_n].copy_(states)
+        scratch_scores[self.size : merged_n].copy_(scores)
+
+        keep_scores, keep_idx = torch.topk(
+            scratch_scores[:merged_n],
+            self.capacity,
+            largest=False,
+            sorted=False,
+        )
+        self.states[: self.capacity].copy_(scratch_states[keep_idx])
+        self.scores[: self.capacity].copy_(keep_scores)
+        self.size = self.capacity
+        self._update_threshold()
+
+    def export(self) -> tuple[torch.Tensor, torch.Tensor]:
+        if self.is_empty():
+            return _empty_states(self.device, self.width, self.state_dtype), _empty_scores(self.device)
+        assert self.states is not None and self.scores is not None
+        return self.states[: self.size], self.scores[: self.size]
 
 
 def _score_states_single_batch(
@@ -857,6 +964,51 @@ def _process_neighbors_chunk(
     if neighbors.numel() == 0:
         return result_parts, found_local
 
+    survivor_scores = _score_states_oom_safe(
+        graph,
+        neighbors,
+        predictor,
+        device,
+        predictor_batch_size=predictor_batch_size,
+        workspace=workspace,
+    )
+
+    owners = _owners_from_hashes(hashes, world_size)
+    owner_order = torch.argsort(owners)
+
+    owners = owners[owner_order]
+    neighbors = neighbors[owner_order]
+    survivor_scores = survivor_scores[owner_order]
+
+    owner_ids, starts, ends = _owner_sorted_spans(owners)
+
+    for span_idx in range(owner_ids.shape[0]):
+        owner_rank = int(owner_ids[span_idx].item())
+        owner_budget = owner_budgets[owner_rank]
+        if owner_budget <= 0:
+            continue
+
+        start = int(starts[span_idx].item())
+        end = int(ends[span_idx].item())
+        owner_chunk_states = neighbors[start:end]
+        owner_chunk_scores = survivor_scores[start:end]
+        if owner_chunk_states.numel() == 0:
+            continue
+
+        owner_chunk_states, owner_chunk_scores = _topk_by_score(
+            owner_chunk_states,
+            owner_chunk_scores,
+            owner_budget,
+        )
+        result_parts.append((owner_rank, owner_chunk_states, owner_chunk_scores))
+
+    return result_parts, found_local
+
+    neighbors = neighbors[history_mask]
+    hashes = hashes[history_mask]
+    if neighbors.numel() == 0:
+        return result_parts, found_local
+
     owners = _owners_from_hashes(hashes, world_size)
     owner_order = torch.argsort(owners)
 
@@ -982,9 +1134,16 @@ def _owner_partitioned_streaming_candidates(
         )
         for owner_rank in range(world_size)
     ]
-
-    owner_states = [_empty_states(device, width, state_dtype) for _ in range(world_size)]
-    owner_scores = [_empty_scores(device) for _ in range(world_size)]
+    owner_buffers = [
+        _OwnerTopKBuffer(
+            capacity=owner_budgets[owner_rank],
+            width=width,
+            device=device,
+            state_dtype=state_dtype,
+            workspace=workspace,
+        )
+        for owner_rank in range(world_size)
+    ]
 
     beam_offset = 0
     success_streak = 0
@@ -1021,41 +1180,19 @@ def _owner_partitioned_streaming_candidates(
         for owner_rank, owner_chunk_states, owner_chunk_scores in local_parts:
             if owner_chunk_states.numel() == 0:
                 continue
-
-            budget = owner_budgets[owner_rank]
-            if budget <= 0:
-                continue
-
-            # ОТРЫВ ОТ REUSABLE BUFFERS
-            chunk_states = owner_chunk_states.clone()
-            chunk_scores = owner_chunk_scores.clone()
-
-            cur_states = owner_states[owner_rank]
-            cur_scores = owner_scores[owner_rank]
-
-            if cur_states.numel() == 0:
-                if chunk_states.shape[0] <= budget:
-                    owner_states[owner_rank] = chunk_states
-                    owner_scores[owner_rank] = chunk_scores
-                else:
-                    owner_states[owner_rank], owner_scores[owner_rank] = _topk_by_score(
-                        chunk_states,
-                        chunk_scores,
-                        budget,
-                    )
-            else:
-                merged_states = torch.cat([cur_states, chunk_states], dim=0)
-                merged_scores = torch.cat([cur_scores, chunk_scores], dim=0)
-                owner_states[owner_rank], owner_scores[owner_rank] = _topk_by_score(
-                    merged_states,
-                    merged_scores,
-                    budget,
-                )
+            owner_buffers[owner_rank].push(owner_chunk_states, owner_chunk_scores)
 
         found_local = found_local or local_found
         beam_offset = upper
         success_streak += 1
         current_chunk_size = _maybe_grow_chunk_size(current_chunk_size, base_chunk_size, success_streak)
+
+    owner_states: list[torch.Tensor] = []
+    owner_scores: list[torch.Tensor] = []
+    for buf in owner_buffers:
+        states_out, scores_out = buf.export()
+        owner_states.append(states_out)
+        owner_scores.append(scores_out)
 
     return owner_states, owner_scores, found_local, current_chunk_size, had_local_oom
 
@@ -1325,6 +1462,11 @@ def search_multigpu_owner_partitioned(
                     min_load = int(owner_load_min_t.item())
                     max_load = int(owner_load_max_t.item())
                     imbalance = (max_load / max(1, min_load)) if min_load > 0 else float("inf")
+                    mem_alloc_gb = 0.0
+                    mem_reserved_gb = 0.0
+                    if device.type == "cuda":
+                        mem_alloc_gb = float(torch.cuda.memory_allocated(device)) / (1024**3)
+                        mem_reserved_gb = float(torch.cuda.memory_reserved(device)) / (1024**3)
                     print(
                         f"Step {step}: "
                         f"beam={int(global_count_t.item())}, "
@@ -1333,7 +1475,9 @@ def search_multigpu_owner_partitioned(
                         f"owner_load_min={min_load}, "
                         f"owner_load_max={max_load}, "
                         f"owner_imbalance={imbalance:.3f}, "
-                        f"expand_chunk_size={adaptive_expand_chunk_size}."
+                        f"expand_chunk_size={adaptive_expand_chunk_size}, "
+                        f"rank0_alloc_gb={mem_alloc_gb:.3f}, "
+                        f"rank0_reserved_gb={mem_reserved_gb:.3f}."
                     )
 
             if stop_code == STOP_FOUND:
