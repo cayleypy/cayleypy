@@ -11,7 +11,7 @@ CUDA-focused implementation notes:
       owner-local beam/history plus bounded pre-pruned owner-local candidate buffers;
     - larger world size therefore permits substantially larger global beam width.
 
-Memory-oriented design changes relative to the original version:
+Memory-oriented design changes:
 
 - repeated incremental `torch.cat(...)` inside the chunk loop is removed;
 - predictor scoring uses a single preallocated output tensor instead of list+cat;
@@ -19,7 +19,9 @@ Memory-oriented design changes relative to the original version:
 - send/recv tensors are reused via a simple workspace allocator;
 - dedup performs a single sort by hash and only gathers surviving rows;
 - large `.contiguous()` copies are avoided unless actually useful;
-- adaptive chunk sizing uses a more realistic temporary-memory model.
+- adaptive chunk sizing uses a more realistic temporary-memory model;
+- if graph exposes `get_neighbors_chunked(...)`, neighbor expansion is streamed
+  in generator chunks instead of materializing the full neighborhood tensor.
 """
 
 from __future__ import annotations
@@ -27,7 +29,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Iterable, Optional
 
 import torch
 import torch.distributed as dist
@@ -440,7 +442,6 @@ def _deduplicate_keep_best_score(
             is_best = sorted_scores == min_scores[inverse]
             best_positions = torch.nonzero(is_best, as_tuple=False).reshape(-1)
 
-            # Keep only the first "best" row inside each hash-group.
             best_group_ids = inverse[best_positions]
             first_best = torch.ones(best_positions.shape[0], dtype=torch.bool, device=best_positions.device)
             if best_positions.shape[0] > 1:
@@ -645,16 +646,14 @@ def _infer_expand_chunk_size(
     state_width = max(1, int(graph.encoded_state_size))
     state_bytes = state_width * torch.tensor([], dtype=state_dtype).element_size()
 
-    # More realistic temporary-memory approximation per expanded state:
-    # state + hash + score + owner + temporary permutation/index/mask overhead.
     approx_bytes_per_state = (
-        state_bytes  # candidate state storage
-        + 8          # hash
-        + 4          # score
-        + 8          # owner / temp int64
-        + 8          # index / permutation
-        + 1          # mask
-        + state_bytes  # extra gather / reorder / staging overhead
+        state_bytes
+        + 8
+        + 4
+        + 8
+        + 8
+        + 1
+        + state_bytes
     )
     approx_bytes_per_state = max(64, int(approx_bytes_per_state * 1.5))
 
@@ -737,20 +736,37 @@ def _finalize_owner_parts(
             continue
 
         state_parts = owner_states_parts[owner_rank]
+        score_parts = owner_scores_parts[owner_rank]
         if not state_parts:
             continue
 
-        score_parts = owner_scores_parts[owner_rank]
-        if len(state_parts) == 1:
-            merged_states = state_parts[0]
-            merged_scores = score_parts[0]
-        else:
-            merged_states = torch.cat(state_parts, dim=0)
-            merged_scores = torch.cat(score_parts, dim=0)
+        cur_states = _empty_states(device, width, state_dtype)
+        cur_scores = _empty_scores(device)
 
-        kept_states, kept_scores = _topk_by_score(merged_states, merged_scores, budget)
-        final_states[owner_rank] = kept_states
-        final_scores[owner_rank] = kept_scores
+        for part_states, part_scores in zip(state_parts, score_parts):
+            if part_states.numel() == 0:
+                continue
+
+            if cur_states.numel() == 0:
+                if part_states.shape[0] <= budget:
+                    cur_states = part_states
+                    cur_scores = part_scores
+                else:
+                    cur_states, cur_scores = _topk_by_score(part_states, part_scores, budget)
+                continue
+
+            merged_n = cur_states.shape[0] + part_states.shape[0]
+            if merged_n <= budget:
+                cur_states = torch.cat([cur_states, part_states], dim=0)
+                cur_scores = torch.cat([cur_scores, part_scores], dim=0)
+                continue
+
+            merged_states = torch.cat([cur_states, part_states], dim=0)
+            merged_scores = torch.cat([cur_scores, part_scores], dim=0)
+            cur_states, cur_scores = _topk_by_score(merged_states, merged_scores, budget)
+
+        final_states[owner_rank] = cur_states
+        final_scores[owner_rank] = cur_scores
 
     return final_states, final_scores
 
@@ -784,10 +800,32 @@ def _prepare_send_buffers(
     return send_states[:total_send], send_scores[:total_send], send_counts
 
 
-def _process_beam_chunk_once(
+def _iter_neighbors_chunks(
+    graph: "CayleyGraph",
+    beam_chunk: torch.Tensor,
+) -> Iterable[torch.Tensor]:
+    chunked_fn = getattr(graph, "get_neighbors_chunked", None)
+    if callable(chunked_fn):
+        for item in chunked_fn(beam_chunk):
+            if isinstance(item, tuple) and len(item) == 3:
+                _, _, neighbors_chunk = item
+            else:
+                neighbors_chunk = item
+            neighbors_chunk = _normalize_states(neighbors_chunk, graph.encoded_state_size)
+            if neighbors_chunk.numel() > 0:
+                yield neighbors_chunk
+        return
+
+    neighbors = graph.get_neighbors(beam_chunk)
+    neighbors = _normalize_states(neighbors, graph.encoded_state_size)
+    if neighbors.numel() > 0:
+        yield neighbors
+
+
+def _process_neighbors_chunk(
     graph: "CayleyGraph",
     *,
-    beam_chunk: torch.Tensor,
+    neighbors: torch.Tensor,
     destination_encoded: torch.Tensor,
     world_size: int,
     history_hashes: list[torch.Tensor],
@@ -800,8 +838,6 @@ def _process_beam_chunk_once(
     result_parts: list[tuple[int, torch.Tensor, torch.Tensor]] = []
     found_local = False
 
-    neighbors = graph.get_neighbors(beam_chunk)
-    neighbors = _normalize_states(neighbors, graph.encoded_state_size)
     if neighbors.numel() == 0:
         return result_parts, False
 
@@ -855,6 +891,42 @@ def _process_beam_chunk_once(
             owner_budget,
         )
         result_parts.append((owner_rank, owner_chunk_states, owner_chunk_scores))
+
+    return result_parts, found_local
+
+
+def _process_beam_chunk_once(
+    graph: "CayleyGraph",
+    *,
+    beam_chunk: torch.Tensor,
+    destination_encoded: torch.Tensor,
+    world_size: int,
+    history_hashes: list[torch.Tensor],
+    predictor: Optional[Predictor],
+    owner_budgets: list[int],
+    predictor_batch_size: int,
+    device: torch.device,
+    workspace: _SearchWorkspace,
+) -> tuple[list[tuple[int, torch.Tensor, torch.Tensor]], bool]:
+    result_parts: list[tuple[int, torch.Tensor, torch.Tensor]] = []
+    found_local = False
+
+    for neighbors_chunk in _iter_neighbors_chunks(graph, beam_chunk):
+        chunk_parts, chunk_found = _process_neighbors_chunk(
+            graph,
+            neighbors=neighbors_chunk,
+            destination_encoded=destination_encoded,
+            world_size=world_size,
+            history_hashes=history_hashes,
+            predictor=predictor,
+            owner_budgets=owner_budgets,
+            predictor_batch_size=predictor_batch_size,
+            device=device,
+            workspace=workspace,
+        )
+        if chunk_parts:
+            result_parts.extend(chunk_parts)
+        found_local = found_local or chunk_found
 
     return result_parts, found_local
 
