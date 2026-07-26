@@ -16,6 +16,69 @@ if TYPE_CHECKING:
     from ..cayley_graph import CayleyGraph
 
 
+def _cuda_sync() -> None:
+    """Synchronize the GPU stream so wall-clock timers reflect actual execution.
+
+    Without this, `time.time()` around asynchronous GPU ops measures kernel
+    *launch* time, not execution time (the exact bug AGENTS.md §10 warns about
+    for the Kaggle benchmark script). Only called when `verbose >= 100`, so the
+    sync cost never pollutes benchmark timings (benchmarks run at verbose=0).
+    """
+    if torch.cuda.is_available():
+        torch.cuda.synchronize()
+
+
+class _BeamSearchProfile:
+    """Accumulates per-region GPU-synced timings for `verbose >= 100` profiling.
+
+    Each region is timed with `time.time()` bracketed by `_cuda_sync()` so the
+    measurement reflects actual GPU execution (not kernel launch time). The
+    accumulator tracks per-region totals across all steps and chunks; the
+    `verbose >= 100` print line reports both the running total and the
+    per-step delta so dominant regions are visible at a glance.
+
+    Regions tracked (iterated mode; advanced mode tracks the subset that applies):
+      t_moves   — dim-check / unsqueeze (trivial; the actual neighbor application
+                  is inside `get_neighbors_generator` and not separately timed
+                  here — use the torch.profiler trace for that level of detail).
+      t_hash    — `hasher.make_hashes` (was UNTIMED in the original code).
+      t_sort    — `torch.sort` of chunk hashes (was UNTIMED).
+      t_dedup   — accumulator `torch.isin` + mask application (was UNTIMED).
+      t_check   — `_check_path_found` (was UNTIMED).
+      t_isin    — non-backtracking isin loop + mask application.
+      t_predict — predictor call + topk + accumulator write.
+    """
+
+    __slots__ = ("moves", "hash", "sort", "dedup", "check", "isin", "predict", "step_start")
+
+    def __init__(self) -> None:
+        self.moves: float = 0.0
+        self.hash: float = 0.0
+        self.sort: float = 0.0
+        self.dedup: float = 0.0
+        self.check: float = 0.0
+        self.isin: float = 0.0
+        self.predict: float = 0.0
+        self.step_start: float = 0.0
+
+    def reset_step(self) -> None:
+        """Start a new step: snapshot the per-step accumulator baseline."""
+        self.step_start = time.time()
+        self.moves = self.hash = self.sort = self.dedup = 0.0
+        self.check = self.isin = self.predict = 0.0
+
+    def format_line(self, i_step: int, t0: float) -> str:
+        """Format the verbose=100 profiling line for the current step."""
+        total = time.time() - self.step_start
+        return (
+            f"  step {i_step}: total={total:.3f}s "
+            f"moves={self.moves:.3f} hash={self.hash:.3f} sort={self.sort:.3f} "
+            f"dedup={self.dedup:.3f} check={self.check:.3f} "
+            f"isin={self.isin:.3f} predict={self.predict:.3f} "
+            f"(elapsed={time.time() - t0:.1f}s)"
+        )
+
+
 def _check_path_found(hashes, bfs_layers_hashes):
     for j, layer in enumerate(bfs_layers_hashes):
         if torch.any(isin_via_searchsorted(layer, hashes)):
@@ -104,6 +167,13 @@ class BeamSearchAlgorithm:
             OR
             int radius of BfsResult to be pre-computed on the go
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
+          At level 100, each step prints a GPU-synced per-region timing breakdown
+          (moves/hash/sort/dedup/check/isin/predict). The sync brackets add
+          overhead — NEVER use verbose>=100 in benchmarks; use it only for
+          one-shot profiling (see kaggle_benchmarks/perf/run.py `run_profiling`).
+          For a Chrome-trace flame graph (lower friction, no per-step syncs),
+          wrap your `graph.beam_search(...)` call in `torch.profiler.profile`
+          externally and export with `prof.export_chrome_trace(path)`.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         if beam_mode == "simple":
@@ -322,6 +392,10 @@ class BeamSearchAlgorithm:
             OR
             int radius of BfsResult to be pre-computed on the go
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
+          At level 100, each step prints a GPU-synced per-region timing breakdown
+          (moves/hash/sort/dedup/check/isin/predict). The sync brackets add
+          overhead — NEVER use verbose>=100 in benchmarks; use it only for
+          one-shot profiling.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         debug_scores: dict[int, float] = {}
@@ -384,27 +458,46 @@ class BeamSearchAlgorithm:
 
         # Main beam search cycle.
         t0 = time.time()
+        profile = _BeamSearchProfile() if verbose >= 100 else None
         for i_step in range(1, max_steps + 1):
-            t_moves = t_isin = t_unique_els = 0.0
-            t_full_step = time.time()
+            if profile is not None:
+                _cuda_sync()
+                profile.reset_step()
 
             # Create new states by applying all generators.
-            t1 = time.time()
+            if profile is not None:
+                _cuda_sync()
+                t1 = time.time()
             _new_states = graph.get_neighbors(beam_states)
             # Ensure it's 2D: (n_states, state_size).
             if _new_states.dim() == 1:
                 _new_states = _new_states.unsqueeze(0)
             elif _new_states.dim() > 2:
                 _new_states = _new_states.flatten(end_dim=1)
-            t_moves += time.time() - t1
+            if profile is not None:
+                _cuda_sync()
+                profile.moves += time.time() - t1
 
-            # Take only unique states.
-            t1 = time.time()
+            # Take only unique states (internally: make_hashes + sort + dedup).
+            if profile is not None:
+                _cuda_sync()
+                t1 = time.time()
             _new_states, _new_hashes = graph.get_unique_states(_new_states)
-            t_unique_els += time.time() - t1
+            if profile is not None:
+                _cuda_sync()
+                # In advanced mode, hash+sort+dedup are inside get_unique_states;
+                # the iterated mode splits them (see search_iterated). Time the
+                # whole call as t_hash here — use the profiler trace for finer detail.
+                profile.hash += time.time() - t1
 
             # Check if dest state is found.
+            if profile is not None:
+                _cuda_sync()
+                t1 = time.time()
             bfs_layer_id = _check_path_found(_new_hashes.to(path_device), bfs_layers_hashes)
+            if profile is not None:
+                _cuda_sync()
+                profile.check += time.time() - t1
             if bfs_layer_id != -1:
                 # Path found.
                 path = None
@@ -422,8 +515,10 @@ class BeamSearchAlgorithm:
 
             # Non-backtracking: forbid visiting states visited before.
             if history_depth > 0:
+                if profile is not None:
+                    _cuda_sync()
+                    t1 = time.time()
 
-                t1 = time.time()
                 mask_new = torch.ones_like(_new_hashes, dtype=torch.bool)
                 for j in range(nonbacktrack_hashes.shape[1]):
                     mask_new *= ~torch.isin(_new_hashes, nonbacktrack_hashes[:, j], assume_unique=False)
@@ -437,7 +532,9 @@ class BeamSearchAlgorithm:
                     _new_states = _new_states[mask_new, :]
                     _new_hashes = _new_hashes[mask_new]
 
-                t_isin += time.time() - t1
+                if profile is not None:
+                    _cuda_sync()
+                    profile.isin += time.time() - t1
 
             if _new_hashes.shape[0] == 0:
                 if verbose >= 1:
@@ -445,7 +542,9 @@ class BeamSearchAlgorithm:
                 return BeamSearchResult(False, i_step, None, debug_scores, graph.definition)
 
             # Estimate states and select top beam_width ones.
-            t_predict = time.time()
+            if profile is not None:
+                _cuda_sync()
+                t1 = time.time()
             if _new_states.shape[0] > beam_width:
                 # Score states using predictor.
                 scores = _predictor(graph.decode_states(_new_states))
@@ -478,19 +577,17 @@ class BeamSearchAlgorithm:
             if memory_cleanup:
                 graph.free_memory()
 
-            t_predict = time.time() - t_predict
+            if profile is not None:
+                _cuda_sync()
+                profile.predict += time.time() - t1
 
             # Verbose output.
             if verbose >= 10 and (i_step - 1) % 10 == 0:
-                t_full_step = time.time() - t_full_step
                 print(f"Step {i_step}, beam size: {beam_states.shape[0]}.")
 
-            if verbose >= 100 and (i_step - 1) % 15 == 0:
-                t_full_step = time.time() - t_full_step
-                print(
-                    f"Time: {time.time() - t0:.1f}s, t_moves: {t_moves:.3f}s, "  # t_hash: {t_hash:.3f}s,
-                    f"t_isin: {t_isin:.3f}s, t_unique_els: {t_unique_els:.3f}s, t_full_step: {t_full_step:.3f}s"
-                )
+            if profile is not None:
+                _cuda_sync()
+                print(profile.format_line(i_step, t0))
 
         # Path not found.
         if verbose >= 1:
@@ -536,6 +633,10 @@ class BeamSearchAlgorithm:
             OR
             int radius of BfsResult to be pre-computed on the go
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
+          At level 100, each step prints a GPU-synced per-region timing breakdown
+          (moves/hash/sort/dedup/check/isin/predict). The sync brackets add
+          overhead — NEVER use verbose>=100 in benchmarks; use it only for
+          one-shot profiling.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         debug_scores: dict[int, float] = {}
@@ -610,9 +711,11 @@ class BeamSearchAlgorithm:
 
         # Main beam search cycle.
         t0 = time.time()
+        profile = _BeamSearchProfile() if verbose >= 100 else None
         for i_step in range(1, max_steps + 1):
-            t_moves = t_isin = t_unique_els = t_predict = 0.0
-            t_full_step = time.time()
+            if profile is not None:
+                _cuda_sync()
+                profile.reset_step()
 
             _chunk_idx = 0
             i_tmp = 0
@@ -626,27 +729,60 @@ class BeamSearchAlgorithm:
             # Create new states by applying all generators one by one.
             for _new_states_chunk in graph.get_neighbors_generator(beam_states):
                 # Ensure it's 2D: (n_states, state_size).
-                t1 = time.time()
+                if profile is not None:
+                    _cuda_sync()
+                    t1 = time.time()
                 if _new_states_chunk.dim() == 1:
                     _new_states_chunk = _new_states_chunk.unsqueeze(0)
                 elif _new_states_chunk.dim() > 2:
                     _new_states_chunk = _new_states_chunk.flatten(end_dim=1)
-                t_moves += time.time() - t1
+                if profile is not None:
+                    _cuda_sync()
+                    profile.moves += time.time() - t1
 
+                # Hash the chunk (was UNTIMED in the original code).
+                if profile is not None:
+                    _cuda_sync()
+                    t1 = time.time()
                 _new_hashes_chunk = graph.hasher.make_hashes(_new_states_chunk)
+                if profile is not None:
+                    _cuda_sync()
+                    profile.hash += time.time() - t1
+
+                # Sort by hash (was UNTIMED; preserves the sorted invariant, AGENTS.md §6).
+                if profile is not None:
+                    _cuda_sync()
+                    t1 = time.time()
                 _new_hashes_chunk, idx = torch.sort(_new_hashes_chunk, stable=True)
                 _new_states_chunk = _new_states_chunk[idx, :]
+                if profile is not None:
+                    _cuda_sync()
+                    profile.sort += time.time() - t1
 
                 # Skip already generated states instead of deduplication at the end.
+                # (was UNTIMED; the .item() here is a GPU→CPU sync point — Task 1.3 target.)
                 if _chunk_idx > 0:
+                    if profile is not None:
+                        _cuda_sync()
+                        t1 = time.time()
                     mask_new = ~torch.isin(_new_hashes_chunk, accm_hashes, assume_unique=False)
 
                     if mask_new.sum().item() > 0:
                         _new_states_chunk = _new_states_chunk[mask_new, :]
                         _new_hashes_chunk = _new_hashes_chunk[mask_new]
+                    if profile is not None:
+                        _cuda_sync()
+                        profile.dedup += time.time() - t1
 
-                # Check if dest state is found.
+                # Check if dest state is found. (was UNTIMED; the .to() is a no-op when
+                # return_path=False since path_device==graph.device — see Task 1.1 caveat.)
+                if profile is not None:
+                    _cuda_sync()
+                    t1 = time.time()
                 bfs_layer_id = _check_path_found(_new_hashes_chunk.to(path_device), bfs_layers_hashes)
+                if profile is not None:
+                    _cuda_sync()
+                    profile.check += time.time() - t1
                 if bfs_layer_id != -1:
                     # Path found.
                     path = None
@@ -664,7 +800,9 @@ class BeamSearchAlgorithm:
 
                 # Non-backtracking: forbid visiting states visited before.
                 if history_depth > 0:
-                    t1 = time.time()
+                    if profile is not None:
+                        _cuda_sync()
+                        t1 = time.time()
 
                     mask_new = torch.ones_like(_new_hashes_chunk, dtype=torch.bool)
                     for j in range(nonbacktrack_hashes.shape[1]):
@@ -680,10 +818,14 @@ class BeamSearchAlgorithm:
                         _new_states_chunk = _new_states_chunk[mask_new, :]
                         _new_hashes_chunk = _new_hashes_chunk[mask_new]
 
-                    t_isin += time.time() - t1
+                    if profile is not None:
+                        _cuda_sync()
+                        profile.isin += time.time() - t1
 
                 # Estimate states and select top beam_width ones.
-                t1 = time.time()
+                if profile is not None:
+                    _cuda_sync()
+                    t1 = time.time()
                 if _new_states_chunk.shape[0] > beam_width_part:
                     # Score states using predictor.
                     scores = _predictor(graph.decode_states(_new_states_chunk))
@@ -708,7 +850,9 @@ class BeamSearchAlgorithm:
 
                     _chunk_idx += _new_states_chunk.shape[0]
 
-                t_predict += time.time() - t1
+                if profile is not None:
+                    _cuda_sync()
+                    profile.predict += time.time() - t1
 
             if _chunk_idx == 0:
                 if verbose >= 1:
@@ -734,15 +878,11 @@ class BeamSearchAlgorithm:
 
             # Verbose output.
             if verbose >= 10 and (i_step - 1) % 10 == 0:
-                t_full_step = time.time() - t_full_step
                 print(f"Step {i_step}, beam size: {beam_states.shape[0]}.")
 
-            if verbose >= 100 and (i_step - 1) % 15 == 0:
-                t_full_step = time.time() - t_full_step
-                print(
-                    f"Time: {time.time() - t0:.1f}s, t_moves: {t_moves:.3f}s, "  # t_hash: {t_hash:.3f}s,
-                    f"t_isin: {t_isin:.3f}s, t_unique_els: {t_unique_els:.3f}s, t_full_step: {t_full_step:.3f}s"
-                )
+            if profile is not None:
+                _cuda_sync()
+                print(profile.format_line(i_step, t0))
 
         # Path not found.
         if verbose >= 1:

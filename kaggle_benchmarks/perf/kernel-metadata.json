@@ -1,0 +1,13 @@
+{
+  "id": "ivankolt/cayleypy-gpu-perf",
+  "title": "cayleypy-gpu-perf",
+  "code_file": "run.py",
+  "language": "python",
+  "kernel_type": "script",
+  "is_private": true,
+  "enable_gpu": true,
+  "enable_internet": true,
+  "dataset_sources": [],
+  "kernel_sources": [],
+  "competition_sources": []
+}
