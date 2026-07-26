@@ -17,3 +17,8 @@ dist/
 # Sphinx
 docs/_build
 docs/generated
+
+# Kaggle credentials (never commit)
+.kaggle/
+access_token
+kaggle.json

@@ -230,3 +230,49 @@ perf agent knows where to look.
 - **Benchmarks:** `pytest --benchmark-only` runs regression baselines stored in
   `.benchmarks/` (gitignored). These are NOT in CI; they are for manual before/after
   comparison during performance work.
+
+## 10. GPU benchmarking on Kaggle
+
+The Kaggle GPU benchmark makes `beam_search` performance measurement repeatable
+across perf iterations. The immutable baseline kernel installs from
+`feature/foundation-perf-readiness`; a future perf kernel will install from the perf
+branch (TBD). Scripts live in `kaggle_benchmarks/`.
+
+- **Setup (one-time):** `~/.kaggle/kaggle.json` contains
+  `{"username":"ivanKolt","key":"KGAT_..."}`. The `kaggle` CLI v2.x (2.2.4) does
+  NOT read `kaggle.json` directly (legacy mechanism removed). Extract the `key`
+  value and set it as an env var before each session:
+  `$env:KAGGLE_API_TOKEN="KGAT_..."` (PowerShell) or
+  `export KAGGLE_API_TOKEN=...` (bash).
+- **Hardware:** Kaggle allocates Tesla P100 (CUDA capability sm_60). The default
+  Kaggle torch 2.10 only supports sm_70+ and crashes on P100 with
+  `cudaErrorNoKernelImageForDevice`. The benchmark script pins
+  `torch==2.5.1+cu121` (supports sm_60–sm_90, so it also works on T4).
+- **Benchmark levels:**
+  - **Quick**: LRX(8) + cube333, all 3 modes, `bw=10^5`, `steps=30`, 2 warmup +
+    5 measured. ~15–35 min GPU (cube333 dominates; exact time TBD on first run).
+  - **Deep**: cube333 iterated only, `bw=2^18`, `steps=100`,
+    `hashed_neigbourhood=3`, 1 measured run. ~20 min GPU. Skippable by
+    commenting the deep block in `run.py`.
+  - Total (quick + deep): ~35–55 min GPU per benchmark run.
+- **Run cycle** (PowerShell):
+  ```
+  $env:KAGGLE_API_TOKEN="<key from kaggle.json>"
+  kaggle kernels push -p kaggle_benchmarks/baseline
+  # poll (one cycle ≈ 40–60 min: push + queue + run + download):
+  kaggle kernels status ivankolt/cayleypy-gpu-baseline
+  # download via Python API (the `kaggle kernels output` CLI has a charmap
+  # encoding bug on Windows when the log contains non-ASCII; Python API avoids it):
+  python -c "from kaggle import KaggleApi; api=KaggleApi(); api.authenticate(); api.kernels_output('ivankolt/cayleypy-gpu-baseline', path='./kaggle_out', force=True, quiet=True)"
+  # read ./kaggle_out/gpu_benchmark_result.json
+  ```
+- **Two kernels:** `cayleypy-gpu-baseline` (installs from
+  `feature/foundation-perf-readiness`) is the immutable baseline. The perf kernel
+  (installs from `<perf-branch-name>`, TBD) is created later by copying
+  `kaggle_benchmarks/baseline/` to `kaggle_benchmarks/perf/` and changing the
+  install branch in `run.py` + the kernel `id` in `kernel-metadata.json` to
+  `ivankolt/cayleypy-gpu-perf`. Keep the two scripts in sync — only the install
+  branch and kernel id differ.
+- **Quota:** ~30 GPU-hours/week on a free account. One full benchmark run
+  (quick + deep) ≈ 35–55 min. ~30–50 runs per week — budget for ~10–15
+  before/after comparison cycles.
