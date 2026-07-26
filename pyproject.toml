@@ -60,6 +60,13 @@ docs = [
 [tool.setuptools]
 include-package-data = true
 
+# Explicit package discovery: without this, setuptools' flat-layout auto-discovery
+# treats every top-level directory containing .py files as a package candidate, which
+# conflicts with auxiliary dirs like kaggle_benchmarks/ and aborts the build with
+# "Multiple top-level packages discovered". Restrict to the cayleypy package tree.
+[tool.setuptools.packages.find]
+include = ["cayleypy*"]
+
 [tool.setuptools.package-data]
 "cayleypy" = ["data/*.csv", "puzzles/gap_files/**"]
 
