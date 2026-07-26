@@ -4,19 +4,7 @@ import subprocess
 import sys
 import time
 
-# Install cayleypy from the foundation branch (immutable baseline).
-subprocess.check_call(
-    [
-        sys.executable,
-        "-m",
-        "pip",
-        "install",
-        "-q",
-        "git+https://github.com/cayleypy/cayleypy.git@feature/foundation-perf-readiness",
-    ]
-)
-
-# Pin torch 2.5.1+cu121: Kaggle's default torch 2.10 only supports sm_70+ and
+# Pin torch 2.5.1+cu121 FIRST: Kaggle's default torch 2.10 only supports sm_70+ and
 # crashes on Tesla P100 (sm_60) with cudaErrorNoKernelImageForDevice.
 # torch 2.5.1+cu121 supports sm_60–sm_90, so it works on P100 AND T4.
 subprocess.check_call(
@@ -29,6 +17,27 @@ subprocess.check_call(
         "torch==2.5.1",
         "--index-url",
         "https://download.pytorch.org/whl/cu121",
+    ]
+)
+
+# Install cayleypy's non-torch runtime deps separately so the next step can use
+# --no-deps: cayleypy declares torch>=2.6.0, but it runs correctly on 2.5.1, and
+# --no-deps keeps pip from re-resolving torch upward above the 2.5.1 pin (which would
+# both waste a large download and emit a dependency-conflict warning). Kaggle
+# preinstalls numpy/scipy; h5py/numba/kagglehub are ensured here.
+subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "h5py", "numba", "kagglehub"])
+
+# Install cayleypy pinned to an immutable commit SHA (NOT the mutable branch ref) so
+# the baseline is reproducible even if the branch is force-pushed or deleted.
+subprocess.check_call(
+    [
+        sys.executable,
+        "-m",
+        "pip",
+        "install",
+        "-q",
+        "--no-deps",
+        "git+https://github.com/cayleypy/cayleypy.git@4ba6b0448861d6d5264bc021b2d67205b1fafbe3",
     ]
 )
 

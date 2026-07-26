@@ -119,21 +119,24 @@ def bench_simple_cube222(benchmark):
 
 
 def bench_simple_cube333(benchmark):
-    """Benchmark simple beam search on 3x3x3 cube (quick level)."""
-    result = benchmark(
+    """Benchmark simple beam search on 3x3x3 cube (quick level).
+
+    path_found is not guaranteed at quick level (reduced params, no MITM); this
+    benchmark measures search throughput, not solution quality. The Kaggle script
+    (kaggle_benchmarks/baseline/run.py) records path_found/path_length as stats.
+    """
+    benchmark(
         _CUBE333_GRAPH.beam_search,
         start_state=_CUBE333_START,
         beam_mode="simple",
         beam_width=10**5,
         max_steps=30,
     )
-    # path_found is not guaranteed at quick level (reduced params); throughput is what we measure.
-    assert isinstance(result.path_found, bool)
 
 
 def bench_advanced_cube333_history2(benchmark):
     """Benchmark advanced beam search with history_depth=2 on 3x3x3 cube (quick level)."""
-    result = benchmark(
+    benchmark(
         _CUBE333_GRAPH.beam_search,
         start_state=_CUBE333_START,
         beam_mode="advanced",
@@ -141,12 +144,11 @@ def bench_advanced_cube333_history2(benchmark):
         max_steps=30,
         history_depth=2,
     )
-    assert isinstance(result.path_found, bool)
 
 
 def bench_iterated_cube333_history2(benchmark):
     """Benchmark iterated beam search with history_depth=2 on 3x3x3 cube (quick level)."""
-    result = benchmark(
+    benchmark(
         _CUBE333_GRAPH.beam_search,
         start_state=_CUBE333_START,
         beam_mode="iterated",
@@ -154,4 +156,3 @@ def bench_iterated_cube333_history2(benchmark):
         max_steps=30,
         history_depth=2,
     )
-    assert isinstance(result.path_found, bool)

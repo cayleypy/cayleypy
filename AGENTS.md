@@ -234,9 +234,11 @@ perf agent knows where to look.
 ## 10. GPU benchmarking on Kaggle
 
 The Kaggle GPU benchmark makes `beam_search` performance measurement repeatable
-across perf iterations. The immutable baseline kernel installs from
-`feature/foundation-perf-readiness`; a future perf kernel will install from the perf
-branch (TBD). Scripts live in `kaggle_benchmarks/`.
+across perf iterations. The immutable baseline kernel installs cayleypy from a
+pinned commit SHA (`4ba6b04` on `feature/foundation-perf-readiness`) — a SHA, not
+the mutable branch ref, so the baseline is reproducible even if the branch is
+force-pushed or deleted; a future perf kernel will install from the perf commit
+(TBD). Scripts live in `kaggle_benchmarks/`.
 
 - **Setup (one-time):** `~/.kaggle/kaggle.json` contains
   `{"username":"ivanKolt","key":"KGAT_..."}`. The `kaggle` CLI v2.x (2.2.4) does
@@ -266,13 +268,12 @@ branch (TBD). Scripts live in `kaggle_benchmarks/`.
   python -c "from kaggle import KaggleApi; api=KaggleApi(); api.authenticate(); api.kernels_output('ivankolt/cayleypy-gpu-baseline', path='./kaggle_out', force=True, quiet=True)"
   # read ./kaggle_out/gpu_benchmark_result.json
   ```
-- **Two kernels:** `cayleypy-gpu-baseline` (installs from
-  `feature/foundation-perf-readiness`) is the immutable baseline. The perf kernel
-  (installs from `<perf-branch-name>`, TBD) is created later by copying
-  `kaggle_benchmarks/baseline/` to `kaggle_benchmarks/perf/` and changing the
-  install branch in `run.py` + the kernel `id` in `kernel-metadata.json` to
-  `ivankolt/cayleypy-gpu-perf`. Keep the two scripts in sync — only the install
-  branch and kernel id differ.
+- **Two kernels:** `cayleypy-gpu-baseline` (installs from pinned commit `4ba6b04`)
+  is the immutable baseline. The perf kernel (installs from the perf commit, TBD)
+  is created later by copying `kaggle_benchmarks/baseline/` to
+  `kaggle_benchmarks/perf/` and changing the install commit SHA in `run.py` + the
+  kernel `id` in `kernel-metadata.json` to `ivankolt/cayleypy-gpu-perf`. Keep the
+  two scripts in sync — only the install commit SHA and kernel id differ.
 - **Quota:** ~30 GPU-hours/week on a free account. One full benchmark run
   (quick + deep) ≈ 35–55 min. ~30–50 runs per week — budget for ~10–15
   before/after comparison cycles.
