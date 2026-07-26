@@ -387,7 +387,7 @@ def test_load_dataset_not_found_raises():
 def test_load_dataset_not_found_silent():
     """``load_dataset`` with ``error_if_not_found=False`` returns empty dict for missing dataset."""
     result = load_dataset("this_dataset_does_not_exist", error_if_not_found=False)
-    assert result == {}
+    assert not result
 
 
 def test_load_dataset_returns_expected_shape():
@@ -396,6 +396,6 @@ def test_load_dataset_returns_expected_shape():
     assert isinstance(data, dict)
     assert len(data) > 0
     # Each value should be a list of integers (layer sizes).
-    for key, value in data.items():
+    for _, value in data.items():
         assert isinstance(value, list)
         assert all(isinstance(x, int) for x in value)

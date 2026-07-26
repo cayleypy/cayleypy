@@ -48,7 +48,7 @@ def test_generate_bfs_mode_states_unique_without_subsampling():
     the invariant holds.
     """
     graph = CayleyGraph(PermutationGroups.lrx(5))
-    x, y = graph.random_walks(width=10**6, length=10, mode="bfs")
+    x, _ = graph.random_walks(width=10**6, length=10, mode="bfs")
     state_tuples = [tuple(int(v) for v in s) for s in x]
     assert len(state_tuples) == len(set(state_tuples)), "BFS states should be unique without subsampling"
 
@@ -66,7 +66,7 @@ def test_generate_bfs_mode_duplicates_with_subsampling():
     # to miss duplicates. Revisit during the perf plan.
     """
     graph = CayleyGraph(PermutationGroups.lrx(5))
-    x, y = graph.random_walks(width=5, length=10, mode="bfs")
+    x, _ = graph.random_walks(width=5, length=10, mode="bfs")
     state_tuples = [tuple(int(v) for v in s) for s in x]
     # Pin current behavior: duplicates exist when subsampling is active.
     assert len(state_tuples) > len(set(state_tuples)), "Expected duplicates with subsampling"
@@ -105,7 +105,7 @@ def test_classic_custom_start_state():
     """Custom start_state is used as the first state."""
     graph = CayleyGraph(PermutationGroups.lrx(5))
     start = [4, 3, 2, 1, 0]
-    x, y = RandomWalksGenerator(graph).generate(width=1, length=2, mode="classic", start_state=start)
+    x, _ = RandomWalksGenerator(graph).generate(width=1, length=2, mode="classic", start_state=start)
     assert tuple(int(v) for v in x[0]) == tuple(start)
 
 
@@ -118,7 +118,7 @@ def test_bfs_exhausts_graph():
     """On a tiny graph, BFS exhausts all states before reaching ``length`` layers."""
     graph = CayleyGraph(PermutationGroups.lrx(3))
     # LRX(3) has 6 states; with width=10 and length=100, BFS finds all 6.
-    x, y = graph.random_walks(width=10, length=100, mode="bfs")
+    x, _ = graph.random_walks(width=10, length=100, mode="bfs")
     assert x.shape[0] <= 60  # at most 6 states * 10 width
     assert x.shape[0] <= 6  # all unique -> at most 6
 
@@ -126,7 +126,7 @@ def test_bfs_exhausts_graph():
 def test_bfs_width_limits_layer():
     """Width caps the number of states per layer."""
     graph = CayleyGraph(PermutationGroups.lrx(5))
-    x, y = graph.random_walks(width=2, length=10, mode="bfs")
+    _, y = graph.random_walks(width=2, length=10, mode="bfs")
     # Each layer has at most 2 states.
     for step in range(1, 10):
         mask = y == step

@@ -553,15 +553,12 @@ def test_apply_path_round_trip():
     """
     graph = CayleyGraph(PermutationGroups.lrx(5))
     start = [0, 1, 2, 3, 4]
-    inv_graph_def = graph.definition.with_inverted_generators()
     # Find a pair (i, j) where generator j is the inverse of generator i.
     n_gens = graph.definition.n_generators
     found = False
     for i in range(n_gens):
-        gen_i = list(graph.definition.generators_permutations[i])
         for j in range(n_gens):
-            inv_gen_j = list(inv_graph_def.generators_permutations[j])
-            # Check if applying gen_i then inv_gen_j is identity.
+            # Check if applying generator i then j returns to start (identity).
             result = graph.apply_path(start, [i, j])
             if torch.equal(result.reshape(-1), torch.tensor(start)):
                 found = True
