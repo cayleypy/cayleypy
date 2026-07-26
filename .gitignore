@@ -11,6 +11,9 @@ htmlcov/
 venv/
 dist/
 
+# pytest-benchmark baselines (regression snapshots, not for version control)
+.benchmarks/
+
 # Sphinx
 docs/_build
 docs/generated

@@ -90,3 +90,23 @@ jobs:
           pip install .[docs]
       - name: Build the docs
         run: docs/build_docs.sh
+  coverage:
+    name: Coverage (core+algo >=90%)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v1
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          architecture: 'x64'
+      - name: Install requirements
+        run: pip install .[test,dev]
+      - name: Run tests with coverage
+        run: coverage run --branch -m pytest
+      - name: Core+algo coverage gate (must be >=90%)
+        run: |
+          coverage report \
+            --omit="cayleypy/puzzles/*,cayleypy/models/*,cayleypy/graphs_lib.py,cayleypy/datasets.py,cayleypy/data/*,*_test.py,*_benchmark.py" \
+            --fail-under=90
+      - name: Whole-package coverage (informational, never fails)
+        run: coverage report || true

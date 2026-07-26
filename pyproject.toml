@@ -109,3 +109,34 @@ disable = [
 
 [tool.black]
 line-length = 120
+
+[tool.pytest.ini_options]
+testpaths = ["cayleypy"]
+addopts = "-q"
+# `bench_*` functions in *_benchmark.py files are collected only when the file is
+# explicitly passed to pytest (benchmark files do not match test_*.py / *_test.py, so
+# they are not auto-collected during normal `pytest`). To run benchmarks:
+#   pytest --benchmark-only cayleypy/algo/beam_search_benchmark.py
+python_files = ["test_*.py", "*_test.py"]
+python_functions = ["test_*", "bench_*"]
+markers = [
+    # `slow` marker is informational only; slow tests are gated by the RUN_SLOW_TESTS=1
+    # environment variable via @pytest.mark.skipif (the existing convention). Registering
+    # the marker here silences PytestUnknownMarkWarning; it does not select tests.
+    "slow: slow tests (run only with RUN_SLOW_TESTS=1)",
+]
+
+[tool.coverage.run]
+source = ["cayleypy"]
+branch = true
+parallel = false
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "if TYPE_CHECKING:",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+]

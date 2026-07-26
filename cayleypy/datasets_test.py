@@ -371,3 +371,31 @@ def test_prefix_cycles_cayley_growth():
         assert sum(layer_sizes) == math.factorial(n)
         if n <= 6:
             _verify_layers_fast(PermutationGroups.prefix_cycles(n), layer_sizes)
+
+
+# =============================================================================
+# Contract tests for load_dataset edge cases
+# =============================================================================
+
+
+def test_load_dataset_not_found_raises():
+    """``load_dataset`` raises KeyError for a non-existent dataset name."""
+    with pytest.raises(KeyError, match="No such dataset"):
+        load_dataset("this_dataset_does_not_exist")
+
+
+def test_load_dataset_not_found_silent():
+    """``load_dataset`` with ``error_if_not_found=False`` returns empty dict for missing dataset."""
+    result = load_dataset("this_dataset_does_not_exist", error_if_not_found=False)
+    assert result == {}
+
+
+def test_load_dataset_returns_expected_shape():
+    """``load_dataset`` returns a dict with at least one entry for a bundled CSV."""
+    data = load_dataset("lrx_cayley_growth")
+    assert isinstance(data, dict)
+    assert len(data) > 0
+    # Each value should be a list of integers (layer sizes).
+    for key, value in data.items():
+        assert isinstance(value, list)
+        assert all(isinstance(x, int) for x in value)

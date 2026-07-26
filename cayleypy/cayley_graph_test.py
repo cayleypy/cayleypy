@@ -480,3 +480,174 @@ def test_bfs_on_modified_copy_preserves_structure_safe():
     assert not torch.equal(new_graph.central_state, graph.central_state)
     assert new_graph.hasher is graph.hasher
     assert new_graph.string_encoder is graph.string_encoder
+
+
+# =============================================================================
+# Hot-path method tests (get_neighbors, encode/decode, apply_path, restore_path,
+# find_path_from, free_memory, get_neighbors_generator)
+# =============================================================================
+
+
+def test_get_neighbors_central_state():
+    """``get_neighbors`` returns ``n_generators`` copies of the state, each transformed."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    encoded = graph.encode_states(graph.central_state)
+    neighbors = graph.get_neighbors(encoded)
+    # LRX has 3 generators -> 3 neighbor rows (1 state * 3 generators).
+    assert neighbors.shape[0] == graph.definition.n_generators
+    # The central state [0,1,2,3,4] should NOT appear among its own neighbors.
+    central_decoded = graph.decode_states(encoded)
+    for i in range(neighbors.shape[0]):
+        assert not torch.equal(neighbors[i], central_decoded[0])
+
+
+def test_get_neighbors_multiple_states():
+    """``get_neighbors`` on ``k`` states returns ``k * n_generators`` rows."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    states = graph.encode_states(torch.tensor([[0, 1, 2, 3, 4], [4, 3, 2, 1, 0]]))
+    neighbors = graph.get_neighbors(states)
+    assert neighbors.shape[0] == 2 * graph.definition.n_generators
+
+
+def test_get_neighbors_generator_yields_per_generator():
+    """``get_neighbors_generator`` yields one chunk per generator."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    states = graph.encode_states(graph.central_state)
+    chunks = list(graph.get_neighbors_generator(states))
+    assert len(chunks) == graph.definition.n_generators
+    for chunk in chunks:
+        assert chunk.shape[0] == states.shape[0]
+
+
+def test_encode_decode_round_trip():
+    """encode_states -> decode_states is the identity for non-bit-encoded graphs."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), bit_encoding_width=None)
+    original = torch.tensor([[0, 1, 2, 3, 4], [4, 3, 2, 1, 0]])
+    encoded = graph.encode_states(original)
+    decoded = graph.decode_states(encoded)
+    assert torch.equal(decoded, original)
+
+
+def test_encode_decode_round_trip_bit_encoded():
+    """encode -> decode round-trip with bit encoding."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), bit_encoding_width=3)
+    original = torch.tensor([[0, 1, 2, 3, 4], [4, 3, 2, 1, 0]])
+    encoded = graph.encode_states(original)
+    decoded = graph.decode_states(encoded)
+    assert torch.equal(decoded, original)
+
+
+def test_apply_path_single_generator():
+    """``apply_path`` applies generators in order; single-step path."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    start = [0, 1, 2, 3, 4]
+    result = graph.apply_path(start, [0])
+    # Applying generator 0 (L) to [0,1,2,3,4] should produce a non-identity state.
+    assert not torch.equal(result.reshape(-1), torch.tensor(start))
+
+
+def test_apply_path_round_trip():
+    """Applying a generator and then its inverse returns to the start state.
+
+    For LRX, generators L (shift left) and R (shift right) are inverses.
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    start = [0, 1, 2, 3, 4]
+    inv_graph_def = graph.definition.with_inverted_generators()
+    # Find a pair (i, j) where generator j is the inverse of generator i.
+    n_gens = graph.definition.n_generators
+    found = False
+    for i in range(n_gens):
+        gen_i = list(graph.definition.generators_permutations[i])
+        for j in range(n_gens):
+            inv_gen_j = list(inv_graph_def.generators_permutations[j])
+            # Check if applying gen_i then inv_gen_j is identity.
+            result = graph.apply_path(start, [i, j])
+            if torch.equal(result.reshape(-1), torch.tensor(start)):
+                found = True
+                break
+        if found:
+            break
+    assert found, "Should find at least one generator/inverse pair"
+
+
+def test_apply_path_validates_generator_ids():
+    """``apply_path`` asserts generator_id is in range."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    with pytest.raises(AssertionError):
+        graph.apply_path([0, 1, 2, 3, 4], [999])
+
+
+def test_restore_path_from_bfs():
+    """``restore_path`` reconstructs a path from BFS layer hashes.
+
+    ``restore_path(layers_hashes[:k], target)`` returns a path of length k that goes
+    from layer[0] to ``target`` (which is at layer k).
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    bfs_result = graph.bfs(max_diameter=5, return_all_hashes=True)
+    # Pick a state at layer 2.
+    layer2 = bfs_result.get_layer(2)
+    if len(layer2) > 0:
+        target_state = layer2[0]
+        path = graph.restore_path(bfs_result.layers_hashes[:2], target_state)
+        # Path length should be 2 (two layers).
+        assert len(path) == 2
+        # Applying the path from layer-0 state should reach target_state.
+        layer0_state = torch.tensor(bfs_result.get_layer(0)[0])
+        result = graph.apply_path(layer0_state, path)
+        assert torch.equal(result.reshape(-1), torch.tensor(target_state))
+
+
+def test_find_path_from_using_bfs():
+    """``find_path_from`` finds a path from a state to central using pre-computed BFS."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    bfs_result = graph.bfs(max_diameter=5, return_all_hashes=True)
+    # Pick a state at layer 2 and find path from it to central.
+    layer2 = bfs_result.get_layer(2)
+    if len(layer2) > 0:
+        start_state = layer2[0]
+        path = graph.find_path_from(start_state, bfs_result)
+        assert path is not None
+        assert len(path) == 2
+        graph.validate_path(start_state, path)
+
+
+def test_find_path_from_not_found_returns_none():
+    """``find_path_from`` returns None when the state is not in the BFS layers."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    bfs_result = graph.bfs(max_diameter=1, return_all_hashes=True)
+    # A state at distance > 1 won't be found.
+    far_state = [4, 3, 2, 1, 0]
+    path = graph.find_path_from(far_state, bfs_result)
+    assert path is None
+
+
+def test_free_memory_cpu():
+    """``free_memory`` runs without error on CPU (calls gc.collect)."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    graph.free_memory()  # Should not raise.
+
+
+def test_get_unique_states_returns_sorted_hashes():
+    """Hidden critical contract: ``get_unique_states`` returns hashes in sorted order.
+
+    This invariant is relied upon by ``isin_via_searchsorted`` (which requires a
+    sorted ``test_elements_sorted`` argument) inside ``_check_path_found`` and
+    ``_remove_seen_states``. A regression here would silently break MITM path
+    detection. See AGENTS.md section "Invariants".
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(8), random_seed=42)
+    # Create states whose hashes are NOT in sorted order (use a non-identity hasher).
+    assert not graph.hasher.is_identity
+    states = torch.tensor(
+        [
+            [4, 3, 2, 1, 0, 7, 6, 5],
+            [0, 1, 2, 3, 4, 5, 6, 7],
+            [7, 6, 5, 4, 3, 2, 1, 0],
+        ],
+        dtype=torch.int64,
+    )
+    _, hashes = graph.get_unique_states(graph.encode_states(states))
+    if len(hashes) > 1:
+        assert torch.all(hashes[1:] >= hashes[:-1]), f"Hashes not sorted: {hashes}"
