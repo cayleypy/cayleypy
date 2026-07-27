@@ -528,9 +528,11 @@ class BeamSearchAlgorithm:
                 i_tmp = len(_new_hashes)
                 nonbacktrack_hashes[:i_tmp, i_cyclic_index_for_hash_storage] = _new_hashes
 
-                if mask_new.sum().item() > 0:
-                    _new_states = _new_states[mask_new, :]
-                    _new_hashes = _new_hashes[mask_new]
+                # Apply mask unconditionally (Task 1.3): drops the .item()
+                # GPU→CPU sync guard. Empty result is handled by the shape[0]==0
+                # early-exit below.
+                _new_states = _new_states[mask_new, :]
+                _new_hashes = _new_hashes[mask_new]
 
                 if profile is not None:
                     _cuda_sync()
@@ -787,9 +789,14 @@ class BeamSearchAlgorithm:
                         t1 = time.time()
                     mask_new = ~torch.isin(_new_hashes_chunk, accm_hashes, assume_unique=False)
 
-                    if mask_new.sum().item() > 0:
-                        _new_states_chunk = _new_states_chunk[mask_new, :]
-                        _new_hashes_chunk = _new_hashes_chunk[mask_new]
+                    # Apply mask unconditionally (Task 1.3): the old
+                    # `mask_new.sum().item() > 0` guard forced a GPU→CPU sync per
+                    # chunk. Boolean indexing with all-False produces an empty
+                    # tensor (shape [0, ...]), handled by downstream guards
+                    # (shape[0] > beam_width_part skips topk; shape[0] > 0 skips
+                    # accumulator write).
+                    _new_states_chunk = _new_states_chunk[mask_new, :]
+                    _new_hashes_chunk = _new_hashes_chunk[mask_new]
                     if profile is not None:
                         _cuda_sync()
                         profile.dedup += time.time() - t1
@@ -844,11 +851,11 @@ class BeamSearchAlgorithm:
                     nonbacktrack_hashes[i_cyclic_index_for_hash_storage].add_sorted_hashes(_new_hashes_chunk)
                     i_tmp += len(_new_hashes_chunk)
 
-                    # Apply mask unconditionally (Task 1.3 will drop the .item()
-                    # sync guard; kept here for now to isolate the Task 1.6 change).
-                    if mask_new.sum().item() > 0:
-                        _new_states_chunk = _new_states_chunk[mask_new, :]
-                        _new_hashes_chunk = _new_hashes_chunk[mask_new]
+                    # Apply mask unconditionally (Task 1.3): drops the .item()
+                    # GPU→CPU sync guard. Empty result (all-False mask) is handled
+                    # by downstream shape[0] guards.
+                    _new_states_chunk = _new_states_chunk[mask_new, :]
+                    _new_hashes_chunk = _new_hashes_chunk[mask_new]
 
                     if profile is not None:
                         _cuda_sync()
