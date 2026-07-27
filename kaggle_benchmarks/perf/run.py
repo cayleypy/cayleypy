@@ -142,6 +142,7 @@ QUICK_MODES = [
     {"name": "simple"},
     {"name": "advanced", "history_depth": 2},
     {"name": "iterated", "history_depth": 2},
+    {"name": "iterated_batched", "history_depth": 2},
 ]
 
 
