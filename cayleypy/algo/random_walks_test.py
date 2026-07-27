@@ -4,6 +4,7 @@ This module has no test file currently; these tests cover each public mode.
 """
 
 import pytest
+import numpy as np
 import torch
 
 from cayleypy.cayley_graph import CayleyGraph
@@ -53,23 +54,22 @@ def test_generate_bfs_mode_states_unique_without_subsampling():
     assert len(state_tuples) == len(set(state_tuples)), "BFS states should be unique without subsampling"
 
 
-def test_generate_bfs_mode_duplicates_with_subsampling():
-    """BFS mode: duplicates CAN appear when ``width`` < layer size (subsampling triggered).
+def test_generate_bfs_mode_states_unique_with_subsampling():
+    """BFS mode: all states are unique even when ``width`` < layer size (subsampling active).
 
-    # TODO(char-spec): This contradicts the docstring at ``random_walks.py:55`` which
-    # states "All states in the output are unique." The root cause is a bug in the
-    # subsampling path: after ``torch.randperm`` selects a random subset of states
-    # (random_walks.py:143-146), the resulting hashes are in random (non-sorted)
-    # order, but ``TorchHashSet.add_sorted_hashes`` assumes sorted input
-    # (torch_utils.py:20: "IMPORTANT: Assumes that new numbers are sorted"). This
-    # violates the precondition, causing subsequent ``isin_via_searchsorted`` lookups
-    # to miss duplicates. Revisit during the perf plan.
+    Previously this was a known bug (TODO(char-spec)): after ``torch.randperm``
+    subsampling, hashes were in random order, violating the ``add_sorted_hashes``
+    precondition, causing duplicate states to slip through. Fixed by sorting hashes
+    after subsampling (random_walks.py). This test now asserts the documented
+    invariant "All states in the output are unique" (random_walks.py:55) holds even
+    with subsampling.
     """
+    np.random.seed(12345)
+    torch.manual_seed(12345)
     graph = CayleyGraph(PermutationGroups.lrx(5))
     x, _ = graph.random_walks(width=5, length=10, mode="bfs")
     state_tuples = [tuple(int(v) for v in s) for s in x]
-    # Pin current behavior: duplicates exist when subsampling is active.
-    assert len(state_tuples) > len(set(state_tuples)), "Expected duplicates with subsampling"
+    assert len(state_tuples) == len(set(state_tuples)), "BFS states should be unique even with subsampling"
 
 
 def test_generate_nbt_mode():

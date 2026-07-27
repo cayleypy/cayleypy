@@ -144,6 +144,12 @@ class RandomWalksGenerator:
                 layer_size = width
                 next_states = next_states[random_indices]
                 next_states_hashes = next_states_hashes[random_indices]
+            # Sort by hash before adding to the hash-set (add_sorted_hashes requires
+            # sorted input — see torch_utils.py precondition). After randperm
+            # subsampling above, hashes are in random order; without this sort,
+            # isin_via_searchsorted lookups miss duplicates (AGENTS.md §7 bug).
+            next_states_hashes, _sort_idx = torch.sort(next_states_hashes, stable=True)
+            next_states = next_states[_sort_idx]
             x.append(next_states)
             x_hashes.add_sorted_hashes(next_states_hashes)
             y.append(torch.full((layer_size,), i_step, device=graph.device, dtype=torch.int32))
