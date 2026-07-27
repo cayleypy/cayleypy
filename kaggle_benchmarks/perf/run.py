@@ -27,12 +27,9 @@ subprocess.check_call(
 # preinstalls numpy/scipy; h5py/numba/kagglehub are ensured here.
 subprocess.check_call([sys.executable, "-m", "pip", "install", "-q", "h5py", "numba", "kagglehub"])
 
-# Install cayleypy from the perf branch. Unlike the baseline kernel (which pins to an
-# immutable commit SHA for reproducibility), the perf kernel installs from the
-# `feature/beam-search-perf` BRANCH REF so it auto-tracks the latest pushed perf
-# commit. This is intentional: each perf iteration pushes a new commit, and we want
-# the kernel to pick it up without manually updating the SHA each time. Before the
-# FINAL cross-phase comparison run, pin this to a specific SHA for reproducibility.
+# Install cayleypy from the perf branch. Pinned to commit SHA `be8b087` for
+# reproducible final validation (Phase 1 + Phase 4 + bugfix + Task 3.2).
+# To resume auto-tracking the branch, replace the SHA with `feature/beam-search-perf`.
 subprocess.check_call(
     [
         sys.executable,
@@ -41,7 +38,7 @@ subprocess.check_call(
         "install",
         "-q",
         "--no-deps",
-        "git+https://github.com/cayleypy/cayleypy.git@feature/beam-search-perf",
+        "git+https://github.com/cayleypy/cayleypy.git@be8b087",
     ]
 )
 
@@ -264,6 +261,31 @@ results["cube333_deep"] = {
     "path_length": deep_result.path_length,
 }
 print(f"  iterated: time={deep_time:.1f}s found={deep_result.path_found}", flush=True)
+
+# --- Deep level: cube 3x3x3 iterated_batched (regime B, 1 run) ---
+# Compares batched vs chunked iterated at deep beam (bw=2^18, mitm=3).
+print("=== Cube 3x3x3 deep (iterated_batched) ===", flush=True)
+deep_batched_kwargs = {
+    "beam_mode": "iterated_batched",
+    "beam_width": _BEAM_WIDTH_DEEP,
+    "max_steps": _MAX_STEPS_DEEP,
+    "history_depth": 2,
+    "hashed_neigbourhood": 3,
+    "return_path": False,
+}
+if device.type == "cuda":
+    torch.cuda.synchronize()
+deep_b_t0 = time.time()
+deep_b_result = graph_cube333.beam_search(start_state=_CUBE333_START, **deep_batched_kwargs)
+if device.type == "cuda":
+    torch.cuda.synchronize()
+deep_b_time = time.time() - deep_b_t0
+results["cube333_deep_batched"] = {
+    "time_sec": deep_b_time,
+    "path_found": deep_b_result.path_found,
+    "path_length": deep_b_result.path_length,
+}
+print(f"  iterated_batched: time={deep_b_time:.1f}s found={deep_b_result.path_found}", flush=True)
 
 # --- Phase 0.3 profiling: large groups, iterated mode, verbose=100 ---
 # One-shot per group (not measured). Captures per-region GPU timing breakdown to
