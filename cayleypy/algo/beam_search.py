@@ -652,7 +652,13 @@ class BeamSearchAlgorithm:
         beam_width_part = beam_width // graph.definition.n_generators
 
         accm_states = torch.zeros((beam_width, graph.definition.state_size), dtype=graph.dtype, device=graph.device)
-        accm_hashes = torch.zeros((beam_width,), dtype=torch.int64, device=graph.device)
+        # Compact dedup set (dedup-unification): replaces the zero-padded accm_hashes
+        # buffer + torch.isin. Fixes the latent zero-padding bug (hash==0 states
+        # falsely deduped) and is faster (searchsorted vs torch.isin re-sort).
+        # Queries via get_mask_to_remove_seen_hashes (isin_via_searchsorted on sorted
+        # shards); adds via add_sorted_hashes (requires sorted input — guaranteed by
+        # the sort step, with a re-sort after topk to restore hash order).
+        accm_hashset = TorchHashSet()
 
         scores = None
         best_score = 1e6
@@ -736,7 +742,6 @@ class BeamSearchAlgorithm:
                 profile.reset_step()
 
             _chunk_idx = 0
-            i_tmp = 0
 
             if history_depth > 0:
                 i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
@@ -746,7 +751,7 @@ class BeamSearchAlgorithm:
                 nonbacktrack_hashes[i_cyclic_index_for_hash_storage].data = []
 
             accm_states.fill_(0)
-            accm_hashes.fill_(0)
+            accm_hashset.data = []
 
             # Create new states by applying all generators one by one.
             # clone=False: the yielded buffer is reused across generators. Safe because
@@ -786,13 +791,16 @@ class BeamSearchAlgorithm:
                     _cuda_sync()
                     profile.sort += time.time() - t1
 
-                # Skip already generated states instead of deduplication at the end.
-                # (was UNTIMED; the .item() here is a GPU→CPU sync point — Task 1.3 target.)
+                # Skip already generated states (dedup-unification): replaces
+                # torch.isin against the zero-padded accm_hashes buffer with a
+                # TorchHashSet query (isin_via_searchsorted on sorted shards).
+                # Fixes the latent zero-padding bug (hash==0 states falsely deduped)
+                # and is faster (searchsorted vs torch.isin re-sorting the full buffer).
                 if _chunk_idx > 0:
                     if profile is not None:
                         _cuda_sync()
                         t1 = time.time()
-                    mask_new = ~torch.isin(_new_hashes_chunk, accm_hashes, assume_unique=False)
+                    mask_new = accm_hashset.get_mask_to_remove_seen_hashes(_new_hashes_chunk)
 
                     # Apply mask unconditionally (Task 1.3): the old
                     # `mask_new.sum().item() > 0` guard forced a GPU→CPU sync per
@@ -854,7 +862,6 @@ class BeamSearchAlgorithm:
                     # and deduplicated against the accumulator (dedup step above),
                     # so `add_sorted_hashes` is safe.
                     nonbacktrack_hashes[i_cyclic_index_for_hash_storage].add_sorted_hashes(_new_hashes_chunk)
-                    i_tmp += len(_new_hashes_chunk)
 
                     # Apply mask unconditionally (Task 1.3): drops the .item()
                     # GPU→CPU sync guard. Empty result (all-False mask) is handled
@@ -870,6 +877,7 @@ class BeamSearchAlgorithm:
                 if profile is not None:
                     _cuda_sync()
                     t1 = time.time()
+                _topk_applied = False
                 if _new_states_chunk.shape[0] > beam_width_part:
                     # Score states using predictor.
                     scores = _predictor(graph.decode_states(_new_states_chunk))
@@ -884,13 +892,25 @@ class BeamSearchAlgorithm:
 
                     _new_states_chunk = _new_states_chunk[idx, :]
                     _new_hashes_chunk = _new_hashes_chunk[idx]
+                    _topk_applied = True
 
                     if (i_step not in debug_scores) or (best_score < debug_scores[i_step]):
                         debug_scores[i_step] = best_score
 
                 if _new_states_chunk.shape[0] > 0:
                     accm_states[_chunk_idx : _chunk_idx + _new_states_chunk.shape[0], :] = _new_states_chunk
-                    accm_hashes[_chunk_idx : _chunk_idx + _new_states_chunk.shape[0]] = _new_hashes_chunk
+
+                    # Add chunk hashes to the dedup hashset (dedup-unification).
+                    # Precondition: add_sorted_hashes requires sorted-by-hash input.
+                    # The sort step (:789) guarantees this, BUT topk (above) reorders
+                    # by score via idx, breaking the hash order. Re-sort only when
+                    # topk was applied. When topk is skipped, _new_hashes_chunk is
+                    # still hash-sorted (preserved through boolean-mask dedup/nonbacktrack).
+                    if _topk_applied:
+                        _hash_sort_idx = torch.argsort(_new_hashes_chunk, stable=True)
+                        accm_hashset.add_sorted_hashes(_new_hashes_chunk[_hash_sort_idx])
+                    else:
+                        accm_hashset.add_sorted_hashes(_new_hashes_chunk)
 
                     _chunk_idx += _new_states_chunk.shape[0]
 
@@ -904,7 +924,10 @@ class BeamSearchAlgorithm:
                 return BeamSearchResult(False, i_step, None, debug_scores, graph.definition)
 
             beam_states = accm_states[:_chunk_idx, :].clone()
-            beam_hashes = accm_hashes[:_chunk_idx].clone()
+            # Get merged sorted hashes from the hashset (dedup-unification): replaces
+            # accm_hashes[:k].clone(). The hashset owns the tensor; on next step's
+            # reset (data = []), beam_hashes still holds a reference → tensor kept alive.
+            beam_hashes = accm_hashset.get_merged_sorted()
 
             _chunk_idx = 0
 

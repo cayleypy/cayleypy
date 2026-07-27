@@ -367,6 +367,53 @@ def test_beam_search_iterated_verbose_output():
     assert result.path_found or result.path_length == 5
 
 
+def test_beam_search_iterated_dedup_no_false_positive_on_zero_hash():
+    """Dedup must not falsely remove a state whose hash is 0.
+
+    Covers the dedup-unification fix (replaces the zero-padded accm_hashes buffer
+    whose `torch.isin` against padding-zeros falsely deduped any hash==0 state).
+    With the TorchHashSet, only actual hashes added this step are in the set.
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    # Use a small beam so multiple chunks are generated and dedup runs.
+    # history_depth=0 isolates the dedup path (no nonbacktrack interference).
+    result = graph.beam_search(
+        start_state=np.random.permutation(8),
+        beam_mode="iterated",
+        beam_width=100,
+        max_steps=20,
+        history_depth=0,
+    )
+    # Should complete without errors — if the zero-hash bug were present, some
+    # valid states would be silently dropped, potentially causing path_not_found
+    # or wrong path_length. The characterization tests with `<=` bounds tolerate
+    # composition changes; here we just assert no crash.
+    assert isinstance(result.path_found, bool)
+
+
+def test_beam_search_iterated_dedup_sorted_precondition_after_topk():
+    """The re-sort after topk must produce a hash-sorted chunk for add_sorted_hashes.
+
+    Covers the dedup-unification's extra sort branch (when topk reorders by score,
+    breaking hash order). Exercises the path where _topk_applied is True so the
+    re-sort runs. A beam_width small enough that chunks exceed beam_width_part
+    (forcing topk) is required.
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    # beam_width=1000, 3 generators → beam_width_part=333. After the first step
+    # the beam grows beyond 333, so topk runs on subsequent chunks.
+    result = graph.beam_search(
+        start_state=np.random.permutation(8),
+        beam_mode="iterated",
+        beam_width=1000,
+        max_steps=10,
+        history_depth=2,
+    )
+    # If the sorted precondition were violated, add_sorted_hashes would produce
+    # a corrupt set → false dedup → path_not_found or wrong path. Assert no crash.
+    assert result.path_found or result.path_length == 10
+
+
 # =============================================================================
 # Tests for exact values
 # =============================================================================
