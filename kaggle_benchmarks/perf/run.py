@@ -48,6 +48,20 @@ subprocess.check_call(
 import torch
 from cayleypy import CayleyGraph, PermutationGroups, Puzzles
 
+# Fix ALL randomness for reproducible before/after comparison across kernel versions.
+# The hasher uses random.randint for its seed when none is passed; without fixing it,
+# each kernel run gets a different hash function, so path_found/path_length/depth-run
+# timing vary stochastically (a v1-vs-v2 deep-run difference of "found at step 43" vs
+# "not found in 100" is hash-seed noise, NOT a regression). This matches conftest.py's
+# DETERMINISTIC_SEED=12345 used by the CPU test suite.
+import random
+
+import numpy as np
+
+np.random.seed(12345)
+random.seed(12345)
+torch.manual_seed(12345)
+
 # --- Scenario constants (keep in sync with cayleypy/algo/beam_search_benchmark.py) ---
 _LRX8_START = [3, 5, 7, 1, 0, 6, 4, 2]
 _BEAM_WIDTH_QUICK = 10**5
