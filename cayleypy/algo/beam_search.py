@@ -10,7 +10,7 @@ from .beam_search_result import BeamSearchResult
 from ..bfs_result import BfsResult
 from ..cayley_graph_def import AnyStateType
 from ..predictor import Predictor
-from ..torch_utils import isin_via_searchsorted
+from ..torch_utils import TorchHashSet, isin_via_searchsorted
 
 if TYPE_CHECKING:
     from ..cayley_graph import CayleyGraph
@@ -700,8 +700,24 @@ class BeamSearchAlgorithm:
         bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
         # Initialize hash storage for non-backtracking.
+        # Compact representation (Task 1.6): one TorchHashSet per history-depth slot,
+        # holding only the actual hashes generated each step. Replaces the old dense
+        # (beam_width × n_generators, history_depth) int64 matrix which:
+        #   - was preallocated to the maximum beam size (bw*ng) so any layer would
+        #     fit — the start hash filling it was an artifact of `expand` from a
+        #     single-element tensor, not an intentional invariant;
+        #   - consumed 6.00 GB at bw=2^24, cube555, hd=2 (vs ~0.25 GB here), AND
+        #   - was queried by a Python `for j in range(hd)` isin loop launching `hd`
+        #     kernels per chunk (the dominant t_isin cost, 57-70% per profiling).
+        # Invariants preserved:
+        #   (a) `add_sorted_hashes` requires sorted input — chunk hashes are sorted
+        #       at the sort step above;
+        #   (b) `get_merged_sorted` collapses shards before querying (no Python loop).
+        # The start hash is NOT re-added on reset: it was an artifact of the old
+        # preallocation, not a correctness requirement. The seen set holds only the
+        # actual hashes from the previous `history_depth` steps.
         if history_depth > 0:
-            nonbacktrack_hashes = beam_hashes.expand(beam_width * graph.definition.n_generators, history_depth).clone()
+            nonbacktrack_hashes: list[TorchHashSet] = [TorchHashSet() for _ in range(history_depth)]
             i_cyclic_index_for_hash_storage = 0
 
         # Checks if any of `hashes` are in neighborhood of the central state.
@@ -722,6 +738,10 @@ class BeamSearchAlgorithm:
 
             if history_depth > 0:
                 i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
+                # Reset the current slot (Task 1.6): the old dense matrix did this
+                # implicitly by overwriting rows in-place; the compact hash-set must
+                # be cleared explicitly before adding this step's hashes.
+                nonbacktrack_hashes[i_cyclic_index_for_hash_storage].data = []
 
             accm_states.fill_(0)
             accm_hashes.fill_(0)
@@ -799,21 +819,33 @@ class BeamSearchAlgorithm:
                     return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
                 # Non-backtracking: forbid visiting states visited before.
+                # Compact hash-set query (Task 1.6): one `get_merged_sorted` +
+                # one `isin_via_searchsorted` replaces the old `for j in range(hd)`
+                # loop that launched `hd` separate `torch.isin` kernels per chunk.
+                # The merged tensor is cached for the step (all chunks share it).
                 if history_depth > 0:
                     if profile is not None:
                         _cuda_sync()
                         t1 = time.time()
 
+                    # Query all history slots: union of "seen in any prior slot".
+                    # Each slot is queried via its own merged sorted tensor; the
+                    # number of slots == history_depth (small, e.g. 2), so this
+                    # is a bounded loop (vs the old per-depth isin loop which was
+                    # also hd-iterations but each did a full torch.isin).
                     mask_new = torch.ones_like(_new_hashes_chunk, dtype=torch.bool)
-                    for j in range(nonbacktrack_hashes.shape[1]):
-                        mask_new *= ~torch.isin(_new_hashes_chunk, nonbacktrack_hashes[:, j], assume_unique=False)
+                    for slot in nonbacktrack_hashes:
+                        mask_new &= slot.get_mask_to_remove_seen_hashes(_new_hashes_chunk)
 
-                    # Update hash storage.
-                    nonbacktrack_hashes[i_tmp : i_tmp + len(_new_hashes_chunk), i_cyclic_index_for_hash_storage] = (
-                        _new_hashes_chunk
-                    )
+                    # Update the current step's slot with this chunk's hashes.
+                    # Precondition: `_new_hashes_chunk` is sorted (sort step above)
+                    # and deduplicated against the accumulator (dedup step above),
+                    # so `add_sorted_hashes` is safe.
+                    nonbacktrack_hashes[i_cyclic_index_for_hash_storage].add_sorted_hashes(_new_hashes_chunk)
                     i_tmp += len(_new_hashes_chunk)
 
+                    # Apply mask unconditionally (Task 1.3 will drop the .item()
+                    # sync guard; kept here for now to isolate the Task 1.6 change).
                     if mask_new.sum().item() > 0:
                         _new_states_chunk = _new_states_chunk[mask_new, :]
                         _new_hashes_chunk = _new_hashes_chunk[mask_new]

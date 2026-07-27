@@ -107,3 +107,53 @@ def test_torch_hash_set_coalescing_at_10_shards():
     elements = torch.tensor(list(range(20)), dtype=torch.int64)
     mask = hs.get_mask_to_remove_seen_hashes(elements)
     assert torch.equal(mask, torch.zeros(20, dtype=torch.bool))
+
+
+def test_torch_hash_set_empty():
+    """Empty set: all elements pass (none are seen)."""
+    hs = TorchHashSet()
+    elements = torch.tensor([1, 2, 3], dtype=torch.int64)
+    mask = hs.get_mask_to_remove_seen_hashes(elements)
+    assert torch.equal(mask, torch.tensor([True, True, True]))
+    assert len(hs) == 0
+    merged = hs.get_merged_sorted()
+    assert len(merged) == 0
+
+
+def test_torch_hash_set_get_merged_sorted():
+    """get_merged_sorted collapses shards into one sorted tensor."""
+    hs = TorchHashSet()
+    hs.add_sorted_hashes(torch.tensor([5, 7, 9], dtype=torch.int64))
+    hs.add_sorted_hashes(torch.tensor([1, 3], dtype=torch.int64))
+    assert len(hs.data) == 2
+    merged = hs.get_merged_sorted()
+    # After merge, only one shard remains, sorted.
+    assert len(hs.data) == 1
+    assert torch.equal(merged, torch.tensor([1, 3, 5, 7, 9], dtype=torch.int64))
+    # Subsequent queries are a single isin_via_searchsorted (no Python loop).
+    mask = hs.get_mask_to_remove_seen_hashes(torch.tensor([1, 2, 9], dtype=torch.int64))
+    assert torch.equal(mask, torch.tensor([False, True, False]))
+
+
+def test_torch_hash_set_len():
+    """__len__ sums shard sizes (including pre-merge)."""
+    hs = TorchHashSet()
+    assert len(hs) == 0
+    hs.add_sorted_hashes(torch.tensor([1, 3], dtype=torch.int64))
+    assert len(hs) == 2
+    hs.add_sorted_hashes(torch.tensor([5], dtype=torch.int64))
+    assert len(hs) == 3
+    # After merge, len is preserved.
+    hs.get_merged_sorted()
+    assert len(hs) == 3
+
+
+def test_torch_hash_set_add_empty_no_op():
+    """Adding an empty tensor is a no-op (no empty shard appended)."""
+    hs = TorchHashSet()
+    hs.add_sorted_hashes(torch.tensor([], dtype=torch.int64))
+    assert len(hs.data) == 0
+    assert len(hs) == 0
+    # A real add still works after the no-op.
+    hs.add_sorted_hashes(torch.tensor([1, 2], dtype=torch.int64))
+    assert len(hs.data) == 1
