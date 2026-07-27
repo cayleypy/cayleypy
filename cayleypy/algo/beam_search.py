@@ -1221,10 +1221,11 @@ class BeamSearchAlgorithm:
                 # Per-generator selection.
                 _sel_states_list: list[torch.Tensor] = []
                 _sel_hashes_list: list[torch.Tensor] = []
-                _sel_scores_list: list[torch.Tensor] = []
+                _sel_global_idx_list: list[torch.Tensor] = []
                 _slots_used = 0
                 for _g in range(n_generators):
                     _g_mask = _gen_origin == _g
+                    _g_global_idx = torch.where(_g_mask)[0]
                     _g_states = _new_states[_g_mask]
                     _g_hashes = _new_hashes[_g_mask]
                     _g_scores = _all_scores[_g_mask]
@@ -1232,20 +1233,20 @@ class BeamSearchAlgorithm:
                         _vals, _idx = torch.topk(_g_scores, k=beam_width_part, largest=False, sorted=True)
                         _g_states = _g_states[_idx]
                         _g_hashes = _g_hashes[_idx]
-                        _g_scores = _g_scores[_idx]
+                        # Map topk indices back to GLOBAL indices (fixes surplus bug:
+                        # previously _g_global[:_keep] took hash-first, not topk-selected).
+                        _g_global_idx = _g_global_idx[_idx]
                     _sel_states_list.append(_g_states)
                     _sel_hashes_list.append(_g_hashes)
-                    _sel_scores_list.append(_g_scores)
+                    _sel_global_idx_list.append(_g_global_idx)
                     _slots_used += _g_states.shape[0]
 
                 # Surplus redistribution: if total selected < beam_width, fill remaining
                 # slots from the global pool (all survivors not yet selected), by score.
                 if _slots_used < beam_width:
                     _selected_mask = torch.zeros(_new_states.shape[0], dtype=torch.bool, device=graph.device)
-                    for _g in range(n_generators):
-                        _keep = _sel_scores_list[_g].shape[0]
-                        _g_global = torch.where(_gen_origin == _g)[0]
-                        _selected_mask[_g_global[:_keep]] = True
+                    for _g_idx in _sel_global_idx_list:
+                        _selected_mask[_g_idx] = True
                     _remaining_idx = torch.where(~_selected_mask)[0]
                     _remaining_scores = _all_scores[_remaining_idx]
                     _n_fill = min(beam_width - _slots_used, _remaining_scores.shape[0])

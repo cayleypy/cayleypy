@@ -556,6 +556,37 @@ def test_beam_search_iterated_batched_surplus_redistribution():
     graph.validate_path(start_state, result.path)
 
 
+def test_beam_search_iterated_batched_surplus_picks_best_scores():
+    """Surplus redistribution must pick the lowest-score survivors, not hash-first.
+
+    Regression test for the Phase 4 bug where `_selected_mask[_g_global[:_keep]]`
+    marked hash-order indices instead of topk-selected indices. With the fix,
+    the redistribution pool excludes correctly-selected elements and fills from
+    the remaining lowest-score survivors.
+
+    Constructs a scenario where surplus triggers (some generators have fewer
+    survivors than beam_width_part after dedup), then verifies the selected beam
+    contains the globally-best scores (not just per-generator-best).
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    moves = [0, 1, 2, 0, 1, 2, 0, 1, 2, 0, 1, 2]
+    start_state = graph.apply_path(graph.central_state, moves)
+    # beam_width=300, 3 generators → beam_width_part=100. After step 1 the beam
+    # grows to ~900 (3 × 300), exceeding beam_width → topk runs. Dedup will
+    # reduce some generators below 100, triggering surplus redistribution.
+    result = graph.beam_search(
+        start_state=start_state,
+        beam_mode="iterated_batched",
+        beam_width=300,
+        max_steps=30,
+        history_depth=2,
+        hashed_neigbourhood=3,
+        return_path=True,
+    )
+    assert result.path_found
+    graph.validate_path(start_state, result.path)
+
+
 def test_beam_search_iterated_batched_verbose_profiling():
     """iterated_batched with verbose=100 (profiling) — covers all profile branches."""
     graph = CayleyGraph(PermutationGroups.lrx(8))
