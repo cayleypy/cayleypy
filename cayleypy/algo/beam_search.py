@@ -516,8 +516,12 @@ class BeamSearchAlgorithm:
         bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
         # Initialize hash storage for non-backtracking.
+        # Compact representation (Task 3.2): one TorchHashSet per history-depth slot,
+        # same as search_iterated Task 1.6. Replaces the dense (beam_width × n_generators,
+        # history_depth) int64 matrix. The start hash filling the old matrix was an
+        # artifact of `expand` (preallocation to max beam size), not an invariant.
         if history_depth > 0:
-            nonbacktrack_hashes = beam_hashes.expand(beam_width * graph.definition.n_generators, history_depth).clone()
+            nonbacktrack_hashes: list[TorchHashSet] = [TorchHashSet() for _ in range(history_depth)]
             i_cyclic_index_for_hash_storage = 0
 
         # Checks if any of `hashes` are in neighborhood of the central state.
@@ -583,19 +587,23 @@ class BeamSearchAlgorithm:
                 return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
             # Non-backtracking: forbid visiting states visited before.
+            # Compact hash-set (Task 3.2): replaces the dense matrix + for-j-in-range(hd)
+            # isin loop with a single get_mask_to_remove_seen_hashes per slot.
+            # Same pattern as search_iterated Task 1.6. _new_hashes comes from
+            # get_unique_states (sorted, AGENTS.md §6 invariant), and nonbacktrack
+            # is BEFORE topk → add_sorted_hashes precondition met (no re-sort needed).
             if history_depth > 0:
                 if profile is not None:
                     _cuda_sync()
                     t1 = time.time()
 
                 mask_new = torch.ones_like(_new_hashes, dtype=torch.bool)
-                for j in range(nonbacktrack_hashes.shape[1]):
-                    mask_new *= ~torch.isin(_new_hashes, nonbacktrack_hashes[:, j], assume_unique=False)
+                for _slot in nonbacktrack_hashes:
+                    mask_new &= _slot.get_mask_to_remove_seen_hashes(_new_hashes)
 
-                # Update hash storage.
+                # Update the current step's slot.
                 i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
-                i_tmp = len(_new_hashes)
-                nonbacktrack_hashes[:i_tmp, i_cyclic_index_for_hash_storage] = _new_hashes
+                nonbacktrack_hashes[i_cyclic_index_for_hash_storage].add_sorted_hashes(_new_hashes)
 
                 # Apply mask unconditionally (Task 1.3): drops the .item()
                 # GPU→CPU sync guard. Empty result is handled by the shape[0]==0
