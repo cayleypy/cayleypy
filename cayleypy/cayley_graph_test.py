@@ -519,6 +519,29 @@ def test_get_neighbors_generator_yields_per_generator():
         assert chunk.shape[0] == states.shape[0]
 
 
+def test_get_neighbors_generator_no_clone_aliases_buffer():
+    """With ``clone=False``, all yielded chunks alias the same internal buffer.
+
+    Documents the no-alias contract (Task 1.5): the caller MUST reassign the yielded
+    reference (e.g. via fancy-indexing) before the next yield, or it will see the next
+    generator's data. This test verifies the aliasing behavior so a future change to
+    the default or the buffer reuse strategy is caught.
+
+    Covers the ``clone=False`` branch for the coverage gate.
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    states = graph.encode_states(graph.central_state)
+    chunks = list(graph.get_neighbors_generator(states, clone=False))
+    assert len(chunks) == graph.definition.n_generators
+    # All chunks alias the same storage — the last generator's data overwrites all.
+    assert all(chunk.data_ptr() == chunks[0].data_ptr() for chunk in chunks)
+    # After collecting all, every chunk sees the LAST generator's result.
+    last_gen_states = graph.encode_states(graph.central_state)
+    graph.apply_generator_batched(graph.definition.n_generators - 1, states, last_gen_states)
+    assert torch.equal(chunks[0], last_gen_states)
+    assert torch.equal(chunks[-1], last_gen_states)
+
+
 def test_encode_decode_round_trip():
     """encode_states -> decode_states is the identity for non-bit-encoded graphs."""
     graph = CayleyGraph(PermutationGroups.lrx(5), bit_encoding_width=None)

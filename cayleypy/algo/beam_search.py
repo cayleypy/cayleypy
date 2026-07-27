@@ -749,7 +749,12 @@ class BeamSearchAlgorithm:
             accm_hashes.fill_(0)
 
             # Create new states by applying all generators one by one.
-            for _new_states_chunk in graph.get_neighbors_generator(beam_states):
+            # clone=False: the yielded buffer is reused across generators. Safe because
+            # the consumer reassigns `_new_states_chunk` via fancy-indexing at the sort
+            # step below (idx = torch.sort(...); _new_states_chunk = _new_states_chunk[idx, :])
+            # BEFORE the next yield — so no alias survives past the next generator's
+            # write. See Task 1.5 (no-alias invariant documented in plan).
+            for _new_states_chunk in graph.get_neighbors_generator(beam_states, clone=False):
                 # Ensure it's 2D: (n_states, state_size).
                 if profile is not None:
                     _cuda_sync()

@@ -203,12 +203,24 @@ class CayleyGraph:
             self.apply_generator_batched(i, states, dst)
         return neighbors
 
-    def get_neighbors_generator(self, states: torch.Tensor) -> typing_Generator[torch.Tensor, torch.Tensor, None]:
-        """Calculates all neighbors of `states` (in internal representation)."""
+    def get_neighbors_generator(
+        self, states: torch.Tensor, clone: bool = True
+    ) -> typing_Generator[torch.Tensor, torch.Tensor, None]:
+        """Calculates all neighbors of `states` (in internal representation).
+
+        :param states: States to apply generators to (in internal representation).
+        :param clone: If True (default), yields a copy of the internal buffer so the
+            caller can retain chunks across yields. If False, yields the buffer
+            directly — the caller MUST reassign the yielded reference (e.g. via fancy
+            indexing) before the next yield, or it will see the next generator's data.
+            Used by `search_iterated` with `clone=False` to avoid a per-chunk copy
+            (2.34 GB/chunk at bw=2^24). The no-alias contract is documented in
+            `beam_search.py` at the call site.
+        """
         neighbors = torch.zeros_like(states)
         for i in range(self.definition.n_generators):
             self.apply_generator_batched(i, states, neighbors)
-            yield neighbors.clone()
+            yield neighbors.clone() if clone else neighbors
 
     def get_neighbors_decoded(self, states: torch.Tensor) -> torch.Tensor:
         """Calculates neighbors in decoded (external) representation."""
