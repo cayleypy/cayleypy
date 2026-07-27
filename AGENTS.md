@@ -97,7 +97,7 @@ These methods are called on every beam_search iteration and on every BFS layer:
 | `decode_states` | `cayleypy/cayley_graph.py:149` | Converts internal representation back to human-readable |
 | `apply_path` | `cayley_graph.py:175` | Applies a sequence of generators to a state |
 | `get_neighbors` | `cayley_graph.py:195` | Computes all neighbors (n_generators × n_states) |
-| `get_neighbors_generator` | `cayley_graph.py:206` | Yields neighbors one generator at a time (memory-efficient) |
+| `get_neighbors_generator` | `cayley_graph.py:206` | Yields neighbors one generator at a time (memory-efficient). `clone=False` opt-in for `search_iterated` (avoids per-chunk copy). |
 | `bfs` | `cayley_graph.py:217` | Full breadth-first search |
 | `restore_path` | `cayley_graph.py:388` | Reconstructs path from BFS layer hashes |
 | `find_path_from` | `cayley_graph.py:431` | Finds path from a state to central using pre-computed BFS |
@@ -181,21 +181,22 @@ This sorted-order guarantee is relied upon by:
 path detection** — no exception, no test failure (unless a test explicitly checks this,
 which `test_get_unique_states_returns_sorted_hashes` in `cayleypy_graph_test.py` does).
 
-## 7. Danger zones / perf candidates (for the follow-up perf plan, NOT this one)
+## 7. Danger zones / perf candidates
 
-These are known performance bottlenecks flagged for a future optimization plan.
-Do NOT address them in the foundation plan — they are documented here so the future
-perf agent knows where to look.
+Known performance bottlenecks. Items marked **RESOLVED** were addressed on
+`feature/beam-search-perf`; remaining items are candidates for future work.
 
-| Location | Issue |
-|----------|-------|
-| `beam_search.py:109-149` | `search()` dispatch — 3 modes share ~80% identical code (MITM precompute, predictor init, encode, topk, return_path, memory_cleanup) |
-| `beam_search.py:428-429`, `:670-671` | Python `for j in range(history_depth): torch.isin(...)` loop — O(history_depth) GPU kernel launches per step |
-| `beam_search.py:436`, `:644`, `:679` | `.item()` calls — CPU-GPU synchronization on every step (forces `mask_new.sum()` to GPU→CPU) |
-| `beam_search.py:718-719` | `.clone()` of accumulators every step — unnecessary copy of `accm_states` and `accm_hashes` |
-| `beam_search.py:19-23` | `_check_path_found` — Python loop over BFS layers, one `isin_via_searchsorted` per layer |
-| `torch_utils.py:28-29` | `TorchHashSet.get_mask_to_remove_seen_hashes` — Python loop over shards (up to 10) |
-| `random_walks.py:143-146` | **Bug:** after `torch.randperm` subsampling, hashes are added to `TorchHashSet` unsorted, violating `add_sorted_hashes` precondition and breaking deduplication (see `test_generate_bfs_mode_duplicates_with_subsampling`) |
+| Location | Issue | Status |
+|----------|-------|--------|
+| `beam_search.py` `search()` dispatch | 3+ modes share ~80% identical code (MITM precompute, predictor init, encode, topk, return_path, memory_cleanup). Mode unification deferred. | Open (Task 6) |
+| nonbacktrack `for j in range(hd)` isin loop | Was O(history_depth) GPU kernel launches per step. **RESOLVED**: replaced with compact `TorchHashSet` (Task 1.6 for iterated, Task 3.2 for advanced). `t_isin` dropped from 57-70% → 19-23% (iterated) / 38% → lower (advanced). | **RESOLVED** |
+| `.item()` GPU→CPU sync in dedup/nonbacktrack guards | Was 24 syncs/step (cube444). **RESOLVED**: dropped the guard, apply mask unconditionally (Task 1.3). | **RESOLVED** |
+| `accm_hashes` zero-padding latent bug | `torch.isin` against zero-padded buffer falsely deduped hash==0 states. **RESOLVED**: replaced with `TorchHashSet` (dedup-unification). | **RESOLVED** |
+| `accm_states.clone()` every step | 2.34 GB/step copy at 2^24. Investigated: clone cost is 0.16-0.63% of step time — below optimization threshold. Skipped. | Closed (negligible) |
+| `_check_path_found` Python loop over BFS layers | One `isin_via_searchsorted` per layer. Profiling: `t_check` is 1-2% — negligible. Batch version deferred. | Closed (negligible) |
+| `TorchHashSet.get_mask_to_remove_seen_hashes` shard loop | Python loop over shards (up to 10). Merge threshold keeps it bounded; `get_merged_sorted()` collapses shards before querying. | Mitigated |
+| `random_walks.py:143-146` subsampling bug | Hashes added unsorted after `torch.randperm`, violating `add_sorted_hashes` precondition. **RESOLVED**: sort hashes after subsampling (Task 2). | **RESOLVED** |
+| `search_iterated_batched` surplus redistribution | Phase 4 bug: marked hash-order indices instead of topk-selected. **RESOLVED**: track global indices directly (Task 0 bugfix). | **RESOLVED** |
 
 ## 8. Contribution rules
 
@@ -251,12 +252,13 @@ force-pushed or deleted; a future perf kernel will install from the perf commit
   `cudaErrorNoKernelImageForDevice`. The benchmark script pins
   `torch==2.5.1+cu121` (supports sm_60–sm_90, so it also works on T4).
 - **Benchmark levels:**
-  - **Quick**: LRX(8) + cube333, all 3 modes, `bw=10^5`, `steps=30`, 2 warmup +
-    5 measured. ~15–35 min GPU (cube333 dominates; exact time TBD on first run).
-  - **Deep**: cube333 iterated only, `bw=2^18`, `steps=100`,
-    `hashed_neigbourhood=3`, 1 measured run. ~20 min GPU. Skippable by
-    commenting the deep block in `run.py`.
-  - Total (quick + deep): ~35–55 min GPU per benchmark run.
+  - **Quick**: LRX(8) + cube333, 4 modes (simple, advanced, iterated, iterated_batched),
+    `bw=10^5`, `steps=30`, 2 warmup + 5 measured. Seed=12345 for reproducibility.
+  - **Deep**: cube333 iterated + iterated_batched, `bw=2^18`, `steps=100`,
+    `hashed_neigbourhood=3`, 1 measured run each. Skippable by commenting the deep
+    blocks in `run.py`.
+  - **Profiling**: verbose=100 per-region GPU-synced timing for iterated (cube333,
+    cube444, cube555, lrx32), advanced (cube333, cube555), and simple (cube333).
 - **Run cycle** (PowerShell):
   ```
   $env:KAGGLE_API_TOKEN="<key from kaggle.json>"
