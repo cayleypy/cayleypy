@@ -194,6 +194,7 @@ class BeamSearchAlgorithm:
                 path_device=path_device,
                 hashed_neigbourhood=hashed_neigbourhood,
                 memory_cleanup=memory_cleanup,
+                verbose=verbose,
             )
         elif beam_mode == "advanced":
             return self.search_advanced(
@@ -251,6 +252,7 @@ class BeamSearchAlgorithm:
         path_device: Union[str, torch.device] = "auto",
         hashed_neigbourhood: Optional[Union[BfsResult, int]] = None,
         memory_cleanup: bool = False,
+        verbose: int = 0,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
 
@@ -267,6 +269,10 @@ class BeamSearchAlgorithm:
             central state).
             OR
             int radius of BfsResult to be pre-computed on the go
+        :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
+          At level 100, each step prints a GPU-synced per-region timing breakdown
+          (moves/hash/check/predict). The sync brackets add overhead — NEVER use
+          verbose>=100 in benchmarks; use it only for one-shot profiling.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         debug_scores: dict[int, float] = {}
@@ -315,26 +321,48 @@ class BeamSearchAlgorithm:
             raise ValueError("Graph from bfs_result_for_mitm must be the same.")
         bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
 
-        # Checks if any of `hashes` are in neighborhood of the central state.
-        # Returns the number of the first layer where intersection was found, or -1 if not found.
         _new_states: torch.Tensor
         _new_hashes: torch.Tensor
 
         # Main beam search cycle.
+        t0 = time.time()
+        profile = _BeamSearchProfile() if verbose >= 100 else None
         for i_step in range(1, max_steps + 1):
+            if profile is not None:
+                _cuda_sync()
+                profile.reset_step()
+
             # Create new states by applying all generators.
+            if profile is not None:
+                _cuda_sync()
+                t1 = time.time()
             _new_states = graph.get_neighbors(beam_states)
             # Ensure it's 2D: (n_states, state_size).
             if _new_states.dim() == 1:
                 _new_states = _new_states.unsqueeze(0)
             elif _new_states.dim() > 2:
                 _new_states = _new_states.flatten(end_dim=1)
+            if profile is not None:
+                _cuda_sync()
+                profile.moves += time.time() - t1
 
-            # Take only unique states.
+            # Take only unique states (bundles make_hashes + sort + dedup inside get_unique_states).
+            if profile is not None:
+                _cuda_sync()
+                t1 = time.time()
             _new_states, _new_hashes = graph.get_unique_states(_new_states)
+            if profile is not None:
+                _cuda_sync()
+                profile.hash += time.time() - t1
 
             # Check if dest state is found.
+            if profile is not None:
+                _cuda_sync()
+                t1 = time.time()
             bfs_layer_id = _check_path_found(_new_hashes.to(path_device), bfs_layers_hashes)
+            if profile is not None:
+                _cuda_sync()
+                profile.check += time.time() - t1
             if bfs_layer_id != -1:
                 # Path found.
                 path = None
@@ -351,6 +379,9 @@ class BeamSearchAlgorithm:
                 return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
             # Pick `beam_width` states with lowest scores.
+            if profile is not None:
+                _cuda_sync()
+                t1 = time.time()
             if _new_states.shape[0] > beam_width:
                 scores = _predictor(graph.decode_states(_new_states))
                 vals, idx = torch.topk(scores, k=min(beam_width, len(scores)), largest=False, sorted=True)
@@ -361,11 +392,17 @@ class BeamSearchAlgorithm:
 
                 debug_scores[i_step] = best_score
 
-                if graph.verbose >= 2:
+                if verbose >= 2:
                     print(f"Iteration {i_step}, best score {best_score}.")
             else:
                 beam_states = _new_states
                 beam_hashes = _new_hashes
+
+                if verbose >= 2:
+                    print(f"Iteration {i_step}, not scored cause beam_width is big enough.")
+            if profile is not None:
+                _cuda_sync()
+                profile.predict += time.time() - t1
 
             if return_path:
                 restore_path_hashes.append(beam_hashes.to(path_device))
@@ -373,7 +410,17 @@ class BeamSearchAlgorithm:
             if memory_cleanup:
                 graph.free_memory()
 
+            if verbose >= 10 and (i_step - 1) % 10 == 0:
+                print(f"Step {i_step}, beam size: {beam_states.shape[0]}.")
+
+            if profile is not None:
+                _cuda_sync()
+                print(profile.format_line(i_step, t0))
+
         # Path not found.
+        if verbose >= 1:
+            print(f"Path not found after {max_steps} steps.")
+
         return BeamSearchResult(False, 0, None, debug_scores, graph.definition)
 
     def search_advanced(

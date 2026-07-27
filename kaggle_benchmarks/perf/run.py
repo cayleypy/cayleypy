@@ -180,8 +180,8 @@ def run_benchmark(graph, start_state, modes, beam_width, max_steps, warmup=2, me
     return out
 
 
-def run_profiling(graph, name, start_state, beam_width, max_steps, history_depth=2):
-    """Run ONE iterated beam_search pass with verbose=100 and capture the per-step
+def run_profiling(graph, name, start_state, beam_width, max_steps, history_depth=2, beam_mode="iterated"):
+    """Run ONE beam_search pass with verbose=100 and capture the per-step
     profiling lines from stdout. verbose=100 adds torch.cuda.synchronize() brackets
     around timed regions (see beam_search.py Task 0.2), so the printed t_hash/t_sort/
     t_dedup/t_check/t_predict/t_isin/t_moves values reflect actual GPU execution time,
@@ -195,22 +195,25 @@ def run_profiling(graph, name, start_state, beam_width, max_steps, history_depth
     if device.type == "cuda":
         torch.cuda.synchronize()
     t0 = time.time()
+    kwargs = {
+        "start_state": start_state,
+        "beam_mode": beam_mode,
+        "beam_width": beam_width,
+        "max_steps": max_steps,
+        "verbose": 100,
+        "return_path": False,
+    }
+    # simple mode has no history_depth param.
+    if beam_mode != "simple":
+        kwargs["history_depth"] = history_depth
     with redirect_stdout(buf):
-        result = graph.beam_search(
-            start_state=start_state,
-            beam_mode="iterated",
-            beam_width=beam_width,
-            max_steps=max_steps,
-            history_depth=history_depth,
-            verbose=100,
-            return_path=False,
-        )
+        result = graph.beam_search(**kwargs)
     if device.type == "cuda":
         torch.cuda.synchronize()
     elapsed = time.time() - t0
     profile_lines = buf.getvalue().splitlines()
     print(
-        f"  {name}: {elapsed:.2f}s, found={result.path_found}, len={result.path_length}, "
+        f"  {name} [{beam_mode}]: {elapsed:.2f}s, found={result.path_found}, len={result.path_length}, "
         f"{len(profile_lines)} profile lines",
         flush=True,
     )
@@ -279,6 +282,25 @@ results["profiling"]["cube555"] = run_profiling(
 )
 results["profiling"]["lrx32"] = run_profiling(
     graph_lrx32, "lrx32", _LRX32_START, _BEAM_WIDTH_PROFILE, _MAX_STEPS_PROFILE
+)
+
+# --- Advanced + simple mode profiling (Task 1: profile non-iterated modes) ---
+# Advanced uses get_unique_states (bundles hash+sort+dedup) and nonbacktrack once
+# per step (vs n_gens× per step in iterated). Simple has no nonbacktrack at all.
+# These runs reveal whether the same bottlenecks apply, or if different regions dominate.
+print("=== Advanced mode profiling (verbose=100) ===", flush=True)
+results["profiling_advanced"] = {}
+results["profiling_advanced"]["cube333"] = run_profiling(
+    graph_cube333, "cube333", _CUBE333_START, _BEAM_WIDTH_PROFILE, _MAX_STEPS_PROFILE, beam_mode="advanced"
+)
+results["profiling_advanced"]["cube555"] = run_profiling(
+    graph_cube555, "cube555", _CUBE555_START, _BEAM_WIDTH_PROFILE, _MAX_STEPS_PROFILE, beam_mode="advanced"
+)
+
+print("=== Simple mode profiling (verbose=100) ===", flush=True)
+results["profiling_simple"] = {}
+results["profiling_simple"]["cube333"] = run_profiling(
+    graph_cube333, "cube333", _CUBE333_START, _BEAM_WIDTH_PROFILE, _MAX_STEPS_PROFILE, beam_mode="simple"
 )
 
 # --- Phase 0.3 memory probe: cube555 at 2^22 ---
