@@ -41,6 +41,26 @@ class StateHasher:
             return
 
         torch.manual_seed(self.seed)
+
+        # CPU-only fast path (permutation groups only): dual int32 matmul combined to
+        # 2^64 via a zero-copy view. ~1.1-1.2x faster than the int64 path on CPU (cheaper
+        # int8/int64->int32 cast, BLAS-optimized int32 matmul, zero-copy combine). GPU
+        # keeps the int64 path below because dual int32 doubles kernel launches there.
+        # The two int32 hashes are independent, so a collision requires both to collide
+        # (~2^-64 per pair).
+        # Gated on permutation groups: permutation state values are small indices (< n),
+        # so the int64->int32 cast is lossless. Matrix groups (modulo==0) can hold arbitrary
+        # int64 values whose high bits would be silently truncated by the int32 cast, so
+        # they must keep the int64 path to preserve dedup correctness.
+        if graph.device.type == "cpu" and graph.definition.is_permutation_group():
+            self.vec_hasher_i32 = torch.randint(
+                -(2**30), 2**30, size=(self.state_size, 2), device=graph.device, dtype=torch.int32
+            )
+            self.make_hashes = self._make_hashes_dual_int32
+            return
+
+        # GPU path (and CPU matrix groups): int64 matmul (BLAS on modern GPUs,
+        # sum-reduction fallback on older GPUs).
         self.vec_hasher = torch.randint(
             -MAX_INT, MAX_INT, size=(self.state_size, 1), device=graph.device, dtype=torch.int64
         )
@@ -52,6 +72,23 @@ class StateHasher:
         except RuntimeError:
             self.vec_hasher = self.vec_hasher.reshape((self.state_size,))
             self.make_hashes = self._make_hashes_older_gpu
+
+    def _make_hashes_dual_int32(self, states: torch.Tensor) -> torch.Tensor:
+        # One int32 matmul against a (state_size, 2) matrix yields two independent
+        # int32 hashes in a single (n, 2) tensor, which is byte-reinterpretable as
+        # int64 via a zero-copy ``.view`` (2 x int32 == 1 x int64). This reads the
+        # casted states once instead of two separate matmuls. On little-endian
+        # (x86/ARM) the second hash lands in the high 32 bits; this is a valid
+        # deterministic hash (same input -> same output on one architecture).
+        if states.shape[0] <= self.chunk_size:
+            s32 = states.to(torch.int32)
+            return (s32 @ self.vec_hasher_i32).view(torch.int64).reshape(-1)
+        parts = int(math.ceil(states.shape[0] / self.chunk_size))
+        result = []
+        for z in torch.tensor_split(states, parts):
+            s32 = z.to(torch.int32)
+            result.append((s32 @ self.vec_hasher_i32).view(torch.int64).reshape(-1))
+        return torch.hstack(result)
 
     def _make_hashes_cpu_and_modern_gpu(self, states: torch.Tensor) -> torch.Tensor:
         if states.shape[0] <= self.chunk_size:

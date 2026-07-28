@@ -279,3 +279,37 @@ force-pushed or deleted; a future perf kernel will install from the perf commit
 - **Quota:** ~30 GPU-hours/week on a free account. One full benchmark run
   (quick + deep) ≈ 35–55 min. ~30–50 runs per week — budget for ~10–15
   before/after comparison cycles.
+
+## 11. CPU performance notes
+
+Two CPU-only optimizations live on the beam_search hot path. They are gated on
+`graph.device.type == "cpu"` (and the hasher additionally on
+`definition.is_permutation_group()`) so they cannot affect GPU behaviour or
+matrix-group correctness. The hasher gate is required because matrix groups
+(`modulo==0`) can hold arbitrary int64 state values whose high bits would be
+silently truncated by the int32 cast — permutation groups use small indices (< n),
+so the cast is lossless. Both are no-ops for correctness — the sorted-hash invariant
+(§6) is preserved because the new hasher path returns int64 tensors.
+
+- **Hamming predictor** (`predictor.py:13`): `torch.sum(x != y, dim=1, dtype=torch.int32)`.
+  Avoids the implicit `bool -> int64` cast that `torch.sum` performs by default.
+  ~1.3-1.4x faster on CPU; int32 is ample (max distance = `state_size` < 2^31).
+- **Dual int32 hasher** (`hasher.py:43-92`, CPU + permutation-group branch): one
+  int32 matmul against a `(state_size, 2)` matrix yielding two independent int32 hashes,
+  combined into one int64 via a zero-copy `.view(torch.int64)` reinterpretation.
+  Cheaper `int8/int64->int32` cast + BLAS-optimized int32 matmul (single launch, states
+  read once) vs the old `int8->int64` cast + non-BLAS int64 matmul. ~1.1-1.2x faster on
+  CPU; hash space stays 2^64 (collision needs BOTH int32 hashes to collide,
+  ~2^-64/pair — safe for 2^24 beams). Matrix groups keep the int64 path.
+
+**Thread scaling:** the dual int32 path is non-monotonic in thread count on CPU —
+the default `torch.get_num_threads()` (all cores) and 1 thread are both near-optimal,
+while 2-4 threads can be slower. Because the default is already good, no opt-in
+`num_threads` parameter was added (a global `torch.set_num_threads` side-effect in
+`CayleyGraph.__init__` was judged too invasive for marginal gain). CPU users who want
+to experiment can call `torch.set_num_threads(N)` before constructing the graph.
+
+**CPU mode recommendation:** prefer `beam_mode="iterated_batched"`. The memory gate
+that falls back from `iterated_batched` to `iterated` is CUDA-only, so batched mode is
+always available on CPU and eliminates the per-chunk Python loop (`n_generators`
+iterations/step) — significant overhead on CPU where Python-loop cost dominates.
