@@ -67,6 +67,21 @@ def test_isin_single_element():
     assert torch.equal(result, torch.tensor([False, True, False, True]))
 
 
+def test_isin_clamps_out_of_range_indices():
+    """Elements larger than the max test element are clamped to the last index (torch_utils.py:18).
+
+    searchsorted returns len(test_elements_sorted) for elements exceeding the max.
+    The clamp to len-1 makes the subsequent ``== elements`` check return False
+    (the clamped index points at the max, which the element does not equal).
+    Covers the clamp branch explicitly (otherwise only exercised indirectly).
+    """
+    test_elements_sorted = torch.tensor([10, 20, 30])
+    # 99 and 100 exceed the max (30) -> searchsorted returns 3 (out of range).
+    elements = torch.tensor([10, 99, 20, 100, 30, -5])
+    result = isin_via_searchsorted(elements, test_elements_sorted)
+    assert torch.equal(result, torch.tensor([True, False, True, False, True, False]))
+
+
 # =============================================================================
 # TorchHashSet
 # =============================================================================

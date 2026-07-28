@@ -11,8 +11,13 @@ def isin_via_searchsorted(elements: torch.Tensor, test_elements_sorted: torch.Te
     """
     if len(test_elements_sorted) == 0:
         return torch.zeros_like(elements, dtype=torch.bool)
+    # Clamp out-of-range indices to the last valid index. searchsorted may return
+    # len(...) for elements larger than the max; clamping (1 fused kernel) is cheaper
+    # than the masked-assign it replaces (compare + indexed-put = 2 kernels) and is
+    # semantically identical (the subsequent == elements check filters the clamped
+    # rows back to False since they did not match any test element).
     ts = torch.searchsorted(test_elements_sorted, elements)
-    ts[ts >= len(test_elements_sorted)] = len(test_elements_sorted) - 1
+    ts = torch.clamp(ts, max=len(test_elements_sorted) - 1)
     return test_elements_sorted[ts] == elements
 
 

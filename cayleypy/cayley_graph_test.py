@@ -509,6 +509,32 @@ def test_get_neighbors_multiple_states():
     assert neighbors.shape[0] == 2 * graph.definition.n_generators
 
 
+def test_get_neighbors_matches_per_generator_loop():
+    """The CPU batched-gather fast path (cayley_graph.py:195-219) produces output identical
+    to the per-generator loop it replaces.
+
+    The fast path is gated on CPU + permutation group + non-bit-encoded. This test
+    exercises that branch on cube333 and LRX(8) and compares against an inlined
+    per-generator loop. Guards against layout/ordering regressions in the batched gather.
+    """
+    for graph in (
+        CayleyGraph(PermutationGroups.lrx(8), device="cpu"),
+        CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"), device="cpu"),
+    ):
+        states = graph.encode_states(torch.randint(0, 8, (7, graph.definition.state_size), dtype=torch.int64))
+        actual = graph.get_neighbors(states)
+        # Inlined per-generator loop (the path the batched gather replaces on CPU).
+        states_num = states.shape[0]
+        n_gen = graph.definition.n_generators
+        expected = torch.zeros(
+            (states_num * n_gen, graph.definition.state_size), dtype=graph.dtype, device=graph.device
+        )
+        for i in range(n_gen):
+            dst = expected[i * states_num : (i + 1) * states_num, :]
+            graph.apply_generator_batched(i, states, dst)
+        assert torch.equal(actual, expected)
+
+
 def test_get_neighbors_generator_yields_per_generator():
     """``get_neighbors_generator`` yields one chunk per generator."""
     graph = CayleyGraph(PermutationGroups.lrx(5))
