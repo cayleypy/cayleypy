@@ -468,16 +468,16 @@ def test_beam_search_iterated_batched_equivalence():
         ), f"Batched path_length {r_batched.path_length} > iterated {r_iterated.path_length}"
 
 
-def test_beam_search_iterated_batched_memory_gate_fallback():
-    """Memory gate should fall back to chunked iterated for large beams.
+def test_beam_search_iterated_batched_memory_check_no_trip_on_cpu():
+    """Memory check does not trip on CPU (CUDA-only check).
 
-    On CPU there is no CUDA memory gate, so this test verifies the fallback path
-    works by checking the result is identical to iterated mode (the fallback target).
-    The gate only triggers on CUDA; on CPU we verify the non-gate path still works.
+    On CPU there is no device memory limit, so batched mode always runs. This test
+    verifies the non-tripped path works (small beam, CPU). The MemoryError branch
+    is CUDA-only and covered by ``test_iterated_batched_memory_error_on_oversized_beam``.
     """
     graph = CayleyGraph(PermutationGroups.lrx(8))
     start_state = list(np.random.permutation(8))
-    # Small beam — no gate trip (CPU), exercises the batched path directly.
+    # Small beam — no check trip (CPU), exercises the batched path directly.
     r = graph.beam_search(
         start_state=start_state,
         beam_mode="iterated_batched",
@@ -487,6 +487,35 @@ def test_beam_search_iterated_batched_memory_gate_fallback():
     )
     # Should complete without errors (path_found or not depends on scramble).
     assert isinstance(r.path_found, bool)
+
+
+@pytest.mark.skipif(not torch.cuda.is_available(), reason="Memory check is CUDA-only")
+def test_iterated_batched_memory_error_on_oversized_beam():
+    """Memory check raises MemoryError when beam is too large for batched mode.
+
+    Uses a beam_width large enough to trip the check (estimated peak > 90% of device
+    memory). Verifies the error message includes the parameters and the suggestion to
+    use beam_mode='iterated'.
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    start_state = list(np.random.permutation(8))
+    device_memory_gb = torch.cuda.get_device_properties(graph.device).total_memory / 2**30
+    # Pick a beam_width that trips the check: 1.5 * n_gens * bw * state_size > 0.9 * device.
+    # n_gens=3, state_size=8 (int8, itemsize=1). Solve for bw.
+    n_gens = graph.definition.n_generators
+    state_size = graph.definition.state_size
+    itemsize = graph.dtype.itemsize
+    # bw such that estimated_peak = 0.95 * device_memory (just over 90% threshold).
+    target_bytes = 0.95 * device_memory_gb * 2**30
+    beam_width = int(target_bytes / (1.5 * n_gens * state_size * itemsize)) + 1
+    with pytest.raises(MemoryError, match="iterated_batched would need"):
+        graph.beam_search(
+            start_state=start_state,
+            beam_mode="iterated_batched",
+            beam_width=beam_width,
+            max_steps=5,
+            history_depth=2,
+        )
 
 
 def test_beam_search_iterated_batched_per_generator_topk():

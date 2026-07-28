@@ -155,8 +155,8 @@ class BeamSearchAlgorithm:
             neighbors at once (ONE hash+sort+dedup+predictor), then per-generator topk
             with origin tracking. Faster than "iterated" at medium beams (regime B,
             <= ~2^21 for cube555) by eliminating per-chunk Python/launch overhead.
-            Falls back to "iterated" if the memory gate trips (n_gens x bw x state_size
-            > 0.6 x device memory). Opt-in; fairness measured per group.
+            Raises `MemoryError` if the memory check fails (use beam_mode="iterated"
+            for large beams). Opt-in; fairness measured per group.
 
         :param start_state: State from which to start search.
         :param destination_state: Target state to find. Defaults to central state for "simple" mode.
@@ -1061,10 +1061,12 @@ class BeamSearchAlgorithm:
         per-generator topk with origin tracking. Eliminates the per-chunk Python loop
         and per-chunk kernel launches of `search_iterated`.
 
-        **Memory gate:** if `n_gens x beam_width x state_size > 0.6 x device_memory`,
-        falls back to `search_iterated` (chunked, Phase 1 path). Regime B only
-        (<= ~2^21 cube555, <= ~2^22 cube333 on a 16 GB GPU); regime A (2^24) uses
-        chunked+compaction.
+        **Memory check:** batched mode materializes all `n_gens x beam_width` neighbors
+        at once. If the estimated peak exceeds 90% of device memory, raises `MemoryError`
+        with a message explaining the limit and suggesting `beam_mode="iterated"`
+        (chunked) as the alternative. Does NOT silently fall back — the caller must
+        explicitly choose the chunked mode (silent fallback wasted GPU quota in
+        practice when the caller assumed batched was running).
 
         **Fairness:** per-generator topk preserves per-generator slot allocation
         (`beam_width // n_gens` each), unlike advanced mode's global topk which can
@@ -1086,31 +1088,21 @@ class BeamSearchAlgorithm:
         state_size = graph.definition.state_size
         beam_width_part = beam_width // n_generators
 
-        # Memory gate: if materializing all n_gens x bw neighbors exceeds 0.6x device
-        # memory, fall back to chunked search_iterated (Phase 1 path).
+        # Memory check: batched materializes n_gens * bw * state_size neighbors at once.
+        # Use 1.5x multiplier (1x neighbors + ~0.2x dedup temporaries + ~0.1x predictor
+        # + ~0.2x hashes). 1.5x is conservative (actual ~1.2x) but leaves headroom.
+        # Raises MemoryError instead of silent fallback — see docstring rationale.
         if graph.device.type == "cuda":
-            device_memory = torch.cuda.get_device_properties(graph.device).total_memory
+            device_memory_gb = torch.cuda.get_device_properties(graph.device).total_memory / 2**30
             batched_states_bytes = n_generators * beam_width * state_size * graph.dtype.itemsize
-            # Conservative: neighbors buffer (1x) + hashes (8B/elem) + dedup buffer (1x) +
-            # predictor intermediate (~1x). Use 3x the states buffer as the budget estimate.
-            if batched_states_bytes * 3 > 0.6 * device_memory:
-                if verbose >= 1:
-                    print(
-                        f"Memory gate tripped: batched would need ~{batched_states_bytes * 3 / 2**30:.1f} GB "
-                        f"(> 60% of {device_memory / 2**30:.1f} GB device). Falling back to chunked iterated."
-                    )
-                return self.search_iterated(
-                    start_state=start_state,
-                    destination_state=destination_state,
-                    predictor=predictor,
-                    beam_width=beam_width,
-                    max_steps=max_steps,
-                    return_path=return_path,
-                    path_device=path_device,
-                    history_depth=history_depth,
-                    hashed_neigbourhood=hashed_neigbourhood,
-                    memory_cleanup=memory_cleanup,
-                    verbose=verbose,
+            estimated_peak_gb = batched_states_bytes * 1.5 / 2**30
+            if estimated_peak_gb > device_memory_gb * 0.9:
+                raise MemoryError(
+                    f"iterated_batched would need ~{estimated_peak_gb:.1f} GB "
+                    f"(90% of {device_memory_gb:.1f} GB device memory), which exceeds the safe limit. "
+                    f"Parameters: n_generators={n_generators}, beam_width={beam_width}, "
+                    f"state_size={state_size}. "
+                    f"Use beam_mode='iterated' (chunked) instead, or reduce beam_width."
                 )
 
         # Initialize predictor if not provided.
