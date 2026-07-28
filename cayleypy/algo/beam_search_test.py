@@ -883,11 +883,8 @@ def test_beam_search_matrix_not_found(beam_mode):
     result = graph.beam_search(start_state=start_state, **kwargs)
     assert not result.path_found
     assert result.path is None
-    # not-found returns path_length == max_steps (advanced/iterated) or 0 (simple).
-    if beam_mode == "simple":
-        assert result.path_length == 0
-    else:
-        assert result.path_length == 10
+    # not-found returns path_length == max_steps for all modes.
+    assert result.path_length == 10
 
 
 @pytest.mark.parametrize("beam_mode", _BEAM_MODES)
@@ -1223,3 +1220,120 @@ def test_beam_search_invariant_apply_path_equals_central(beam_mode):
     assert len(result.path) == result.path_length
     # path elements are valid generator ids.
     assert all(0 <= g < graph.definition.n_generators for g in result.path)
+
+
+# =============================================================================
+# Unit tests for shared preamble/postamble helpers
+# =============================================================================
+
+from .beam_search import (
+    _init_predictor,
+    _encode_and_dedupe_start,
+    _setup_path_device_and_restore,
+    _precompute_mitm,
+    _early_return_if_at_dest,
+    _finalize_not_found,
+)
+
+
+@pytest.fixture
+def lrx8_graph():
+    """Fixture: LRX(8) CayleyGraph."""
+    return CayleyGraph(PermutationGroups.lrx(8))
+
+
+def test_init_predictor_hamming_default(lrx8_graph):
+    """Test _init_predictor with None (hamming default)."""
+    pred = _init_predictor(lrx8_graph, None)
+    assert isinstance(pred, Predictor)
+    # Verify it's the hamming predictor by checking output on a test state.
+    test_state = torch.tensor([[0, 1, 2, 3, 4, 5, 6, 7]], dtype=lrx8_graph.dtype)
+    result = pred(test_state)
+    assert result.shape == (1,)
+    assert result.item() == 0  # hamming distance to central is 0
+
+
+def test_init_predictor_wrap_existing(lrx8_graph):
+    """Test _init_predictor wraps existing Predictor."""
+    existing = Predictor(lrx8_graph, "hamming")
+    pred = _init_predictor(lrx8_graph, existing)
+    assert pred is existing  # same instance
+
+
+def test_init_predictor_custom(lrx8_graph):
+    """Test _init_predictor with custom mode string."""
+    pred = _init_predictor(lrx8_graph, "hamming")
+    assert isinstance(pred, Predictor)
+
+
+def test_encode_and_dedupe_start_returns_correct_shapes(lrx8_graph):
+    """Test _encode_and_dedupe_start returns correct tensor shapes."""
+    start = [0, 1, 2, 3, 4, 5, 6, 7]
+    dest = lrx8_graph.central_state
+    beam_states, beam_hashes, dest_hashes = _encode_and_dedupe_start(lrx8_graph, start, dest)
+    assert beam_states.dim() == 2
+    assert beam_hashes.dim() == 1
+    assert len(beam_hashes) == len(beam_states)
+
+
+def test_setup_path_device_and_restore_cpu(lrx8_graph):
+    """Test _setup_path_device_and_restore with CPU path_device."""
+    beam_hashes = torch.tensor([1, 2, 3], dtype=torch.int64)
+    path_device, restore_path_hashes = _setup_path_device_and_restore("cpu", True, beam_hashes, lrx8_graph)
+    assert path_device == "cpu"
+    assert restore_path_hashes is not None
+    assert len(restore_path_hashes) == 1
+
+
+def test_setup_path_device_and_restore_no_return_path(lrx8_graph):
+    """Test _setup_path_device_and_restore with return_path=False."""
+    beam_hashes = torch.tensor([1, 2, 3], dtype=torch.int64)
+    path_device, restore_path_hashes = _setup_path_device_and_restore("auto", False, beam_hashes, lrx8_graph)
+    assert path_device == lrx8_graph.device
+    assert restore_path_hashes is None
+
+
+def test_precompute_mitm_int_radius(lrx8_graph):
+    """Test _precompute_mitm with integer radius."""
+    bfs_result, layers_hashes = _precompute_mitm(lrx8_graph, 2, lrx8_graph.central_state, "cpu")
+    assert layers_hashes is not None
+    assert len(layers_hashes) <= 3  # layers 0, 1, 2
+
+
+def test_precompute_mitm_graph_mismatch_raises(lrx8_graph):
+    """Test _precompute_mitm raises on graph mismatch."""
+    other_graph = CayleyGraph(PermutationGroups.lrx(16))
+    bfs_result = other_graph.bfs(start_states=other_graph.central_state, max_diameter=1, return_all_hashes=True)
+    with pytest.raises(ValueError, match="Graph from bfs_result_for_mitm must be the same."):
+        _precompute_mitm(lrx8_graph, bfs_result, lrx8_graph.central_state, "cpu")
+
+
+def test_early_return_if_at_dest_no_match(lrx8_graph):
+    """Test _early_return_if_at_dest returns None when no match."""
+    beam_hashes = torch.tensor([1, 2, 3], dtype=torch.int64)
+    dest_hashes = torch.tensor([4, 5, 6], dtype=torch.int64)
+    result = _early_return_if_at_dest(beam_hashes, dest_hashes, {}, lrx8_graph)
+    assert result is None
+
+
+def test_early_return_if_at_dest_match(lrx8_graph):
+    """Test _early_return_if_at_dest returns BeamSearchResult on match."""
+    beam_hashes = torch.tensor([1, 2, 3], dtype=torch.int64)
+    dest_hashes = torch.tensor([3, 4, 5], dtype=torch.int64)
+    # No match
+    result = _early_return_if_at_dest(beam_hashes, dest_hashes, {}, lrx8_graph)
+    assert result is None
+    # Match
+    dest_hashes_same = torch.tensor([1, 2, 3], dtype=torch.int64)
+    result = _early_return_if_at_dest(beam_hashes, dest_hashes_same, {}, lrx8_graph)
+    assert result is not None
+    assert result.path_found is True
+    assert result.path_length == 0
+
+
+def test_finalize_not_found_returns_correct_result(lrx8_graph):
+    """Test _finalize_not_found returns correct BeamSearchResult."""
+    result = _finalize_not_found(100, {}, lrx8_graph)
+    assert result.path_found is False
+    assert result.path_length == 100
+    assert result.path is None

@@ -108,6 +108,105 @@ def _restore_path(
     return path1 + path2
 
 
+# =============================================================================
+# Task 6: Shared preamble/postamble helpers (extracted from 4 modes)
+# =============================================================================
+
+
+def _init_predictor(graph: "CayleyGraph", predictor):
+    """Initialize predictor for beam search (hamming default, wrap if needed).
+
+    Returns a Predictor instance. This helper is shared across all 4 modes.
+    """
+    from ..predictor import Predictor as PredictorClass  # pylint: disable=import-outside-toplevel
+
+    if predictor is None:
+        return PredictorClass(graph, "hamming")
+    elif isinstance(predictor, PredictorClass):
+        return predictor
+    else:
+        return PredictorClass(graph, predictor)
+
+
+def _encode_and_dedupe_start(graph: "CayleyGraph", start_state: AnyStateType, destination_state: AnyStateType):
+    """Encode start/dest states and deduplicate via get_unique_states.
+
+    Returns (beam_states, beam_hashes, dest_hashes). Shared across all 4 modes.
+    """
+    beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
+    _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
+    return beam_states, beam_hashes, dest_hashes
+
+
+def _setup_path_device_and_restore(
+    path_device: Union[str, torch.device], return_path: bool, beam_hashes: torch.Tensor, graph: "CayleyGraph"
+):
+    """Resolve path_device and initialize restore_path_hashes if return_path.
+
+    Returns (path_device, restore_path_hashes|None). Shared across all 4 modes.
+    """
+    if path_device == "auto":
+        path_device = "cpu" if return_path else graph.device
+    if return_path:
+        restore_path_hashes = [beam_hashes.to(path_device)]
+    else:
+        restore_path_hashes = None
+    return path_device, restore_path_hashes
+
+
+def _precompute_mitm(
+    graph: "CayleyGraph",
+    hashed_neigbourhood: Union[BfsResult, int, None],
+    destination_state: AnyStateType,
+    path_device: Union[str, torch.device],
+):
+    """Precompute MITM neighborhood (or use provided BfsResult).
+
+    Returns (bfs_result_for_mitm, bfs_layers_hashes). Raises ValueError if graph
+    mismatch. Shared across all 4 modes.
+    """
+    bfs_result_for_mitm: BfsResult
+    hashed_neigbourhood = 0 if hashed_neigbourhood is None else hashed_neigbourhood
+    if isinstance(hashed_neigbourhood, int):
+        bfs_result_for_mitm = graph.bfs(
+            start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
+        ).to_device(path_device)
+    else:
+        bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
+    if bfs_result_for_mitm.graph != graph.definition:
+        raise ValueError("Graph from bfs_result_for_mitm must be the same.")
+    return bfs_result_for_mitm, bfs_result_for_mitm.layers_hashes
+
+
+def _early_return_if_at_dest(
+    beam_hashes: torch.Tensor,
+    dest_hashes: torch.Tensor,
+    debug_scores: dict,
+    graph: "CayleyGraph",
+) -> Optional[BeamSearchResult]:
+    """Check if start state is already the destination.
+
+    Returns BeamSearchResult if found (path length 0), None otherwise.
+    Shared across all 4 modes.
+    """
+    if torch.any(beam_hashes == dest_hashes):
+        return BeamSearchResult(True, 0, [], debug_scores, graph.definition)
+    return None
+
+
+def _finalize_not_found(
+    max_steps: int,
+    debug_scores: dict,
+    graph: "CayleyGraph",
+) -> BeamSearchResult:
+    """Return BeamSearchResult when search exhausted max_steps without success.
+
+    Shared postamble across all 4 modes. Memory cleanup (if requested) happens
+    in the loop body, not here.
+    """
+    return BeamSearchResult(False, max_steps, None, debug_scores, graph.definition)
+
+
 class BeamSearchAlgorithm:
     """Beam search algorithm for finding paths in Cayley graphs.
 
@@ -276,50 +375,19 @@ class BeamSearchAlgorithm:
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         debug_scores: dict[int, float] = {}
-
         graph = self.graph
-
-        # Initialize predictor if not provided.
-        if predictor is None:
-            _predictor = Predictor(graph, "hamming")
-        elif isinstance(predictor, Predictor):
-            _predictor = predictor
-        else:
-            _predictor = Predictor(graph, predictor)
-
-        # Use central state as a dest state.
         destination_state = graph.central_state
 
-        # Encode states.
-        beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
-        _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
-
-        if path_device == "auto":
-            path_device = "cpu" if return_path else graph.device
-
-        if return_path:
-            restore_path_hashes = [
-                beam_hashes.to(path_device),
-            ]
-
-        # Check if start state is already the dest.
-        if torch.any(beam_hashes == dest_hashes):
-            return BeamSearchResult(True, 0, [], debug_scores, graph.definition)
-
-        # Precompute meet in the middle \ destination state neighborhood hashing optimization.
-        bfs_result_for_mitm: BfsResult
-
-        hashed_neigbourhood = 0 if hashed_neigbourhood is None else hashed_neigbourhood
-
-        if isinstance(hashed_neigbourhood, int):
-            bfs_result_for_mitm = graph.bfs(
-                start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
-            ).to_device(path_device)
-        else:
-            bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
-        if bfs_result_for_mitm.graph != graph.definition:
-            raise ValueError("Graph from bfs_result_for_mitm must be the same.")
-        bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
+        # Task 6: Use shared preamble helpers.
+        _predictor = _init_predictor(graph, predictor)
+        beam_states, beam_hashes, dest_hashes = _encode_and_dedupe_start(graph, start_state, destination_state)
+        path_device, restore_path_hashes = _setup_path_device_and_restore(path_device, return_path, beam_hashes, graph)
+        early_result = _early_return_if_at_dest(beam_hashes, dest_hashes, debug_scores, graph)
+        if early_result is not None:
+            return early_result
+        bfs_result_for_mitm, bfs_layers_hashes = _precompute_mitm(
+            graph, hashed_neigbourhood, destination_state, path_device
+        )
 
         _new_states: torch.Tensor
         _new_hashes: torch.Tensor
@@ -421,7 +489,7 @@ class BeamSearchAlgorithm:
         if verbose >= 1:
             print(f"Path not found after {max_steps} steps.")
 
-        return BeamSearchResult(False, 0, None, debug_scores, graph.definition)
+        return _finalize_not_found(max_steps, debug_scores, graph)
 
     def search_advanced(
         self,
@@ -468,52 +536,20 @@ class BeamSearchAlgorithm:
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         debug_scores: dict[int, float] = {}
-
         graph = self.graph
-
-        # Initialize predictor if not provided.
-        if predictor is None:
-            _predictor = Predictor(graph, "hamming")
-        elif isinstance(predictor, Predictor):
-            _predictor = predictor
-        else:
-            _predictor = Predictor(graph, predictor)
-
-        # Use central state as dest if not specified.
         if destination_state is None:
             destination_state = graph.central_state
 
-        # Encode states.
-        beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
-        _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
-
-        if path_device == "auto":
-            path_device = "cpu" if return_path else graph.device
-
-        if return_path:
-            restore_path_hashes = [
-                beam_hashes.to(path_device),
-            ]
-
-        # Check if start state is already the dest.
-        if torch.any(beam_hashes == dest_hashes):
-            return BeamSearchResult(True, 0, [], debug_scores, graph.definition)
-
-        # Precompute meet in the middle \ destination state neighborhood hashing optimization.
-        # Precompute meet in the middle \ destination state neighborhood hashing optimization.
-        bfs_result_for_mitm: BfsResult
-
-        hashed_neigbourhood = 0 if hashed_neigbourhood is None else hashed_neigbourhood
-
-        if isinstance(hashed_neigbourhood, int):
-            bfs_result_for_mitm = graph.bfs(
-                start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
-            ).to_device(path_device)
-        else:
-            bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
-        if bfs_result_for_mitm.graph != graph.definition:
-            raise ValueError("Graph from bfs_result_for_mitm must be the same.")
-        bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
+        # Task 6: Use shared preamble helpers.
+        _predictor = _init_predictor(graph, predictor)
+        beam_states, beam_hashes, dest_hashes = _encode_and_dedupe_start(graph, start_state, destination_state)
+        path_device, restore_path_hashes = _setup_path_device_and_restore(path_device, return_path, beam_hashes, graph)
+        early_result = _early_return_if_at_dest(beam_hashes, dest_hashes, debug_scores, graph)
+        if early_result is not None:
+            return early_result
+        bfs_result_for_mitm, bfs_layers_hashes = _precompute_mitm(
+            graph, hashed_neigbourhood, destination_state, path_device
+        )
 
         # Initialize hash storage for non-backtracking.
         # Compact representation (Task 3.2): one TorchHashSet per history-depth slot,
@@ -672,7 +708,7 @@ class BeamSearchAlgorithm:
         if verbose >= 1:
             print(f"Path not found after {max_steps} steps.")
 
-        return BeamSearchResult(False, max_steps, None, debug_scores, graph.definition)
+        return _finalize_not_found(max_steps, debug_scores, graph)
 
     def search_iterated(
         self,
@@ -740,49 +776,18 @@ class BeamSearchAlgorithm:
         scores = None
         best_score = 1e6
 
-        # Initialize predictor if not provided.
-        if predictor is None:
-            _predictor = Predictor(graph, "hamming")
-        elif isinstance(predictor, Predictor):
-            _predictor = predictor
-        else:
-            _predictor = Predictor(graph, predictor)
-
-        # Use central state as dest if not specified.
+        # Use shared helpers for common preamble.
+        _predictor = _init_predictor(graph, predictor)
         if destination_state is None:
             destination_state = graph.central_state
-
-        # Encode states.
-        beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
-        _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
-
-        if path_device == "auto":
-            path_device = "cpu" if return_path else graph.device
-
-        if return_path:
-            restore_path_hashes = [
-                beam_hashes.to(path_device),
-            ]
-
-        # Check if start state is already the dest.
-        if torch.any(beam_hashes == dest_hashes):
-            return BeamSearchResult(True, 0, [], debug_scores, graph.definition)
-
-        # Precompute meet in the middle \ destination state neighborhood hashing optimization.
-        # Precompute meet in the middle \ destination state neighborhood hashing optimization.
-        bfs_result_for_mitm: BfsResult
-
-        hashed_neigbourhood = 0 if hashed_neigbourhood is None else hashed_neigbourhood
-
-        if isinstance(hashed_neigbourhood, int):
-            bfs_result_for_mitm = graph.bfs(
-                start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
-            ).to_device(path_device)
-        else:
-            bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
-        if bfs_result_for_mitm.graph != graph.definition:
-            raise ValueError("Graph from bfs_result_for_mitm must be the same.")
-        bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
+        beam_states, beam_hashes, dest_hashes = _encode_and_dedupe_start(graph, start_state, destination_state)
+        path_device, restore_path_hashes = _setup_path_device_and_restore(path_device, return_path, beam_hashes, graph)
+        early_result = _early_return_if_at_dest(beam_hashes, dest_hashes, debug_scores, graph)
+        if early_result is not None:
+            return early_result
+        bfs_result_for_mitm, bfs_layers_hashes = _precompute_mitm(
+            graph, hashed_neigbourhood, destination_state, path_device
+        )
 
         # Initialize hash storage for non-backtracking.
         # Compact representation (Task 1.6): one TorchHashSet per history-depth slot,
@@ -1037,7 +1042,7 @@ class BeamSearchAlgorithm:
         if verbose >= 1:
             print(f"Path not found after {max_steps} steps.")
 
-        return BeamSearchResult(False, max_steps, None, debug_scores, graph.definition)
+        return _finalize_not_found(max_steps, debug_scores, graph)
 
     def search_iterated_batched(
         self,
@@ -1105,46 +1110,18 @@ class BeamSearchAlgorithm:
                     f"Use beam_mode='iterated' (chunked) instead, or reduce beam_width."
                 )
 
-        # Initialize predictor if not provided.
-        if predictor is None:
-            _predictor = Predictor(graph, "hamming")
-        elif isinstance(predictor, Predictor):
-            _predictor = predictor
-        else:
-            _predictor = Predictor(graph, predictor)
-
-        # Use central state as dest if not specified.
+        # Use shared helpers for common preamble.
+        _predictor = _init_predictor(graph, predictor)
         if destination_state is None:
             destination_state = graph.central_state
-
-        # Encode states.
-        beam_states, beam_hashes = graph.get_unique_states(graph.encode_states(start_state))
-        _, dest_hashes = graph.get_unique_states(graph.encode_states(destination_state))
-
-        if path_device == "auto":
-            path_device = "cpu" if return_path else graph.device
-
-        if return_path:
-            restore_path_hashes = [
-                beam_hashes.to(path_device),
-            ]
-
-        # Check if start state is already the dest.
-        if torch.any(beam_hashes == dest_hashes):
-            return BeamSearchResult(True, 0, [], debug_scores, graph.definition)
-
-        # Precompute meet-in-the-middle neighborhood.
-        bfs_result_for_mitm: BfsResult
-        hashed_neigbourhood = 0 if hashed_neigbourhood is None else hashed_neigbourhood
-        if isinstance(hashed_neigbourhood, int):
-            bfs_result_for_mitm = graph.bfs(
-                start_states=destination_state, max_diameter=hashed_neigbourhood, return_all_hashes=True
-            ).to_device(path_device)
-        else:
-            bfs_result_for_mitm = hashed_neigbourhood.to_device(path_device)
-        if bfs_result_for_mitm.graph != graph.definition:
-            raise ValueError("Graph from bfs_result_for_mitm must be the same.")
-        bfs_layers_hashes = bfs_result_for_mitm.layers_hashes
+        beam_states, beam_hashes, dest_hashes = _encode_and_dedupe_start(graph, start_state, destination_state)
+        path_device, restore_path_hashes = _setup_path_device_and_restore(path_device, return_path, beam_hashes, graph)
+        early_result = _early_return_if_at_dest(beam_hashes, dest_hashes, debug_scores, graph)
+        if early_result is not None:
+            return early_result
+        bfs_result_for_mitm, bfs_layers_hashes = _precompute_mitm(
+            graph, hashed_neigbourhood, destination_state, path_device
+        )
 
         # Initialize compact non-backtracking hash storage (same as search_iterated Task 1.6).
         if history_depth > 0:
@@ -1342,4 +1319,4 @@ class BeamSearchAlgorithm:
         if verbose >= 1:
             print(f"Path not found after {max_steps} steps.")
 
-        return BeamSearchResult(False, max_steps, None, debug_scores, graph.definition)
+        return _finalize_not_found(max_steps, debug_scores, graph)
