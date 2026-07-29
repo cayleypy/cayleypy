@@ -11,9 +11,9 @@ nodes) that cannot be stored explicitly. The focus is on **Cayley graphs** and
 
 - **Maturity:** Alpha (v0.1.0, `Development Status :: 3 - Alpha` in pyproject.toml).
   The public API is not yet frozen.
-- **Active work:** The `feature/iterated-nonbacktrack` branch and recent commits
-  focus on `beam_search` optimization (iterated mode, non-backtracking, dtype/bit
-  encoding width tuning, memory management).
+- **Active work:** Task 6 (mode unification) completed on `feature/beam-search-perf`.
+  All 4 beam search modes now share 6 common helpers, removing ~120 lines of duplication.
+  Future work: GPU benchmarks, CPU thread tuning, matrix group support for iterated modes.
 - **License:** MIT.
 - **Key dependency:** PyTorch (>=2.6) for all GPU/CPU tensor operations.
 
@@ -109,6 +109,15 @@ These methods are called on every beam_search iteration and on every BFS layer:
 | `TorchHashSet` | `torch_utils.py:13` | Set of int64 backed by sorted tensors |
 | `StateHasher.make_hashes` | `hasher.py:30` | Hashes states to int64 (identity / dot-product / splitmix64) |
 
+| Beam search helpers (Task 6) | Line | Role |
+|------------------------------|------|------|
+| `_init_predictor` | `beam_search.py:116` | Initialize Predictor (hamming default, wrap existing) |
+| `_encode_and_dedupe_start` | `beam_search.py:131` | Encode + dedupe start/dest states |
+| `_setup_path_device_and_restore` | `beam_search.py:143` | Resolve path_device, init restore_path_hashes |
+| `_precompute_mitm` | `beam_search.py:159` | Precompute MITM neighborhood (int radius or BfsResult) |
+| `_early_return_if_at_dest` | `beam_search.py:183` | Check if start==dest, return zero-length path |
+| `_finalize_not_found` | `beam_search.py:199` | Return not-found result (memory_cleanup in loop body) |
+
 ## 4. Architecture & data flow
 
 ```
@@ -134,21 +143,20 @@ wrapper around `BeamSearchAlgorithm(self).search(**kwargs)`.
 
 ## 5. Beam search modes
 
-`BeamSearchAlgorithm.search()` (`beam_search.py:63`) dispatches to 3 modes via `beam_mode`:
+`BeamSearchAlgorithm.search()` (`beam_search.py:63`) dispatches to 4 modes via `beam_mode`:
 
 | Mode | Method | MITM | history_depth | destination_state | Notes |
 |------|--------|------|---------------|-------------------|-------|
 | `"simple"` | `search_simple` | Yes | No | Forces central | Classic beam search |
-| `"advanced"` | `search_advanced` | Yes | Yes | Custom allowed | Non-backtracking via `torch.isin` loop |
+| `"advanced"` | `search_advanced` | Yes | Yes | Custom allowed | Non-backtracking via `TorchHashSet` |
 | `"iterated"` | `search_iterated` | Yes | Yes | Custom allowed | Per-generator chunking; **raises on matrix groups** |
+| `"iterated_batched"` | `search_iterated_batched` | Yes | Yes | Custom allowed | Batched neighbors (one hash+sort+dedup); **raises on matrix groups** |
 
 **Known limitations:**
-- `search_iterated` raises `ValueError("Iterated beam search actually realized only for Permutation Groups.")`
-  (`beam_search.py:546-547`) when called on a non-permutation (matrix) group.
+- `search_iterated` and `search_iterated_batched` raise `ValueError("...actually realized only for Permutation Groups.")`
+  when called on a non-permutation (matrix) group.
   # TODO(char-spec): iterated matrix-group support is planned; revisit.
-- The three modes share massive code duplication (MITM precompute, predictor init,
-  path restoration, non-backtracking filter, topk selection). This is flagged as a
-  perf/refactor candidate in §7.
+- **Task 6 completed:** All 4 modes now share 6 common helpers (see §7), removing ~120 lines of duplication.
 
 ## 6. Invariants (DO NOT break)
 
@@ -188,7 +196,7 @@ Known performance bottlenecks. Items marked **RESOLVED** were addressed on
 
 | Location | Issue | Status |
 |----------|-------|--------|
-| `beam_search.py` `search()` dispatch | 3+ modes share ~80% identical code (MITM precompute, predictor init, encode, topk, return_path, memory_cleanup). Mode unification deferred. | Open (Task 6) |
+| `beam_search.py` `search()` dispatch | 4 modes shared ~80% identical code (MITM precompute, predictor init, encode, topk, return_path, memory_cleanup). **RESOLVED (Task 6)**: extracted 6 shared helpers (`_init_predictor`, `_encode_and_dedupe_start`, `_setup_path_device_and_restore`, `_precompute_mitm`, `_early_return_if_at_dest`, `_finalize_not_found`). All 4 modes now use these helpers, removing ~120 lines of duplication. | **RESOLVED** |
 | nonbacktrack `for j in range(hd)` isin loop | Was O(history_depth) GPU kernel launches per step. **RESOLVED**: replaced with compact `TorchHashSet` (Task 1.6 for iterated, Task 3.2 for advanced). `t_isin` dropped from 57-70% → 19-23% (iterated) / 38% → lower (advanced). | **RESOLVED** |
 | `.item()` GPU→CPU sync in dedup/nonbacktrack guards | Was 24 syncs/step (cube444). **RESOLVED**: dropped the guard, apply mask unconditionally (Task 1.3). | **RESOLVED** |
 | `accm_hashes` zero-padding latent bug | `torch.isin` against zero-padded buffer falsely deduped hash==0 states. **RESOLVED**: replaced with `TorchHashSet` (dedup-unification). | **RESOLVED** |
@@ -197,6 +205,7 @@ Known performance bottlenecks. Items marked **RESOLVED** were addressed on
 | `TorchHashSet.get_mask_to_remove_seen_hashes` shard loop | Python loop over shards (up to 10). Merge threshold keeps it bounded; `get_merged_sorted()` collapses shards before querying. | Mitigated |
 | `random_walks.py:143-146` subsampling bug | Hashes added unsorted after `torch.randperm`, violating `add_sorted_hashes` precondition. **RESOLVED**: sort hashes after subsampling (Task 2). | **RESOLVED** |
 | `search_iterated_batched` surplus redistribution | Phase 4 bug: marked hash-order indices instead of topk-selected. **RESOLVED**: track global indices directly (Task 0 bugfix). | **RESOLVED** |
+| `search_iterated` / `search_iterated_batched` preamble duplication | Inline predictor init, encode, MITM precompute. **RESOLVED (Task 6)**: now use shared helpers. | **RESOLVED** |
 
 ## 8. Contribution rules
 
@@ -231,6 +240,10 @@ Known performance bottlenecks. Items marked **RESOLVED** were addressed on
 - **Benchmarks:** `pytest --benchmark-only` runs regression baselines stored in
   `.benchmarks/` (gitignored). These are NOT in CI; they are for manual before/after
   comparison during performance work.
+  
+  **Snapshots:** Use `--benchmark-save=<name>` to save baseline, `--benchmark-compare`
+  to detect regressions (>5% = warning, >10% = error). Current baseline:
+  `0001_task6-final.json` (post-Task-6 refactoring).
 
 ## 10. GPU benchmarking on Kaggle
 
@@ -313,3 +326,28 @@ to experiment can call `torch.set_num_threads(N)` before constructing the graph.
 that falls back from `iterated_batched` to `iterated` is CUDA-only, so batched mode is
 always available on CPU and eliminates the per-chunk Python loop (`n_generators`
 iterations/step) — significant overhead on CPU where Python-loop cost dominates.
+
+## 12. Task 6: Mode unification (completed)
+
+All 4 beam search modes (`simple`, `advanced`, `iterated`, `iterated_batched`) now share
+6 common preamble/postamble helpers, removing ~120 lines of duplication:
+
+```
+search_simple      ─┐
+search_advanced    ─┼──> [_init_predictor]
+search_iterated    ─┤    [_encode_and_dedupe_start]
+search_iterated_...─┘    [_setup_path_device_and_restore]
+                     ───> [_precompute_mitm]
+                     ───> [_early_return_if_at_dest]
+                     ───> [_finalize_not_found]
+```
+
+**Key decisions:**
+- `memory_cleanup` removed from `_finalize_not_found` — called in loop body, not postamble.
+- `search_iterated` early exit (no new states) stays inline — uses `i_step`, not `max_steps`.
+- Helper unit tests in `beam_search_test.py` (12 tests) pin the API.
+
+**Validation:**
+- All 433 tests pass.
+- pylint 10/10, mypy clean.
+- Benchmark baseline saved: `0001_task6-final.json`.
