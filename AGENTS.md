@@ -65,7 +65,7 @@ cayleypy/
   permutation_utils.py     # Permutation helpers
   datasets.py              # load_dataset — pre-computed growth functions
   algo/
-    beam_search.py         # BeamSearchAlgorithm — 3 modes (simple/advanced/iterated)
+    beam_search.py         # BeamSearchAlgorithm — 4 modes (simple/advanced/iterated/iterated_batched)
     beam_search_result.py  # BeamSearchResult dataclass
     bfs_numpy.py           # NumPy-based BFS
     bfs_bitmask.py         # Bitmask-based BFS (fastest for certain graphs)
@@ -94,14 +94,14 @@ These methods are called on every beam_search iteration and on every BFS layer:
 |--------|------|------|
 | `get_unique_states` | `cayley_graph.py:122` | Removes duplicates, **sorts by hash** (critical invariant, see §6) |
 | `encode_states` | `cayley_graph.py:141` | Converts human-readable states to internal representation |
-| `decode_states` | `cayleypy/cayley_graph.py:149` | Converts internal representation back to human-readable |
+| `decode_states` | `cayley_graph.py:149` | Converts internal representation back to human-readable |
 | `apply_path` | `cayley_graph.py:175` | Applies a sequence of generators to a state |
 | `get_neighbors` | `cayley_graph.py:195` | Computes all neighbors (n_generators × n_states) |
 | `get_neighbors_generator` | `cayley_graph.py:206` | Yields neighbors one generator at a time (memory-efficient). `clone=False` opt-in for `search_iterated` (avoids per-chunk copy). |
 | `bfs` | `cayley_graph.py:217` | Full breadth-first search |
 | `restore_path` | `cayley_graph.py:388` | Reconstructs path from BFS layer hashes |
 | `find_path_from` | `cayley_graph.py:431` | Finds path from a state to central using pre-computed BFS |
-| `free_memory` | `cayleypy/cayley_graph.py:451` | gc.collect + cuda.empty_cache |
+| `free_memory` | `cayley_graph.py:451` | gc.collect + cuda.empty_cache |
 
 | Utility | Line | Role |
 |---------|------|------|
@@ -117,6 +117,7 @@ These methods are called on every beam_search iteration and on every BFS layer:
 | `_precompute_mitm` | `beam_search.py:159` | Precompute MITM neighborhood (int radius or BfsResult) |
 | `_early_return_if_at_dest` | `beam_search.py:183` | Check if start==dest, return zero-length path |
 | `_finalize_not_found` | `beam_search.py:199` | Return not-found result (memory_cleanup in loop body) |
+| `_restore_path` | `beam_search.py:89` | Restore path from hashes; **takes `destination_state`** (fix A1) |
 
 ## 4. Architecture & data flow
 
@@ -147,10 +148,10 @@ wrapper around `BeamSearchAlgorithm(self).search(**kwargs)`.
 
 | Mode | Method | MITM | history_depth | destination_state | Notes |
 |------|--------|------|---------------|-------------------|-------|
-| `"simple"` | `search_simple` | Yes | No | Forces central | Classic beam search |
-| `"advanced"` | `search_advanced` | Yes | Yes | Custom allowed | Non-backtracking via `TorchHashSet` |
-| `"iterated"` | `search_iterated` | Yes | Yes | Custom allowed | Per-generator chunking; **raises on matrix groups** |
-| `"iterated_batched"` | `search_iterated_batched` | Yes | Yes | Custom allowed | Batched neighbors (one hash+sort+dedup); **raises on matrix groups** |
+| `"simple"` | `search_simple` | Yes | No | Forces central | Classic beam search. Ignores `destination_state` (contract, A1-aware). |
+| `"advanced"` | `search_advanced` | Yes | Yes | Custom allowed | Non-backtracking via `TorchHashSet`. Early exit on empty beam (B3). |
+| `"iterated"` | `search_iterated` | Yes | Yes | Custom allowed | Per-generator chunking; **raises on matrix groups**. Requires `beam_width >= n_generators` (B2). |
+| `"iterated_batched"` | `search_iterated_batched` | Yes | Yes | Custom allowed | Batched neighbors (one hash+sort+dedup); **raises on matrix groups**. Requires `beam_width >= n_generators` (B2). |
 
 **Known limitations:**
 - `search_iterated` and `search_iterated_batched` raise `ValueError("...actually realized only for Permutation Groups.")`
@@ -165,11 +166,15 @@ For any `BeamSearchResult` with `path_found=True`:
 2. `len(path) == path_length` (enforced by `BeamSearchResult.__post_init__`).
 3. All elements of `path` are valid generator ids: `0 <= g < graph.definition.n_generators`.
 4. When `hashed_neigbourhood` is provided as a `BfsResult`, its graph must match the
-   search graph (`beam_search.py:222`, `:371`, `:597` raise `ValueError` otherwise).
+   search graph (`_precompute_mitm` at `beam_search.py:177` raises `ValueError` otherwise).
 5. Meet-in-the-middle path length = `i_step + bfs_layer_id` (the beam step plus the
    BFS layer where intersection was found).
 6. Non-backtracking (`history_depth > 0`) must never ban the destination neighborhood —
    otherwise the search could not find the goal.
+
+7. `_restore_path` (`beam_search.py:89`) now requires `destination_state` (fix A1).
+   When `found_layer_id == 0`, the path is restored to `destination_state`, not
+   `graph.central_state`. All 4 call sites pass the in-scope `destination_state`.
 
 ### Hidden critical contract (non-obvious, easy to break silently)
 
@@ -180,7 +185,7 @@ For any `BeamSearchResult` with `path_found=True`:
 This sorted-order guarantee is relied upon by:
 - `isin_via_searchsorted` (`torch_utils.py:4`): its `test_elements_sorted` argument MUST
   be sorted (it uses `torch.searchsorted` internally).
-- `_check_path_found` (`beam_search.py:19-23`): calls `isin_via_searchsorted(layer, hashes)`
+- `_check_path_found` (`beam_search.py:82-86`): calls `isin_via_searchsorted(layer, hashes)`
   where `hashes` comes from `get_unique_states`.
 - `_remove_seen_states` in BFS (`cayley_graph.py:278-282`): calls `isin_via_searchsorted`
   on hashes from `get_unique_states`.
@@ -206,6 +211,10 @@ Known performance bottlenecks. Items marked **RESOLVED** were addressed on
 | `random_walks.py:143-146` subsampling bug | Hashes added unsorted after `torch.randperm`, violating `add_sorted_hashes` precondition. **RESOLVED**: sort hashes after subsampling (Task 2). | **RESOLVED** |
 | `search_iterated_batched` surplus redistribution | Phase 4 bug: marked hash-order indices instead of topk-selected. **RESOLVED**: track global indices directly (Task 0 bugfix). | **RESOLVED** |
 | `search_iterated` / `search_iterated_batched` preamble duplication | Inline predictor init, encode, MITM precompute. **RESOLVED (Task 6)**: now use shared helpers. | **RESOLVED** |
+| `_restore_path` uses `central_state` for `found_layer_id==0` | **RESOLVED (A1)**: now takes `destination_state` param, all 4 call sites pass the correct destination. | **RESOLVED** |
+| `beam_width < n_generators` silent failure in iterated modes | `beam_width_part = beam_width // n_generators == 0` → `topk(k=0)` → empty beam. **RESOLVED (B2)**: raises `ValueError` in `search_iterated`/`search_iterated_batched`. Also validates `beam_width >= 1` in `search()`. | **RESOLVED** |
+| Empty beam in simple/advanced | **RESOLVED (B3)**: early exit after dedup in both `search_simple` and `search_advanced` when `_new_hashes.shape[0] == 0`. | **RESOLVED** |
+| StringEncoder sign-bit overflow (B5) | Analysis shows bit 63 can never be shifted left (`shift > 0`) because it is the highest codeword position. Shift is always ≤ 0 when mask includes bit 63, and the `shift < 0` branch already handles `mask < 0`. **DISPROVEN**: 200 random permutations across 4 `(n,w)` combos confirm correctness. | Closed (disproven) |
 
 ## 8. Contribution rules
 
@@ -227,7 +236,7 @@ Known performance bottlenecks. Items marked **RESOLVED** were addressed on
 
 - **Characterization tests are the current contract.** Tests pin what the code does
   today, including ambiguous behavior. Suspect behavior is marked with
-  `# TODO(char-spec):` so it can be revisited when the 3 modes are unified.
+  `# TODO(char-spec):` so it can be revisited when the 4 modes are unified.
 - **`RUN_SLOW_TESTS=1`** environment variable gates tests that require network access
   (Kaggle model downloads) or are computationally expensive (large graphs).
 - **Determinism:** `conftest.py` seeds numpy, Python `random`, and torch to a fixed
@@ -330,7 +339,7 @@ iterations/step) — significant overhead on CPU where Python-loop cost dominate
 ## 12. Task 6: Mode unification (completed)
 
 All 4 beam search modes (`simple`, `advanced`, `iterated`, `iterated_batched`) now share
-6 common preamble/postamble helpers, removing ~120 lines of duplication:
+6 common preamble/postamble helpers + `_restore_path` (A1-aware), removing ~120 lines of duplication:
 
 ```
 search_simple      ─┐
@@ -340,6 +349,7 @@ search_iterated_...─┘    [_setup_path_device_and_restore]
                      ───> [_precompute_mitm]
                      ───> [_early_return_if_at_dest]
                      ───> [_finalize_not_found]
+                     ───> [_restore_path]  (+ destination_state param)
 ```
 
 **Key decisions:**
@@ -348,6 +358,21 @@ search_iterated_...─┘    [_setup_path_device_and_restore]
 - Helper unit tests in `beam_search_test.py` (12 tests) pin the API.
 
 **Validation:**
-- All 433 tests pass.
+- All 472+ tests pass.
 - pylint 10/10, mypy clean.
 - Benchmark baseline saved: `0001_task6-final.json`.
+
+### Audit fixes (applied after Task 6)
+
+See `.kilo/plans/1785400827134-cayleypy-audit-fixes-plan.md` for full detail.
+Covers Blocks A-C: 8 confirmed bug fixes, 7 probable-issue fixes/verifications,
+and ~15 new/improved tests. Key API changes:
+- `_restore_path` requires `destination_state` parameter (fixes A1)
+- `MatrixGenerator.inv` computes modular inverse for `modulo > 0` (fixes A6)
+- `find_path._precompute_bfs` caches keyed by `(max_diameter, max_layer_size_to_explore)` (fixes A4)
+- `BeamSearchAlgorithm.search` validates `beam_width >= 1`; iterated modes require `beam_width >= n_generators`
+- `search_simple`/`search_advanced` exit early on empty beam
+- `BfsResult.load` returns tensors (not numpy arrays)
+- `_setup_path_device_and_restore` returns `torch.device` for auto+return_path
+- `TorchHashSet.add_sorted_hashes` asserts sorted precondition
+- `TorchHashSet.get_merged_sorted` accepts optional `device` parameter

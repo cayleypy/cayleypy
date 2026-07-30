@@ -22,3 +22,6 @@ docs/generated
 .kaggle/
 access_token
 kaggle.json
+
+# Kaggle benchmark output artifacts
+kaggle_out/
