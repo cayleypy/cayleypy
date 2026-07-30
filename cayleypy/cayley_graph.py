@@ -430,14 +430,17 @@ class CayleyGraph:
         path = []  # type: list[int]
         cur_state = self.decode_states(self.encode_states(to_state))
 
+        # Sort each layer's hashes on graph device once (isin_via_searchsorted requires sorted test_elements).
+        hashes_sorted = [h.to(self.device).sort().values for h in hashes]
+
         for i in range(len(hashes) - 1, -1, -1):
-            # Find hash in hashes[i] from which we could go to cur_state.
+            # Find hash in hashes_sorted[i] from which we could go to cur_state.
             # Corresponding state will be new_cur_state.
             # The generator index in inv_graph that moves cur_state->new_cur_state is the same as generator index
             # in this graph that moves new_cur_state->cur_state - this is what we append to the answer.
             candidates = inv_graph.get_neighbors_decoded(cur_state)
             candidates_hashes = self.hasher.make_hashes(self.encode_states(candidates))
-            mask = torch.isin(candidates_hashes, hashes[i].to(self.device))
+            mask = isin_via_searchsorted(candidates_hashes, hashes_sorted[i])
             assert torch.any(mask), "Not found any neighbor on previous layer."
             gen_id = int(mask.nonzero()[0].item())
             path.append(gen_id)
