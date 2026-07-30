@@ -165,6 +165,10 @@ class CayleyGraphChunkedBfs:
         perms = np.unique(perms)
         keys = perms & self.suffix_mask
         group_starts = np.where(np.roll(keys, 1) != keys)[0]
+        if len(group_starts) == 0:
+            # All perms belong to the same chunk.
+            self.chunk_map[keys[0]].paint_gray(perms)
+            return
         for i in range(len(group_starts) - 1):
             i1, i2 = group_starts[i], group_starts[i + 1]
             self.chunk_map[keys[i1]].paint_gray(perms[i1:i2])
@@ -218,6 +222,7 @@ def bfs_bitmask(graph: CayleyGraph, max_diameter: int = 10**6) -> list[int]:
     assert graph.definition.is_permutation_group(), "Only works for permutations."
     n = graph.definition.state_size
     assert n > R, f"This algorithm works only for N>{R}."
+    assert n <= 16, f"This algorithm uses 4-bit nibbles and works only for N<=16, got N={n}."
     if graph.verbose >= 2:
         estimated_memory_gb = (math.factorial(n) * 3 / 8) / (2**30)
         print(f"Estimated memory usage: {estimated_memory_gb:.02f}GB.")

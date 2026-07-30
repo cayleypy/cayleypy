@@ -1,3 +1,5 @@
+from typing import Optional
+
 import torch
 
 
@@ -49,6 +51,9 @@ class TorchHashSet:
         the accumulator before being added here — see beam_search.py nonbacktrack
         block: the chunk is first deduped, THEN written to the history slot).
         """
+        assert len(sorted_numbers) == 0 or torch.all(
+            sorted_numbers[:-1] <= sorted_numbers[1:]
+        ), "add_sorted_hashes requires sorted input"
         if len(sorted_numbers) > 0:
             self.data.append(sorted_numbers)
             if len(self.data) >= self._MERGE_THRESHOLD:
@@ -71,19 +76,23 @@ class TorchHashSet:
             mask &= ~isin_via_searchsorted(x, self.data[i])
         return mask
 
-    def get_merged_sorted(self) -> torch.Tensor:
+    def get_merged_sorted(self, device: Optional[torch.device] = None) -> torch.Tensor:
         """Merge all shards into one sorted tensor and return it.
 
         After this call, `self.data` holds exactly one tensor, so subsequent
         `get_mask_to_remove_seen_hashes` calls are a single
         `isin_via_searchsorted` (no Python loop). Use this when about to query
         the set many times (e.g. once per chunk per step in beam search).
+
+        If the set is empty and `device` is provided, returns an empty tensor on
+        that device to avoid device mismatch. If `device` is None, falls back to
+        CPU (callers on GPU should provide `device` or guard against empty sets).
         """
         if len(self.data) > 1:
             merged, _ = torch.hstack(self.data).sort()
             self.data = [merged]
         if len(self.data) == 0:
-            return torch.empty(0, dtype=torch.int64, device=self._device())
+            return torch.empty(0, dtype=torch.int64, device=device or self._device())
         return self.data[0]
 
     def _device(self) -> torch.device:

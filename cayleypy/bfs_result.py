@@ -107,12 +107,18 @@ class BfsResult:
                 key = f"edges_list_hashes__{i}"
                 if key not in f:
                     break
-                layers_hashes.append(f[key][()])
+                layers_hashes.append(torch.as_tensor(f[key][()]))
+
+            if len(layers_hashes) > 0 and len(layers_hashes) < len(layer_sizes):
+                raise ValueError(
+                    f"BFS was saved with hashes but only {len(layers_hashes)} of {len(layer_sizes)} "
+                    f"hash layers were found in the file. Re-run BFS with return_all_hashes=True."
+                )
 
             if f["edges_list_hashes"].shape == tuple():
                 edges_list_hashes = None
             else:
-                edges_list_hashes = f["edges_list_hashes"][()]
+                edges_list_hashes = torch.as_tensor(f["edges_list_hashes"][()])
 
             layers_keys = {}
             for k in f.keys():
@@ -123,7 +129,7 @@ class BfsResult:
             loaded_result = BfsResult(
                 bfs_completed=bool(f["bfs_completed"][()]),
                 layer_sizes=layer_sizes,
-                layers={k: f[layer_key][()] for k, layer_key in layers_keys.items()},
+                layers={k: torch.as_tensor(f[layer_key][()]) for k, layer_key in layers_keys.items()},
                 edges_list_hashes=edges_list_hashes,
                 layers_hashes=layers_hashes,
                 graph=CayleyGraphDef.create(

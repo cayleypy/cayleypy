@@ -79,10 +79,66 @@ class MatrixGenerator:
             ans %= self.modulo
         return ans
 
+    @staticmethod
+    def _mod_inv(a: int, m: int) -> int:
+        """Modular inverse of a modulo m via extended Euclidean algorithm."""
+        if m == 1:
+            return 0
+        g, x, _ = MatrixGenerator._ext_gcd(a % m, m)
+        if g != 1:
+            raise ValueError(f"{a} is not invertible mod {m}.")
+        return x % m
+
+    @staticmethod
+    def _ext_gcd(a: int, b: int):
+        """Extended Euclidean algorithm returning (g, x, y) with g = a*x + b*y."""
+        if b == 0:
+            return a, 1, 0
+        g, x1, y1 = MatrixGenerator._ext_gcd(b, a % b)
+        return g, y1, x1 - (a // b) * y1
+
+    @staticmethod
+    def _adjugate(mx: np.ndarray) -> np.ndarray:
+        """Adjugate (adjoint) of a square integer matrix.
+
+        For n <= 3 uses explicit formulas; otherwise computes via minors.
+        adj(A)[i][j] = (-1)^{i+j} * det(minor(j, i)).
+        """
+        n = mx.shape[0]
+        if n == 1:
+            return np.array([[1]], dtype=np.int64)
+        if n == 2:
+            return np.array([[mx[1, 1], -mx[0, 1]], [-mx[1, 0], mx[0, 0]]], dtype=np.int64)
+        if n == 3:
+            a, b, c = mx[0, 0], mx[0, 1], mx[0, 2]
+            d, e, f = mx[1, 0], mx[1, 1], mx[1, 2]
+            g, h, i = mx[2, 0], mx[2, 1], mx[2, 2]
+            return np.array(
+                [
+                    [e * i - f * h, c * h - b * i, b * f - c * e],
+                    [f * g - d * i, a * i - c * g, c * d - a * f],
+                    [d * h - e * g, b * g - a * h, a * e - b * d],
+                ],
+                dtype=np.int64,
+            )
+        adj = np.zeros((n, n), dtype=np.int64)
+        for i in range(n):
+            for j in range(n):
+                minor = np.delete(np.delete(mx, j, axis=0), i, axis=1)
+                det_minor = round(np.linalg.det(minor))
+                adj[i, j] = ((-1) ** (i + j)) * det_minor
+        return adj
+
     @cached_property
     def inv(self):
         """Inverse of this matrix. Throws error if matrix is not invertible."""
-        # TODO: implement modular inverse, if needed.
+        if self.modulo > 0:
+            det = round(np.linalg.det(self.matrix))
+            det_inv = MatrixGenerator._mod_inv(det % self.modulo, self.modulo)
+            adj = MatrixGenerator._adjugate(self.matrix)
+            matrix_inv = (det_inv * adj) % self.modulo
+            assert np.array_equal(self.apply(matrix_inv), np.eye(self.n)), "Matrix is not invertible (mod m)."
+            return MatrixGenerator.create(matrix_inv, self.modulo)
         matrix_inv = np.array(np.linalg.inv(self.matrix), dtype=np.int64)
         assert np.array_equal(self.apply(matrix_inv), np.eye(self.n)), "Matrix is not invertible."
         return MatrixGenerator.create(matrix_inv, self.modulo)

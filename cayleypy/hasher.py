@@ -33,7 +33,7 @@ class StateHasher:
             return
 
         self.is_identity = False
-        self.seed = random_seed or random.randint(-MAX_INT, MAX_INT)
+        self.seed = random_seed if random_seed is not None else random.randint(-MAX_INT, MAX_INT)
 
         # Dot product is not safe for bit-encoded states, it has high probability of collisions.
         if graph.string_encoder is not None:

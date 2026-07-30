@@ -94,9 +94,10 @@ def _restore_path(
     restore_path_hashes: list,
     bfs_layers_hashes: list,
     bfs_result_for_mitm: BfsResult,
+    destination_state: AnyStateType,
 ) -> Optional[list[int]]:
     if found_layer_id == 0:
-        return graph.restore_path(restore_path_hashes, graph.central_state)
+        return graph.restore_path(restore_path_hashes, destination_state)
     assert bfs_result_for_mitm is not None
     mask = isin_via_searchsorted(_new_hashes, bfs_layers_hashes[found_layer_id].to(graph.device))
     if not torch.any(mask):
@@ -146,7 +147,7 @@ def _setup_path_device_and_restore(
     Returns (path_device, restore_path_hashes|None). Shared across all 4 modes.
     """
     if path_device == "auto":
-        path_device = "cpu" if return_path else graph.device
+        path_device = torch.device("cpu") if return_path else graph.device
     if return_path:
         restore_path_hashes = [beam_hashes.to(path_device)]
     else:
@@ -283,6 +284,9 @@ class BeamSearchAlgorithm:
           externally and export with `prof.export_chrome_trace(path)`.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
+        if beam_width < 1:
+            raise ValueError(f"beam_width must be >= 1, got {beam_width}.")
+
         if beam_mode == "simple":
             return self.search_simple(
                 start_state=start_state,
@@ -423,6 +427,12 @@ class BeamSearchAlgorithm:
                 _cuda_sync()
                 profile.hash += time.time() - t1
 
+            # Early exit on empty beam (no new unique states).
+            if _new_hashes.shape[0] == 0:
+                if verbose >= 1:
+                    print(f"Cannot find new states at step {i_step}.")
+                return BeamSearchResult(False, i_step, None, debug_scores, graph.definition)
+
             # Check if dest state is found.
             if profile is not None:
                 _cuda_sync()
@@ -443,6 +453,7 @@ class BeamSearchAlgorithm:
                         restore_path_hashes,
                         bfs_layers_hashes,
                         bfs_result_for_mitm,
+                        destination_state,
                     )
                 return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
@@ -521,7 +532,6 @@ class BeamSearchAlgorithm:
         :param return_path: Whether to return path (consumes much more memory if True).
         :param path_device: Device to store the path on.
         :param history_depth: How many previous levels to remember and ban from revisiting.
-        :param batch_size: Batch size for model predictions. - UNUSED FOR NOW BUT WILL BE USED LATER
         :param hashed_neigbourhood: BfsResult with pre-computed neighborhood of central state to compute for
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
@@ -599,6 +609,12 @@ class BeamSearchAlgorithm:
                 # whole call as t_hash here — use the profiler trace for finer detail.
                 profile.hash += time.time() - t1
 
+            # Early exit on empty beam (no new unique states).
+            if _new_hashes.shape[0] == 0:
+                if verbose >= 1:
+                    print(f"Cannot find new states at step {i_step}.")
+                return BeamSearchResult(False, i_step, None, debug_scores, graph.definition)
+
             # Check if dest state is found.
             if profile is not None:
                 _cuda_sync()
@@ -619,6 +635,7 @@ class BeamSearchAlgorithm:
                         restore_path_hashes,
                         bfs_layers_hashes,
                         bfs_result_for_mitm,
+                        destination_state,
                     )
                 return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
@@ -740,7 +757,6 @@ class BeamSearchAlgorithm:
         :param return_path: Whether to return path (consumes much more memory if True) or on which device to store it.
         :param path_device: Device to store the path on.
         :param history_depth: How many previous levels to remember and ban from revisiting.
-        :param batch_size: Batch size for model predictions. - UNUSED FOR NOW BUT WILL BE USED LATER
         :param hashed_neigbourhood: BfsResult with pre-computed neighborhood of central state to compute for
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
@@ -761,6 +777,12 @@ class BeamSearchAlgorithm:
         # For now iterated beam search don't works with matrix groups.
         if not graph.definition.is_permutation_group():
             raise ValueError("Iterated beam search actually realized only for Permutation Groups.")
+
+        if beam_width < graph.definition.n_generators:
+            raise ValueError(
+                f"beam_width ({beam_width}) must be >= n_generators ({graph.definition.n_generators}) "
+                f"for iterated beam search, otherwise iterated modes cannot allocate per-generator slots."
+            )
 
         beam_width_part = beam_width // graph.definition.n_generators
 
@@ -917,6 +939,7 @@ class BeamSearchAlgorithm:
                             restore_path_hashes,
                             bfs_layers_hashes,
                             bfs_result_for_mitm,
+                            destination_state,
                         )
                     return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
@@ -1089,6 +1112,12 @@ class BeamSearchAlgorithm:
         if not graph.definition.is_permutation_group():
             raise ValueError("Iterated batched beam search actually realized only for Permutation Groups.")
 
+        if beam_width < graph.definition.n_generators:
+            raise ValueError(
+                f"beam_width ({beam_width}) must be >= n_generators ({graph.definition.n_generators}) "
+                f"for iterated batched beam search, otherwise per-generator slots cannot be allocated."
+            )
+
         n_generators = graph.definition.n_generators
         state_size = graph.definition.state_size
         beam_width_part = beam_width // n_generators
@@ -1204,6 +1233,7 @@ class BeamSearchAlgorithm:
                         restore_path_hashes,
                         bfs_layers_hashes,
                         bfs_result_for_mitm,
+                        destination_state,
                     )
                 return BeamSearchResult(True, i_step + bfs_layer_id, path, debug_scores, graph.definition)
 
