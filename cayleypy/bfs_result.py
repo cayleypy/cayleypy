@@ -198,8 +198,16 @@ class BfsResult:
     def edges_list(self) -> np.ndarray:
         """Returns list of edges, with vertices renumbered."""
         assert self.edges_list_hashes is not None, "Run bfs with return_all_edges=True."
-        hashes_to_indices = self.hashes_to_indices_dict
-        return np.array([[hashes_to_indices[int(h)] for h in row] for row in self.edges_list_hashes], dtype=np.int64)
+        layers = [h.cpu().numpy() for h in self.layers_hashes]
+        h_all = np.concatenate(layers)
+        order = np.argsort(h_all, kind="stable")
+        sorted_h = h_all[order]
+        edges_np = self.edges_list_hashes.cpu().numpy()
+        flat = edges_np.ravel()
+        loc = np.searchsorted(sorted_h, flat)
+        assert np.all(sorted_h[loc] == flat), "Hash collision or edge endpoint not found."
+        vertex_idx = order[loc].reshape(edges_np.shape).astype(np.int64)
+        return vertex_idx
 
     def named_undirected_edges(self) -> set[tuple[str, str]]:
         """Names for vertices (representing coset elements in readable format)."""
