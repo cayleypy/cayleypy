@@ -430,7 +430,9 @@ class CayleyGraph:
         path = []  # type: list[int]
         cur_state = self.decode_states(self.encode_states(to_state))
 
-        # Sort each layer's hashes on graph device once (isin_via_searchsorted requires sorted test_elements).
+        # Sort each layer's hashes on graph device (isin_via_searchsorted requires sorted test_elements).
+        # Sources include both BFS layers (guaranteed sorted by get_unique_states) and beam search step
+        # hashes (topk may break sorting) — sorting once here is simplest and correct for both paths.
         hashes_sorted = [h.to(self.device).sort().values for h in hashes]
 
         for i in range(len(hashes) - 1, -1, -1):

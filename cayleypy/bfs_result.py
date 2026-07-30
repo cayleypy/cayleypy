@@ -204,7 +204,7 @@ class BfsResult:
         sorted_h = h_all[order]
         edges_np = self.edges_list_hashes.cpu().numpy()
         flat = edges_np.ravel()
-        loc = np.searchsorted(sorted_h, flat)
+        loc = np.clip(np.searchsorted(sorted_h, flat), 0, len(sorted_h) - 1)
         assert np.all(sorted_h[loc] == flat), "Hash collision or edge endpoint not found."
         vertex_idx = order[loc].reshape(edges_np.shape).astype(np.int64)
         return vertex_idx
