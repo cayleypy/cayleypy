@@ -337,13 +337,17 @@ class CayleyGraphDef:
         if self.generators_type == GeneratorType.PERMUTATION:
             return CayleyGraphDef.create(
                 generators=[inverse_permutation(p) for p in self.generators_permutations],
+                generator_names=[n + "'" for n in self.generator_names],
                 central_state=self.central_state,
+                name=self.name,
             )
         else:
             assert self.generators_type == GeneratorType.MATRIX
             return CayleyGraphDef.for_matrix_group(
                 generators=[m.inv for m in self.generators_matrices],
+                generator_names=[n + "'" for n in self.generator_names],
                 central_state=self.central_state,
+                name=self.name,
             )
 
     def make_inverse_closed(self) -> "CayleyGraphDef":
