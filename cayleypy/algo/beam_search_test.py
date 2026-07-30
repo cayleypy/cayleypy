@@ -10,17 +10,31 @@ from ..cayley_graph import CayleyGraph
 
 from ..graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 from ..predictor import Predictor
+from ..torch_utils import TorchHashSet
+from .beam_search import (
+    _init_predictor,
+    _encode_and_dedupe_start,
+    _setup_path_device_and_restore,
+    _precompute_mitm,
+    _early_return_if_at_dest,
+    _finalize_not_found,
+)
 from .beam_search_result import BeamSearchResult
 
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 
 
-def _validate_beam_search_result(graph: CayleyGraph, start_state, bs_result: BeamSearchResult):
+def _validate_beam_search_result(graph: CayleyGraph, start_state, bs_result: BeamSearchResult, destination_state=None):
     """Validate that beam search result is correct."""
     assert bs_result.path_found
     assert bs_result.path is not None
     path_result = graph.apply_path(start_state, bs_result.path).reshape((-1))
-    assert torch.equal(path_result, graph.central_state)
+    expected = (
+        graph.central_state
+        if destination_state is None
+        else torch.as_tensor(destination_state, device=graph.device, dtype=graph.dtype).reshape((-1))
+    )
+    assert torch.equal(path_result, expected), f"Path leads to {path_result}, expected {expected}"
 
 
 def _scramble(graph: CayleyGraph, num_scrambles: int) -> torch.Tensor:
@@ -634,8 +648,6 @@ def test_beam_search_iterated_batched_verbose_profiling():
 
 def test_beam_search_iterated_batched_with_predictor_object():
     """iterated_batched with a Predictor object — covers the elif/else predictor init."""
-    from cayleypy import Predictor
-
     graph = CayleyGraph(PermutationGroups.lrx(8))
     start_state = list(np.random.permutation(8))
     predictor = Predictor(graph, "hamming")
@@ -800,8 +812,8 @@ def test_beam_search_advanced_with_mitm_works():
     ``hashed_neigbourhood`` argument and uses it for the meet-in-the-middle check.
     Renamed to reflect the pinned behavior.
     # TODO(char-spec): revisit whether advanced mode should support / reject MITM
-    # neighborhood of a different graph (currently ``beam_search.py:371`` validates the
-    # graph matches). Revisit during the perf plan when the 3 modes are unified.
+    # neighborhood of a different graph (currently ``_precompute_mitm`` at
+    # ``beam_search.py:177`` validates the graph matches). Revisit during the perf plan when the 4 modes are unified.
     """
     graph = CayleyGraph(PermutationGroups.lrx(8))
     start_state = np.random.permutation(8)
@@ -813,26 +825,27 @@ def test_beam_search_advanced_with_mitm_works():
 
 
 # =============================================================================
-# Characterization test matrix (pins current behavior of the 3 beam search modes).
+# Characterization test matrix (pins current behavior of the 4 beam search modes).
 #
 # These tests are characterization tests: they document what the code does today,
 # not what it should ideally do. Suspect behavior is marked with
-# ``# TODO(char-spec):`` so it can be revisited when the 3 modes are unified in a
+# ``# TODO(char-spec):`` so it can be revisited when the 4 modes are unified in a
 # follow-up performance plan. The full matrix (mode x {MITM, history_depth,
 # return_path, predictor type, destination, outcome}) must run fully offline using
 # hamming/zero/mock predictors (Kaggle-dependent tests stay under RUN_SLOW_TESTS).
 # =============================================================================
 
 
-_BEAM_MODES = ["simple", "advanced", "iterated"]
-_ADV_MODES = ["advanced", "iterated"]  # modes that support history_depth / destination_state
+_BEAM_MODES = ["simple", "advanced", "iterated", "iterated_batched"]
+_ADV_MODES = ["advanced", "iterated", "iterated_batched"]  # modes that support history_depth / destination_state
 
 
 class _NumpyPredictor:
     """Callable returning a numpy array — exercises the ``np.argsort`` branch.
 
-    Covers ``beam_search.py:457-459`` (simple/advanced) and ``:695-697`` (iterated),
-    where scores are not a torch.Tensor and the code falls back to ``np.argsort``.
+    Covers the ``np.argsort`` fallback in ``search_advanced`` (``:671-672``)
+    and ``search_iterated`` (``:971-972``) where scores are not a
+    ``torch.Tensor`` and the code falls back to ``np.argsort``.
     """
 
     def __call__(self, states: torch.Tensor):
@@ -949,7 +962,7 @@ def test_beam_search_matrix_mitm_bfsresult(beam_mode):
 
 
 def test_beam_search_matrix_mitm_graph_mismatch_raises():
-    """MITM neighborhood from a different graph must raise ValueError (beam_search.py:222/371/597)."""
+    """MITM neighborhood from a different graph must raise ValueError (_precompute_mitm, beam_search.py:177)."""
     graph_a = CayleyGraph(PermutationGroups.lrx(8))
     graph_b = CayleyGraph(PermutationGroups.lrx(10))
     bfs_result_b = graph_b.bfs(max_diameter=3, return_all_hashes=True)
@@ -1036,6 +1049,43 @@ def test_beam_search_matrix_destination_custom(beam_mode):
     assert result.path_found
 
 
+@pytest.mark.parametrize("beam_mode", _ADV_MODES)
+def test_beam_search_destination_custom_with_path(beam_mode):
+    """A1 regression: destination!=central + return_path=True validates path via apply_path.
+    Covers found_layer_id==0 (default hashed_neigbourhood) and layer>0 (hashed_neigbourhood=1) branches."""
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    # Start from identity (central); destination is non-central (_lrx8_scramble_far)
+    start_state = [0, 1, 2, 3, 4, 5, 6, 7]
+    destination = _lrx8_scramble_far()
+
+    # Branch 1: default hashed_neigbourhood (None -> radius 0 -> layer 0 finding)
+    result = graph.beam_search(
+        start_state=start_state,
+        beam_mode=beam_mode,
+        destination_state=destination,
+        beam_width=10**5,
+        max_steps=30,
+        history_depth=2,
+        return_path=True,
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, start_state, result, destination_state=destination)
+
+    # Branch 2: hashed_neigbourhood=1 (layer > 0 MITM branch)
+    result2 = graph.beam_search(
+        start_state=start_state,
+        beam_mode=beam_mode,
+        destination_state=destination,
+        beam_width=10**5,
+        max_steps=30,
+        history_depth=2,
+        hashed_neigbourhood=1,
+        return_path=True,
+    )
+    assert result2.path_found
+    _validate_beam_search_result(graph, start_state, result2, destination_state=destination)
+
+
 @pytest.mark.parametrize("beam_mode", _BEAM_MODES)
 def test_beam_search_matrix_memory_cleanup(beam_mode, monkeypatch):
     """memory_cleanup=True -> graph.free_memory is called each full iteration (not-found path).
@@ -1074,7 +1124,7 @@ def test_beam_search_matrix_path_device_cpu(beam_mode):
 def test_beam_search_matrix_verbose_profiling(beam_mode, capsys):
     """verbose=10 and verbose=100 profiling branches execute without raising.
 
-    Covers beam_search.py:484-493 (advanced) and :736-745 (iterated) timing-print branches.
+    Covers verbose/profiling branches in ``search_advanced`` (``:695-711``) and ``search_iterated`` (``:1034-1045``).
     """
     graph = CayleyGraph(PermutationGroups.lrx(8))
     start_state = _lrx8_scramble_far()
@@ -1095,7 +1145,7 @@ def test_beam_search_matrix_verbose_profiling(beam_mode, capsys):
 def test_beam_search_matrix_iterated_non_permutation_raises():
     """iterated mode on a non-permutation (matrix) group raises ValueError.
 
-    Pins current behavior (beam_search.py:546-547).
+    Pins current behavior (beam_search.py:763).
     # TODO(char-spec): iterated matrix-group support is planned; revisit.
     """
     graph = CayleyGraph(MatrixGroups.heisenberg())
@@ -1107,8 +1157,7 @@ def test_beam_search_matrix_iterated_non_permutation_raises():
 def test_beam_search_matrix_numpy_predictor_simple():
     """Numpy-predictor branch (np.argsort) in simple/advanced: callable returns np.ndarray.
 
-    Covers beam_search.py:457-459. The simple/advanced modes take the ``else`` branch when
-    ``scores`` is not a torch.Tensor and fall back to ``np.argsort``.
+    Covers the ``np.argsort`` fallback in ``search_advanced`` (``:671-672``).
     """
     graph = CayleyGraph(PermutationGroups.lrx(8))
     start_state = _lrx8_scramble_far()
@@ -1128,7 +1177,7 @@ def test_beam_search_matrix_numpy_predictor_simple():
 def test_beam_search_matrix_numpy_predictor_iterated():
     """Numpy-predictor branch (np.argsort) in iterated mode.
 
-    Covers beam_search.py:695-697.
+    Covers the ``np.argsort`` fallback in ``search_iterated`` (``:971-972``).
     """
     graph = CayleyGraph(PermutationGroups.lrx(8))
     start_state = _lrx8_scramble_far()
@@ -1149,7 +1198,7 @@ def test_beam_search_empty_beam_early_exit_advanced(monkeypatch):
     """Outcome: empty-beam early exit in advanced mode -> BeamSearchResult(False, i_step, ...).
 
     When the non-backtracking filter removes ALL candidates, the search gives up
-    mid-search at beam_search.py:442-445. This is hard to trigger naturally (the
+    mid-search at beam_search.py:654-657. This is hard to trigger naturally (the
     search tends to find the goal first on small graphs), so we force it by making
     ``get_unique_states`` return an empty tensor on the second call.
     """
@@ -1223,17 +1272,60 @@ def test_beam_search_invariant_apply_path_equals_central(beam_mode):
 
 
 # =============================================================================
+# B2 / B3 / B6: Validation and edge-case tests
+# =============================================================================
+
+
+def test_beam_search_beam_width_zero_raises():
+    """B2: beam_width=0 must raise ValueError for all modes."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    with pytest.raises(ValueError, match="beam_width must be >= 1"):
+        graph.beam_search(start_state=[0, 1, 2, 3, 4], beam_mode="simple", beam_width=0)
+
+
+@pytest.mark.parametrize("beam_mode", ["iterated", "iterated_batched"])
+def test_beam_search_beam_width_less_than_generators_raises(beam_mode):
+    """B2: iterated modes with beam_width < n_generators must raise ValueError."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))  # LRX(5) has 3 generators
+    with pytest.raises(ValueError, match="beam_width"):
+        graph.beam_search(
+            start_state=[0, 1, 2, 3, 4],
+            beam_mode=beam_mode,
+            beam_width=2,  # < 3 generators
+        )
+
+
+def test_beam_search_simple_empty_beam_early_exit(monkeypatch):
+    """B3: simple mode exits early on empty beam after dedup."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    start_state = [1, 0, 2, 3, 4]
+    original = graph.get_unique_states
+    call_count = {"n": 0}
+
+    def _mocked_unique(states, hashes=None):
+        call_count["n"] += 1
+        if call_count["n"] >= 2:
+            empty = torch.empty((0, states.shape[1] if states.dim() > 1 else 1), dtype=states.dtype)
+            return empty, torch.empty((0,), dtype=torch.int64)
+        return original(states, hashes)
+
+    monkeypatch.setattr(graph, "get_unique_states", _mocked_unique)
+    result = graph.beam_search(
+        start_state=start_state,
+        beam_mode="simple",
+        beam_width=10,
+        max_steps=50,
+    )
+    assert not result.path_found
+    assert result.path is None
+    assert result.path_length < 50  # exited early, not full max_steps
+
+
+# =============================================================================
 # Unit tests for shared preamble/postamble helpers
 # =============================================================================
 
-from .beam_search import (
-    _init_predictor,
-    _encode_and_dedupe_start,
-    _setup_path_device_and_restore,
-    _precompute_mitm,
-    _early_return_if_at_dest,
-    _finalize_not_found,
-)
+# pylint: disable=redefined-outer-name
 
 
 @pytest.fixture
@@ -1270,7 +1362,7 @@ def test_encode_and_dedupe_start_returns_correct_shapes(lrx8_graph):
     """Test _encode_and_dedupe_start returns correct tensor shapes."""
     start = [0, 1, 2, 3, 4, 5, 6, 7]
     dest = lrx8_graph.central_state
-    beam_states, beam_hashes, dest_hashes = _encode_and_dedupe_start(lrx8_graph, start, dest)
+    beam_states, beam_hashes, _ = _encode_and_dedupe_start(lrx8_graph, start, dest)
     assert beam_states.dim() == 2
     assert beam_hashes.dim() == 1
     assert len(beam_hashes) == len(beam_states)
@@ -1293,9 +1385,18 @@ def test_setup_path_device_and_restore_no_return_path(lrx8_graph):
     assert restore_path_hashes is None
 
 
+def test_setup_path_device_and_restore_auto_return_path_returns_device(lrx8_graph):
+    """B6: _setup_path_device_and_restore returns torch.device (not str) for auto+return_path."""
+    beam_hashes = torch.tensor([1, 2, 3], dtype=torch.int64)
+    path_device, restore_path_hashes = _setup_path_device_and_restore("auto", True, beam_hashes, lrx8_graph)
+    assert isinstance(path_device, torch.device), f"Expected torch.device, got {type(path_device)}: {path_device}"
+    assert str(path_device) == "cpu"
+    assert restore_path_hashes is not None
+
+
 def test_precompute_mitm_int_radius(lrx8_graph):
     """Test _precompute_mitm with integer radius."""
-    bfs_result, layers_hashes = _precompute_mitm(lrx8_graph, 2, lrx8_graph.central_state, "cpu")
+    _, layers_hashes = _precompute_mitm(lrx8_graph, 2, lrx8_graph.central_state, "cpu")
     assert layers_hashes is not None
     assert len(layers_hashes) <= 3  # layers 0, 1, 2
 
@@ -1337,3 +1438,126 @@ def test_finalize_not_found_returns_correct_result(lrx8_graph):
     assert result.path_found is False
     assert result.path_length == 100
     assert result.path is None
+
+
+# =============================================================================
+# C2: max_steps=0 edge case
+# =============================================================================
+
+
+@pytest.mark.parametrize("beam_mode", _BEAM_MODES)
+def test_beam_search_max_steps_zero(beam_mode):
+    """C2: max_steps=0 returns not-found result with path_length=0."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    kwargs = {"beam_mode": beam_mode, "max_steps": 0, "return_path": True}
+    if beam_mode in _ADV_MODES:
+        kwargs["history_depth"] = 1
+    # start != central so the loop (range(1, 1)) is empty
+    result = graph.beam_search(start_state=[1, 0, 2, 3, 4], **kwargs)
+    assert not result.path_found
+    assert result.path_length == 0
+    assert result.path is None
+
+
+# =============================================================================
+# C9: simple mode contract — ignores destination_state, forces central
+# =============================================================================
+
+
+def test_beam_search_simple_ignores_destination_state():
+    """C9: simple mode always searches for central_state, ignoring destination_state."""
+    graph = CayleyGraph(PermutationGroups.lrx(5))
+    start = [1, 0, 2, 3, 4]  # 1 step from central
+    # Passing destination_state != central should have no effect (simple mode forces central)
+    result = graph.beam_search(
+        start_state=start,
+        beam_mode="simple",
+        destination_state=[2, 1, 0, 3, 4],  # different from central
+        beam_width=10,
+        max_steps=5,
+        return_path=True,
+    )
+    assert result.path_found
+    # Path leads to central_state, not the passed destination
+    path_result = graph.apply_path(start, result.path).reshape((-1))
+    assert torch.equal(path_result, graph.central_state)
+
+
+# =============================================================================
+# C10: _restore_path unit tests (via integration — manual construction is fragile)
+# =============================================================================
+
+
+def test_restore_path_via_beam_search_custom_destination():
+    """C10: _restore_path is exercised by beam search with custom destination + return_path=True.
+
+    This indirectly validates the layer-0 branch (found_layer_id==0) when
+    hashed_neigbourhood is None (radius 0 → destination hash is layer 0).
+    Uses non-central destination to exercise the A1 fix.
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    start = [0, 1, 2, 3, 4, 5, 6, 7]  # identity
+    dest = _lrx8_scramble_far()  # non-central
+    result = graph.beam_search(
+        start_state=start,
+        beam_mode="advanced",
+        destination_state=dest,
+        return_path=True,
+        history_depth=2,
+        beam_width=10**5,
+        max_steps=30,
+    )
+    assert result.path_found
+    _validate_beam_search_result(graph, start, result, destination_state=dest)
+
+
+# =============================================================================
+# C11: TorchHashSet.add_sorted_hashes precondition — assert sorted input
+# =============================================================================
+
+
+def test_torch_hash_set_add_unsorted_raises():
+    """C11: adding unsorted hashes to TorchHashSet must raise AssertionError."""
+    hs = TorchHashSet()
+    unsorted = torch.tensor([3, 1, 2], dtype=torch.int64)
+    with pytest.raises(AssertionError, match="sorted"):
+        hs.add_sorted_hashes(unsorted)
+
+
+# =============================================================================
+# C16: verbose=2 — output captures "Step" or "best score"
+# =============================================================================
+
+
+def test_beam_search_verbose_level_two(capsys):
+    """C16: verbose=2 prints iteration progress to stdout."""
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    _ = graph.beam_search(
+        start_state=_lrx8_scramble_far(),
+        beam_mode="advanced",
+        beam_width=500,
+        max_steps=3,
+        history_depth=2,
+        verbose=2,
+    )
+    captured = capsys.readouterr()
+    # Should contain either "Step" or "not scored" or "best score"
+    assert "Step" in captured.out or "best" in captured.out, f"Unexpected verbose output: {captured.out}"
+
+
+# =============================================================================
+# C18: history_depth > max_steps — must not raise, returns valid result
+# =============================================================================
+
+
+def test_beam_search_history_depth_exceeds_max_steps():
+    """C18: history_depth > max_steps completes without error."""
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    result = graph.beam_search(
+        start_state=_lrx8_scramble_far(),
+        beam_mode="advanced",
+        beam_width=500,
+        max_steps=3,
+        history_depth=10,
+    )
+    assert isinstance(result, BeamSearchResult)

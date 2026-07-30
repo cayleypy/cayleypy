@@ -697,3 +697,44 @@ def test_get_unique_states_returns_sorted_hashes():
     _, hashes = graph.get_unique_states(graph.encode_states(states))
     if len(hashes) > 1:
         assert torch.all(hashes[1:] >= hashes[:-1]), f"Hashes not sorted: {hashes}"
+
+
+def test_decode_states_matrix_group_reshape():
+    """C14: decode_states for a matrix group returns reshaped (n x m) matrices."""
+    graph = CayleyGraph(MatrixGroups.heisenberg(n=3, modulo=0))
+    # Encode the identity matrix
+    identity = torch.tensor([[1, 0, 0], [0, 1, 0], [0, 0, 1]], dtype=graph.dtype).reshape(-1)
+    encoded = graph.encode_states(identity)
+    decoded = graph.decode_states(encoded)
+    # Shape should be (1, n, m)
+    assert decoded.shape == (1, 3, 3)
+    assert torch.equal(decoded[0], torch.eye(3, dtype=graph.dtype))
+
+
+def test_decode_states_matrix_group_round_trip():
+    """C14: encode->decode round-trip for matrix group preserves the original values."""
+    graph = CayleyGraph(MatrixGroups.heisenberg(n=3, modulo=0))
+    state = torch.tensor([[1, 2, 0], [0, 1, 3], [0, 0, 1]], dtype=graph.dtype).reshape(-1)
+    encoded = graph.encode_states(state)
+    decoded = graph.decode_states(encoded)
+    assert torch.equal(decoded.reshape(-1), state)
+
+
+def test_get_unique_states_with_precomputed_hashes():
+    """C15: get_unique_states accepts precomputed hashes and returns deduped + sorted hashes."""
+    graph = CayleyGraph(PermutationGroups.lrx(8))
+    states = torch.tensor(
+        [
+            [0, 1, 2, 3, 4, 5, 6, 7],
+            [4, 3, 2, 1, 0, 7, 6, 5],
+            [0, 1, 2, 3, 4, 5, 6, 7],  # duplicate of first
+        ],
+        dtype=torch.int64,
+    )
+    encoded = graph.encode_states(states)
+    precomputed = graph.hasher.make_hashes(encoded)
+    unique_states, unique_hashes = graph.get_unique_states(encoded, hashes=precomputed)
+    # Should have 2 unique states (duplicate removed), sorted by hash
+    assert len(unique_states) == 2
+    assert len(unique_hashes) == 2
+    assert torch.all(unique_hashes[1:] >= unique_hashes[:-1]), "Hashes must be sorted"

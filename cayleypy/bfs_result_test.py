@@ -1,6 +1,8 @@
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import h5py
 import numpy as np
+import pytest
 from cayleypy import CayleyGraph, BfsResult, PermutationGroups
 
 
@@ -55,3 +57,37 @@ def test_bfs_result_save_load():
                         loaded_bfs_result = BfsResult.load(temp_dir / "bfs_result.h5")
                         assert bfs_result.graph == loaded_bfs_result.graph
                         assert bfs_result == loaded_bfs_result, "Original and loaded BfsResults must be the same."
+
+
+def test_bfs_result_save_load_after_load_methods_work():
+    """A5 regression: after BfsResult.load(), tensor methods must work (not numpy)."""
+    with TemporaryDirectory() as temp_dir:
+        temp_dir = Path(temp_dir)
+        graph = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
+        bfs_result = graph.bfs(return_all_hashes=True, max_diameter=3)
+        bfs_result.save(temp_dir / "bfs_result.h5")
+        loaded = BfsResult.load(temp_dir / "bfs_result.h5")
+        # These must not raise AttributeError: 'numpy.ndarray' object has no attribute 'cpu'
+        layer = loaded.get_layer(0)
+        assert isinstance(layer, np.ndarray)  # get_layer returns np.ndarray (intentional)
+        loaded.to_device("cpu")
+        last = loaded.last_layer()
+        assert isinstance(last, np.ndarray)
+
+
+def test_bfs_result_load_incomplete_hashes_raises():
+    """A5 regression: loading a BFS save with incomplete hash layers must raise."""
+    with TemporaryDirectory() as temp_dir:
+        temp_dir = Path(temp_dir)
+        graph = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
+        bfs_result = graph.bfs(return_all_hashes=True, max_diameter=3)
+        save_path = temp_dir / "bfs_result.h5"
+        bfs_result.save(save_path)
+        # Corrupt the file by removing one hash layer
+        with h5py.File(save_path, "a") as f:
+            # Find the last edges_list_hashes__ key and delete it
+            keys_to_del = [k for k in f.keys() if k.startswith("edges_list_hashes__")]
+            if keys_to_del:
+                del f[keys_to_del[-1]]
+        with pytest.raises(ValueError, match="BFS was saved with hashes but only"):
+            BfsResult.load(save_path)

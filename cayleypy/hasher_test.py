@@ -60,6 +60,16 @@ def test_hasher_deterministic_with_seed():
     assert torch.equal(h1, h2)
 
 
+def test_hasher_seed_zero_is_deterministic():
+    """A2 regression: random_seed=0 must NOT be silently replaced by random seed."""
+    graph1 = CayleyGraph(PermutationGroups.lrx(5), random_seed=0)
+    graph2 = CayleyGraph(PermutationGroups.lrx(5), random_seed=0)
+    states = torch.tensor([[0, 1, 2, 3, 4], [4, 3, 2, 1, 0]], dtype=torch.int64)
+    h1 = graph1.hasher.make_hashes(states)
+    h2 = graph2.hasher.make_hashes(states)
+    assert torch.equal(h1, h2)
+
+
 def test_hasher_different_seeds_different_hashes():
     """Different random_seed -> (likely) different hashes."""
     graph1 = CayleyGraph(PermutationGroups.lrx(5), random_seed=1)

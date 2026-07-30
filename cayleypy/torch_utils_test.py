@@ -135,6 +135,15 @@ def test_torch_hash_set_empty():
     assert len(merged) == 0
 
 
+def test_torch_hash_set_empty_with_device():
+    """B4: get_merged_sorted with explicit device returns empty tensor on that device."""
+    hs = TorchHashSet()
+    device = torch.device("cpu")
+    merged = hs.get_merged_sorted(device=device)
+    assert len(merged) == 0
+    assert merged.device == device
+
+
 def test_torch_hash_set_get_merged_sorted():
     """get_merged_sorted collapses shards into one sorted tensor."""
     hs = TorchHashSet()
