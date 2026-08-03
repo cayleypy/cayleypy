@@ -44,6 +44,18 @@ Beam search and ML
     cayleypy.algo.RandomWalksGenerator
     cayleypy.models.ModelConfig
 
+Training
+''''''''
+
+
+.. autosummary::
+    :toctree: generated/
+
+    cayleypy.train.Loss
+    cayleypy.train.MseLoss
+    cayleypy.train.PinballLoss
+    cayleypy.train.make_loss
+
 BFS algorithm and its variations
 ''''''''''''''''''''''''''''''''
 
