@@ -45,6 +45,7 @@ Beam search and ML
     cayleypy.models.ModelConfig
     cayleypy.models.MlpModel
     cayleypy.models.ResMlpModel
+    cayleypy.models.QVModel
     cayleypy.models.graph_hash
     cayleypy.models.save_checkpoint
     cayleypy.models.load_checkpoint

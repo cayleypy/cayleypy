@@ -1,6 +1,6 @@
 import math
 import typing
-from typing import Callable
+from typing import Callable, Optional
 
 import torch
 
@@ -33,10 +33,17 @@ class Predictor:
             there are generators in `graph`, and must declare their number in attribute ``n_outputs`` - then
             :meth:`score_children` will call it once per state instead of once per child. Models built by
             :meth:`cayleypy.models.ModelConfig.build_model` declare it automatically.
+
+            A model that has its own way to score children (i.e. has method ``score_children``, e.g.
+            :class:`cayleypy.models.QVModel`) will be asked for children scores through that method.
         """
         self.graph = graph
         self.predict = lambda x: x  # type: Callable[[torch.Tensor], torch.Tensor]
         self.n_outputs = int(getattr(models_or_heuristics, "n_outputs", 1))
+        # Not None if the model scores children itself (see score_children).
+        self._model_score_children = getattr(
+            models_or_heuristics, "score_children", None
+        )  # type: Optional[Callable[[torch.Tensor], torch.Tensor]]
 
         if models_or_heuristics == "zero":
             self.predict = lambda x: torch.zeros((x.shape[0],))
@@ -61,6 +68,18 @@ class Predictor:
         model = PREDICTOR_MODELS[graph.definition.name].load(graph.device)
         return Predictor(graph, model)
 
+    def _apply_batched(self, func: Callable[[torch.Tensor], torch.Tensor], states: torch.Tensor) -> torch.Tensor:
+        """Applies `func` to `states`, splitting them into batches if there are too many."""
+        num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
+        if num_batches > 1:
+            ans = []  # type: list[torch.Tensor]
+            for batch in states.tensor_split(num_batches, dim=0):
+                ans.append(func(batch))
+            # Batches must be concatenated along dimension 0, otherwise outputs of multi-output models are mangled.
+            return torch.cat(ans, dim=0)
+        else:
+            return func(states)
+
     def predict_batched(self, states: torch.Tensor) -> torch.Tensor:
         """Applies the underlying model to `states`, splitting them into batches if there are too many.
 
@@ -70,15 +89,7 @@ class Predictor:
         :param states: States (in decoded representation) to apply the model to.
         :return: Output of the model for `states`.
         """
-        num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
-        if num_batches > 1:
-            ans = []  # type: list[torch.Tensor]
-            for batch in states.tensor_split(num_batches, dim=0):
-                ans.append(self.predict(batch))
-            # Batches must be concatenated along dimension 0, otherwise outputs of multi-output models are mangled.
-            return torch.cat(ans, dim=0)
-        else:
-            return self.predict(states)
+        return self._apply_batched(self.predict, states)
 
     def __call__(self, states: torch.Tensor) -> torch.Tensor:
         ans = self.predict_batched(states)
@@ -95,8 +106,11 @@ class Predictor:
         Children are enumerated in the order of generators: element ``[i, j]`` of the answer is the estimated distance
         for the state obtained by applying generator ``j`` to ``states[i]``.
 
-        For a model having one output per generator (Q-model, i.e. ``n_outputs == n_generators``), the answer is the
-        output of the model applied to `states`, so one model evaluation per state is needed.
+        If the model scores children itself (i.e. has method ``score_children``, e.g.
+        :class:`cayleypy.models.QVModel`), that method is called for `states`.
+
+        Otherwise, for a model having one output per generator (Q-model, i.e. ``n_outputs == n_generators``), the answer
+        is the output of the model applied to `states`, so one model evaluation per state is needed.
 
         Otherwise (for a single-output model), the model is called for every child, which needs `n_generators` times
         more model evaluations than :meth:`__call__`.
@@ -107,14 +121,15 @@ class Predictor:
         n_generators = self.graph.definition.n_generators
         encoded_states = self.graph.encode_states(states)
         num_states = int(encoded_states.shape[0])
-        if self.n_outputs != 1:
-            if self.n_outputs != n_generators:
-                raise ValueError(
-                    f"Model has {self.n_outputs} outputs, but the graph has {n_generators} generators. Model used to "
-                    "score children must have either 1 output (for the state it is applied to), or one output per "
-                    "generator (for every child of that state)."
-                )
-            scores = self.predict_batched(self.graph.decode_states(encoded_states))
+        if self.n_outputs not in (1, n_generators):
+            raise ValueError(
+                f"Model has {self.n_outputs} outputs, but the graph has {n_generators} generators. Model used to "
+                "score children must have either 1 output (for the state it is applied to), or one output per "
+                "generator (for every child of that state)."
+            )
+        if self._model_score_children is not None or self.n_outputs != 1:
+            func = self._model_score_children if self._model_score_children is not None else self.predict
+            scores = self._apply_batched(func, self.graph.decode_states(encoded_states))
             if tuple(scores.shape) != (num_states, n_generators):
                 raise ValueError(
                     f"Model returned output of shape {tuple(scores.shape)}, but shape "
