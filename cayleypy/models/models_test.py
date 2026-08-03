@@ -1,7 +1,10 @@
 import json
+from dataclasses import replace
 
+import kagglehub
 import pytest
 import torch
+from kagglehub import exceptions as kagglehub_exceptions
 
 from .checkpoint import load_checkpoint, save_checkpoint
 from .models import MlpModel, ModelConfig, ResMlpModel
@@ -177,6 +180,36 @@ def test_checkpoint_round_trip(tmp_path):
         assert loaded_config == config
         with torch.no_grad():
             assert torch.equal(loaded_model(STATES), model(STATES))
+
+
+def test_load_weights_from_checkpoint(tmp_path):
+    # Weights for a model of PREDICTOR_MODELS can be saved as a self-describing checkpoint, not only as a bare
+    # state dict, so that the same file can be loaded by both load_checkpoint and ModelConfig.load.
+    config = ModelConfig(model_type="RESMLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8], n_outputs=3)
+    model = config.build_model()
+    checkpoint_path = tmp_path / "checkpoint.pt"
+    save_checkpoint(checkpoint_path, model, config)
+    state_dict_path = tmp_path / "state_dict.pt"
+    torch.save(model.state_dict(), state_dict_path)
+
+    for path in [checkpoint_path, state_dict_path]:
+        loaded_model = replace(config, weights_path=str(path)).load()
+        with torch.no_grad():
+            assert torch.equal(loaded_model(STATES), model(STATES))
+
+
+def test_load_reports_failed_kaggle_download(monkeypatch):
+    def fail(handle):
+        raise kagglehub_exceptions.NotFoundError(f"Model {handle} not found.")
+
+    monkeypatch.setattr(kagglehub, "model_download", fail)
+    config = replace(
+        ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8]),
+        weights_kaggle_id="nobody/no-such-model/pyTorch/v1/1",
+        weights_path="weights.pt",
+    )
+    with pytest.raises(RuntimeError, match="Could not download weights from Kaggle model"):
+        config.load()
 
 
 def test_build_model_with_non_positive_n_outputs():

@@ -4,6 +4,7 @@ from typing import Callable
 
 import torch
 
+from .models.checkpoint import graph_hash
 from .models.models_lib import PREDICTOR_MODELS
 
 if typing.TYPE_CHECKING:
@@ -55,11 +56,25 @@ class Predictor:
 
     @staticmethod
     def pretrained(graph: "CayleyGraph"):
-        """Loads pre-trained predictor for this graph."""
+        """Loads pre-trained predictor for this graph.
+
+        Graphs are looked up by name, so if the config of the pretrained model says which graph the model was trained
+        for (`ModelConfig.graph_hash`), it is checked that it is this graph. Without that check, a graph that has the
+        expected name but another definition would silently get a model that means nothing for it - and for a model
+        having one output per generator, even reordering the generators is enough to make its outputs meaningless.
+
+        :param graph: Graph to load the model for.
+        :return: Predictor using the pretrained model.
+        """
         if graph.definition.name not in PREDICTOR_MODELS:
             raise KeyError("No pretrained model for this graph.")
-        model = PREDICTOR_MODELS[graph.definition.name].load(graph.device)
-        return Predictor(graph, model)
+        config = PREDICTOR_MODELS[graph.definition.name]
+        if config.graph_hash is not None and config.graph_hash != graph_hash(graph.definition):
+            raise ValueError(
+                f'Pretrained model for "{graph.definition.name}" was trained for another graph (hash in the config of '
+                f"the model is {config.graph_hash}, hash of the given graph is {graph_hash(graph.definition)})."
+            )
+        return Predictor(graph, config.load(graph.device))
 
     def predict_batched(self, states: torch.Tensor) -> torch.Tensor:
         """Applies the underlying model to `states`, splitting them into batches if there are too many.

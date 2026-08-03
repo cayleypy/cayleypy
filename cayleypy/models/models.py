@@ -6,7 +6,54 @@ from typing import Any, Optional
 
 import kagglehub
 import torch
+from kagglehub import exceptions as kagglehub_exceptions
 from torch import nn
+
+# Errors kagglehub raises when weights cannot be downloaded: no network, no credentials, no such model. They are
+# wrapped, because on their own they do not say which model of CayleyPy failed to load.
+_KAGGLEHUB_ERRORS = (
+    # Errors of the "requests" library, including kagglehub.exceptions.KaggleApiHTTPError, are subclasses of OSError.
+    OSError,
+    kagglehub_exceptions.BackendError,
+    kagglehub_exceptions.CredentialError,
+    kagglehub_exceptions.DataCorruptionError,
+    kagglehub_exceptions.NotFoundError,
+    kagglehub_exceptions.UnauthenticatedError,
+)
+
+
+def _download_from_kaggle(kaggle_id: str) -> str:
+    """Downloads Kaggle model with weights, reporting failures as errors naming that model.
+
+    :param kaggle_id: Id of the Kaggle model, as passed to `kagglehub.model_download`.
+    :return: Path to the directory the model was downloaded to.
+    """
+    try:
+        return kagglehub.model_download(kaggle_id)
+    except _KAGGLEHUB_ERRORS as error:
+        raise RuntimeError(
+            f'Could not download weights from Kaggle model "{kaggle_id}": {error}. Downloading weights needs network '
+            "access, and weights of a model that is not public also need Kaggle credentials to be configured (see "
+            "https://github.com/Kaggle/kagglehub)."
+        ) from error
+
+
+def _load_state_dict(path: str, device: str) -> dict[str, Any]:
+    """Loads state dict from a file with weights.
+
+    Both bare state dicts and self-describing checkpoints written by :func:`cayleypy.models.save_checkpoint` are
+    accepted, so weights saved in either format can be used for a model of :data:`PREDICTOR_MODELS`.
+
+    :param path: Path to the file with weights.
+    :param device: PyTorch device to load the weights to.
+    :return: The state dict.
+    """
+    # `weights_only=True` is passed explicitly: files with weights contain only tensors and primitive values, so we
+    # never need to unpickle arbitrary objects from them (and must not, because they are downloaded from the internet).
+    data = torch.load(path, map_location=device, weights_only=True)
+    if isinstance(data, dict) and "state_dict" in data:
+        return data["state_dict"]
+    return data
 
 
 @dataclass(frozen=True)
@@ -76,10 +123,8 @@ class ModelConfig:
         if self.weights_path is not None:
             path = self.weights_path
             if self.weights_kaggle_id is not None:
-                model_dir = kagglehub.model_download(self.weights_kaggle_id)
-                path = os.path.join(model_dir, path)
-            # Weights in this format are bare state dicts, so we never need to unpickle arbitrary objects from them.
-            model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
+                path = os.path.join(_download_from_kaggle(self.weights_kaggle_id), path)
+            model.load_state_dict(_load_state_dict(path, device))
         return model.to(device)
 
 
