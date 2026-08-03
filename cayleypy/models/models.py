@@ -1,7 +1,7 @@
 # pylint: disable=not-callable
 
 import os
-from dataclasses import dataclass
+from dataclasses import asdict, dataclass
 from typing import Any, Optional
 
 import kagglehub
@@ -11,7 +11,25 @@ from torch import nn
 
 @dataclass(frozen=True)
 class ModelConfig:
-    """Configuration used to describe ML model."""
+    """Configuration used to describe ML model.
+
+    Fields `n_outputs`, `tokenizer_groups` and `graph_hash` describe capabilities added after the first version of this
+    class. Their defaults describe a single-output model without tokenization, which is not tied to a particular graph,
+    so configs written before these fields existed keep working.
+
+    :param model_type: Type of the model, e.g. "MLP".
+    :param input_size: Number of elements in one state.
+    :param num_classes_for_one_hot: Number of distinct values one element of a state can take.
+    :param layers_sizes: Sizes of hidden layers.
+    :param weights_kaggle_id: Id of the Kaggle model with weights (optional).
+    :param weights_path: Path to the file with weights (optional).
+    :param n_outputs: Number of outputs of the model. 1 means the model predicts distance for the state it is applied
+        to. `n_generators` means the model predicts distance for every child of that state (Q-model).
+    :param tokenizer_groups: Specification of how elements of a state are grouped into tokens, as a list of
+        ``[group_size, num_groups]`` pairs. For example, ``[[3, 20], [2, 30]]`` means 20 tokens of 3 elements followed
+        by 30 tokens of 2 elements. None means the state is not tokenized.
+    :param graph_hash: Hash of the graph this model was trained for, see :func:`cayleypy.models.graph_hash`.
+    """
 
     model_type: str
     input_size: int
@@ -19,6 +37,9 @@ class ModelConfig:
     layers_sizes: list[int]
     weights_kaggle_id: Optional[str] = None
     weights_path: Optional[str] = None
+    n_outputs: int = 1
+    tokenizer_groups: Optional[list[list[int]]] = None
+    graph_hash: Optional[str] = None
 
     @staticmethod
     def from_dict(cfg: dict[str, Any]):
@@ -30,9 +51,17 @@ class ModelConfig:
             layers_sizes=cfg["layers_sizes"],
             weights_kaggle_id=cfg.get("weights_kaggle_id", None),
             weights_path=cfg.get("weights_path", None),
+            n_outputs=cfg.get("n_outputs", 1),
+            tokenizer_groups=cfg.get("tokenizer_groups", None),
+            graph_hash=cfg.get("graph_hash", None),
         )
 
-    def _build_model(self) -> nn.Module:
+    def to_dict(self) -> dict[str, Any]:
+        """Converts this config to a Python dict containing only primitive values."""
+        return asdict(self)
+
+    def build_model(self) -> nn.Module:
+        """Creates model described by this config, with randomly initialized weights."""
         if self.model_type == "MLP":
             return MlpModel(self)
         else:
@@ -40,13 +69,14 @@ class ModelConfig:
 
     def load(self, device="cpu") -> nn.Module:
         """Creates model described by this config and loads weights."""
-        model = self._build_model()
+        model = self.build_model()
         if self.weights_path is not None:
             path = self.weights_path
             if self.weights_kaggle_id is not None:
                 model_dir = kagglehub.model_download(self.weights_kaggle_id)
                 path = os.path.join(model_dir, path)
-            model.load_state_dict(torch.load(path, map_location=device))
+            # Weights in this format are bare state dicts, so we never need to unpickle arbitrary objects from them.
+            model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
         return model.to(device)
 
 
@@ -56,6 +86,8 @@ class MlpModel(nn.Module):
     def __init__(self, config):
         super().__init__()
         assert config.model_type == "MLP"
+        if config.n_outputs != 1:
+            raise ValueError(f"MlpModel supports only n_outputs=1, got {config.n_outputs}.")
         self.num_classes_for_one_hot = config.num_classes_for_one_hot
         self.input_layer_size = config.input_size * self.num_classes_for_one_hot
 
