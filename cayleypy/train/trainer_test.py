@@ -4,8 +4,10 @@ import pytest
 import torch
 
 from .config import TrainConfig
+from .data import MixtureDataSource, PathDataSource, SparseQSampler, TrainingData
 from .trainer import Trainer
 from ..cayley_graph import CayleyGraph
+from ..cayley_path import CayleyPath
 from ..graphs_lib import PermutationGroups
 from ..models.checkpoint import graph_hash, load_checkpoint
 from ..models.models import ModelConfig
@@ -14,6 +16,23 @@ from ..predictor import Predictor
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 
 MLP_CONFIG = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[16, 16])
+
+# Config of a Q-model for lrx(5) - one output per generator. Architectures with several outputs are added in another
+# change, so tests below train the model defined here instead of building one from this config.
+Q_CONFIG = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[16], n_outputs=3)
+
+
+class _QModel(torch.nn.Module):
+    """Minimal model with one output per generator, standing in for a Q-model architecture."""
+
+    def __init__(self, state_size: int = 5, n_outputs: int = 3):
+        super().__init__()
+        self.n_outputs = n_outputs
+        self.layer = torch.nn.Linear(state_size, n_outputs)
+
+    def forward(self, states: torch.Tensor) -> torch.Tensor:
+        return self.layer(states.to(torch.float32))
+
 
 # Configuration making training as short as possible - for tests that check mechanics rather than model quality.
 TINY_CONFIG = TrainConfig(n_epochs=2, n_walks=4, rw_length=3, batch_size=8, seed=0)
@@ -49,14 +68,79 @@ def test_train_returns_loss_for_every_epoch():
 def test_generate_data():
     config = TrainConfig(n_walks=8, rw_length=4, rw_mode="classic")
     graph = _lrx5()
-    states, targets = Trainer(graph, MLP_CONFIG, config).generate_data()
-    assert states.shape == (32, 5)
-    assert targets.shape == (32,)
-    assert targets.dtype == torch.float32
+    data = Trainer(graph, MLP_CONFIG, config).generate_data()
+    assert data.states.shape == (32, 5)
+    assert data.targets.shape == (32,)
+    assert data.targets.dtype == torch.float32
+    assert data.mask is None and data.weights is None
     # First `n_walks` states are copies of the central state, and their distance is 0.
-    assert torch.equal(states[:8], graph.central_state.expand(8, 5))
-    assert torch.equal(targets[:8], torch.zeros(8))
-    assert torch.all(targets >= 0)
+    assert torch.equal(data.states[:8], graph.central_state.expand(8, 5))
+    assert torch.equal(data.targets[:8], torch.zeros(8))
+    assert torch.all(data.targets >= 0)
+
+
+def test_generate_data_mixes_anchors_in():
+    graph = _lrx5()
+    config = TrainConfig(n_walks=8, rw_length=25, anchors_depth=3, anchors_fraction=0.2)
+    trainer = Trainer(graph, MLP_CONFIG, config)
+    assert isinstance(trainer.data_source, MixtureDataSource)
+
+    data = trainer.generate_data()
+    # Walks generate 200 states, which is 80% of 250 states, and the remaining 50 are anchors.
+    assert len(data) == 250
+    exact = {
+        tuple(state.tolist()): distance
+        for distance, layer in graph.bfs(max_layer_size_to_store=None).layers.items()
+        for state in layer
+    }
+    n_exact_targets = sum(
+        1 for state, target in zip(data.states, data.targets) if exact[tuple(state.tolist())] == target
+    )
+    assert n_exact_targets >= 50
+
+
+def test_trainer_trains_q_model_on_sparse_targets():
+    graph = _lrx5()
+    config = TrainConfig(n_epochs=2, n_walks=8, rw_length=6, batch_size=16, lr=0.01, seed=0)
+    trainer = Trainer(graph, Q_CONFIG, config, model=_QModel())
+    assert isinstance(trainer.data_source, SparseQSampler)
+
+    data = trainer.generate_data()
+    assert data.targets.shape == (48, 3)
+    assert data.mask is not None
+
+    weights_before = _weights(trainer.model)
+    result = trainer.train()
+    assert all(loss > 0 for loss in result.losses)
+    for before, after in zip(weights_before, _weights(trainer.model)):
+        assert not torch.equal(before, after)
+
+
+def test_trainer_trains_q_model_on_walks_mixed_with_anchors():
+    graph = _lrx5()
+    config = TrainConfig(n_epochs=2, n_walks=8, rw_length=6, batch_size=16, anchors_depth=2, seed=0)
+    trainer = Trainer(graph, Q_CONFIG, config, model=_QModel())
+    assert isinstance(trainer.data_source, MixtureDataSource)
+    data = trainer.generate_data()
+    assert data.targets.shape[1] == 3
+    # Anchors label all 3 outputs, walk states label at most 2.
+    assert int((data.mask.sum(dim=1) == 3).sum()) > 0
+    assert all(loss > 0 for loss in trainer.train().losses)
+
+
+def test_trainer_uses_given_data_source():
+    graph = _lrx5()
+    start_state = torch.tensor([2, 0, 1, 4, 3])
+    beam_result = graph.beam_search(start_state=start_state, return_path=True)
+    assert beam_result.path_found and beam_result.path is not None
+    path = CayleyPath(start_state, beam_result.path, graph.definition)
+    source = PathDataSource(graph, [path], weight=0.5)
+
+    trainer = Trainer(graph, MLP_CONFIG, TINY_CONFIG, data_source=source)
+    data = trainer.generate_data()
+    assert len(data) == beam_result.path_length + 1
+    assert torch.equal(data.weights, torch.full_like(data.targets, 0.5))
+    assert all(loss > 0 for loss in trainer.train().losses)
 
 
 def test_training_is_deterministic_with_seed():
@@ -68,18 +152,18 @@ def test_training_is_deterministic_with_seed():
 
 def test_train_step_reduces_loss_on_the_same_batch():
     trainer = Trainer(_lrx5(), MLP_CONFIG, TrainConfig(lr=0.01, seed=0))
-    states, targets = trainer.generate_data()
-    first_loss = trainer.train_step(states, targets)
+    data = trainer.generate_data()
+    first_loss = trainer.train_step(data.states, data.targets)
     for _ in range(10):
-        last_loss = trainer.train_step(states, targets)
+        last_loss = trainer.train_step(data.states, data.targets)
     assert last_loss < first_loss
 
 
 def test_fully_masked_batch_does_not_change_weights():
     trainer = Trainer(_lrx5(), MLP_CONFIG, TrainConfig(seed=0))
-    states, targets = trainer.generate_data()
+    data = trainer.generate_data()
     weights_before = _weights(trainer.model)
-    loss = trainer.train_step(states, targets, mask=torch.zeros_like(targets))
+    loss = trainer.train_step(data.states, data.targets, mask=torch.zeros_like(data.targets))
     assert loss == 0
     for before, after in zip(weights_before, _weights(trainer.model)):
         assert torch.equal(before, after)
@@ -89,11 +173,11 @@ def test_ema_follows_weights():
     decay = 0.9
     trainer = Trainer(_lrx5(), MLP_CONFIG, TrainConfig(ema_decay=decay, lr=0.01, seed=0))
     assert trainer.ema_model is not None
-    states, targets = trainer.generate_data()
+    data = trainer.generate_data()
 
     ema_before = _weights(trainer.ema_model)
     for _ in range(2):
-        trainer.train_step(states, targets)
+        trainer.train_step(data.states, data.targets)
         model_weights = _weights(trainer.model)
         ema_after = _weights(trainer.ema_model)
         for before, model_weight, after in zip(ema_before, model_weights, ema_after):
@@ -127,7 +211,7 @@ def test_learning_rate_follows_cosine_schedule():
 def test_predictor_uses_averaged_weights():
     trainer = Trainer(_lrx5(), MLP_CONFIG, TINY_CONFIG)
     trainer.train()
-    states, _ = trainer.generate_data()
+    states = trainer.generate_data().states
     predictor = trainer.predictor()
     assert isinstance(predictor, Predictor)
     assert predictor(states).shape == (states.shape[0],)
@@ -146,7 +230,7 @@ def test_save_and_resume_from_checkpoint(tmp_path):
 
     resumed = Trainer.from_checkpoint(path, graph, TINY_CONFIG)
     assert resumed.model_config == saved_config
-    states, _ = trainer.generate_data()
+    states = trainer.generate_data().states
     with torch.no_grad():
         # Resumed trainer starts from exactly the weights that were saved.
         assert torch.equal(resumed.model(states), trainer.ema_model(states))
@@ -163,7 +247,7 @@ def test_save_can_store_weights_instead_of_their_average(tmp_path):
     trainer.train()
     trainer.save(path, use_ema=False)
     loaded_model, _ = load_checkpoint(path)
-    states, _ = trainer.generate_data()
+    states = trainer.generate_data().states
     with torch.no_grad():
         assert torch.equal(loaded_model(states), trainer.model(states))
 
@@ -194,6 +278,10 @@ def test_train_config_rejects_invalid_values():
         TrainConfig(rw_mode="random")
     with pytest.raises(ValueError, match="nbt_history_depth must be non-negative"):
         TrainConfig(nbt_history_depth=-1)
+    with pytest.raises(ValueError, match="anchors_depth must be non-negative"):
+        TrainConfig(anchors_depth=-1)
+    with pytest.raises(ValueError, match="anchors_fraction must be strictly between 0 and 1"):
+        TrainConfig(anchors_fraction=1.0)
     with pytest.raises(ValueError, match="lr_min must be between 0 and lr"):
         TrainConfig(lr=0.001, lr_min=0.01)
     with pytest.raises(ValueError, match="weight_decay must be non-negative"):
@@ -212,9 +300,10 @@ def test_trainer_rejects_model_for_states_of_another_size():
         Trainer(_lrx5(), config, TINY_CONFIG)
 
 
-def test_trainer_rejects_multi_output_model():
-    config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[16], n_outputs=3)
-    with pytest.raises(ValueError, match="Trainer supports only models with a single output"):
+def test_trainer_rejects_model_with_wrong_number_of_outputs():
+    # This graph has 3 generators, so a model must have either 1 or 3 outputs.
+    config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[16], n_outputs=4)
+    with pytest.raises(ValueError, match="one output per generator of this graph, of which there are 3"):
         Trainer(_lrx5(), config, TINY_CONFIG)
 
 
@@ -227,7 +316,7 @@ def test_trainer_rejects_model_with_too_few_classes():
 def test_train_on_data_rejects_empty_data():
     trainer = Trainer(_lrx5(), MLP_CONFIG, TINY_CONFIG)
     with pytest.raises(ValueError, match="Cannot train on an empty set of states"):
-        trainer.train_on_data(torch.zeros((0, 5), dtype=torch.int64), torch.zeros((0,)))
+        trainer.train_on_data(TrainingData(torch.zeros((0, 5), dtype=torch.int64), torch.zeros((0,))))
 
 
 def test_from_checkpoint_rejects_checkpoint_for_another_graph(tmp_path):
@@ -261,6 +350,41 @@ def test_learns_true_distances_from_exact_labels():
         assert result.path_found, f"No path found for {states[i].tolist()}."
         assert result.path_length == int(distances[i])
         assert torch.equal(graph.apply_path(states[i], result.path).reshape((-1,)), graph.central_state)
+
+
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
+def test_anchors_make_predictions_near_central_state_exact():
+    graph = _lrx5()
+    depth = 3
+    states, distances = _all_states_with_distances(graph)
+    is_near = distances <= depth
+
+    def train(anchors_depth: int, anchors_fraction: float) -> float:
+        """Trains a model and returns its mean absolute error on states at distance at most `depth`."""
+        config = TrainConfig(
+            n_epochs=100,
+            n_walks=64,
+            rw_length=12,
+            batch_size=64,
+            lr=5e-3,
+            seed=42,
+            anchors_depth=anchors_depth,
+            anchors_fraction=anchors_fraction,
+        )
+        trainer = Trainer(graph, ModelConfig("MLP", 5, 5, [64, 64]), config)
+        trainer.train()
+        predictions = trainer.predictor()(states[is_near])
+        return float((predictions - distances[is_near]).abs().mean())
+
+    # Anchors are exact distances of states near the central state, and this is what they buy: without them, targets
+    # for those states come from random walks and are overestimated, so predictions there are off by more than a move.
+    # The share of anchors here is far above the 1-2% that is right for real training - it makes their effect visible
+    # within the tiny budget of a test, and it also shows what a large share costs: predictions on the whole graph get
+    # no better, only predictions near the central state do.
+    error_with_anchors = train(anchors_depth=depth, anchors_fraction=0.9)
+    error_without_anchors = train(anchors_depth=0, anchors_fraction=0.9)
+    assert error_with_anchors < 0.5
+    assert error_without_anchors > 3 * error_with_anchors
 
 
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")

@@ -61,6 +61,13 @@ Training
     cayleypy.train.TrainConfig
     cayleypy.train.Trainer
     cayleypy.train.TrainResult
+    cayleypy.train.TrainingData
+    cayleypy.train.DataSource
+    cayleypy.train.RandomWalksSource
+    cayleypy.train.SparseQSampler
+    cayleypy.train.BfsAnchors
+    cayleypy.train.PathDataSource
+    cayleypy.train.MixtureDataSource
 
 BFS algorithm and its variations
 ''''''''''''''''''''''''''''''''

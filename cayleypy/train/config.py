@@ -31,8 +31,16 @@ class TrainConfig:
     :param rw_length: Length of every random walk. Must be at least 2. Should be at least as large as the diameter of
         the graph, otherwise the model never sees distant states.
     :param rw_mode: Mode of random walk generation - one of "classic", "bfs", "nbt". Defaults to "nbt", which mixes
-        fastest, meaning the number of steps is the closest estimate of the true distance.
+        fastest, meaning the number of steps is the closest estimate of the true distance. Ignored when training a
+        Q-model: its data comes from :class:`cayleypy.train.SparseQSampler`, which needs walks to be paths and
+        therefore always uses "classic" walks.
     :param nbt_history_depth: For "nbt" mode, how many previous levels to remember and ban from revisiting.
+    :param anchors_depth: Depth of the breadth-first search producing anchors - states with exact distances that are
+        mixed into the data, see :class:`cayleypy.train.BfsAnchors`. 0 (the default) means no anchors. Note that memory
+        needed for the search grows quickly with this depth.
+    :param anchors_fraction: Share of anchors in the data of one epoch (ignored if `anchors_depth` is 0). A few per cent
+        is what helps; a large share (10% and more, empirically) makes the model good near the central state and worse
+        where beam search actually spends its time.
     :param batch_size: Number of states in one training batch.
     :param lr: Initial learning rate.
     :param lr_min: Learning rate at the end of training. The learning rate follows a cosine schedule from `lr` to
@@ -51,6 +59,8 @@ class TrainConfig:
     rw_length: int = 20
     rw_mode: str = "nbt"
     nbt_history_depth: int = 1
+    anchors_depth: int = 0
+    anchors_fraction: float = 0.02
     batch_size: int = 512
     lr: float = 1e-3
     lr_min: float = 0.0
@@ -72,6 +82,10 @@ class TrainConfig:
             raise ValueError(f'Unknown rw_mode: "{self.rw_mode}". Supported modes are: {RANDOM_WALK_MODES}.')
         if self.nbt_history_depth < 0:
             raise ValueError(f"nbt_history_depth must be non-negative, got {self.nbt_history_depth}.")
+        if self.anchors_depth < 0:
+            raise ValueError(f"anchors_depth must be non-negative, got {self.anchors_depth}.")
+        if not 0.0 < self.anchors_fraction < 1.0:
+            raise ValueError(f"anchors_fraction must be strictly between 0 and 1, got {self.anchors_fraction}.")
         if not 0.0 <= self.lr_min <= self.lr:
             raise ValueError(f"lr_min must be between 0 and lr={self.lr}, got {self.lr_min}.")
         if self.weight_decay < 0:
