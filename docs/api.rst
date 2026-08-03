@@ -58,6 +58,9 @@ Training
     cayleypy.train.MseLoss
     cayleypy.train.PinballLoss
     cayleypy.train.make_loss
+    cayleypy.train.TrainConfig
+    cayleypy.train.Trainer
+    cayleypy.train.TrainResult
 
 BFS algorithm and its variations
 ''''''''''''''''''''''''''''''''
