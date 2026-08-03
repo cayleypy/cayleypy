@@ -5,10 +5,9 @@ from typing import Sequence
 
 import torch
 
-from .models import ModelConfig
-
 if typing.TYPE_CHECKING:
     from ..cayley_graph_def import CayleyGraphDef
+    from .models import ModelConfig
 
 
 class GroupTokenizer:
@@ -87,7 +86,7 @@ class GroupTokenizer:
         """Index of the segment each token belongs to, of shape ``[n_tokens]``."""
 
     @staticmethod
-    def from_config(config: ModelConfig) -> "GroupTokenizer":
+    def from_config(config: "ModelConfig") -> "GroupTokenizer":
         """Creates tokenizer described by `tokenizer_groups` field of the given model config.
 
         :param config: Config of a model that consumes tokens.

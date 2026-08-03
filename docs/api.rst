@@ -44,6 +44,7 @@ Beam search and ML
     cayleypy.algo.RandomWalksGenerator
     cayleypy.models.ModelConfig
     cayleypy.models.GroupTokenizer
+    cayleypy.models.TransformerModel
     cayleypy.models.graph_hash
     cayleypy.models.save_checkpoint
     cayleypy.models.load_checkpoint
