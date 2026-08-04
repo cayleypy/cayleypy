@@ -55,11 +55,20 @@ class Predictor:
         model = PREDICTOR_MODELS[graph.definition.name].load(graph.device)
         return Predictor(graph, model)
 
+    def _predict_as_tensor(self, states: torch.Tensor) -> torch.Tensor:
+        """Applies the underlying model to `states` and returns its output as a tensor on the graph's device.
+
+        A model does not have to be written in torch - an sklearn estimator, for example, is a supported predictor and
+        its `predict` returns a NumPy array, which has only some of the operations the callers of this method use.
+        """
+        return torch.as_tensor(self.predict(states), device=self.graph.device)
+
     def predict_batched(self, states: torch.Tensor) -> torch.Tensor:
         """Applies the underlying model to `states`, splitting them into batches if there are too many.
 
-        Output of the model is returned as is. It has shape ``[n_states]`` for usual (single-output) models, and shape
-        ``[n_states, n_outputs]`` for multi-output models (e.g. models predicting one score per generator).
+        The shape of the output is the shape the model returns: ``[n_states]`` for usual (single-output) models, and
+        ``[n_states, n_outputs]`` for multi-output models (e.g. models predicting one score per generator). Output of a
+        model that does not return tensors is converted to one.
 
         :param states: States (in decoded representation) to apply the model to.
         :return: Output of the model for `states`.
@@ -71,11 +80,11 @@ class Predictor:
             if num_batches > 1:
                 ans = []  # type: list[torch.Tensor]
                 for batch in states.tensor_split(num_batches, dim=0):
-                    ans.append(self.predict(batch))
+                    ans.append(self._predict_as_tensor(batch))
                 # Batches must be concatenated along dimension 0, otherwise outputs of multi-output models are mangled.
                 return torch.cat(ans, dim=0)
             else:
-                return self.predict(states)
+                return self._predict_as_tensor(states)
 
     def __call__(self, states: torch.Tensor) -> torch.Tensor:
         ans = self.predict_batched(states)
