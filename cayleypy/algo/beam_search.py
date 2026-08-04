@@ -323,8 +323,10 @@ class BeamSearchAlgorithm:
             on the next layer, keeping only one state from each orbit. States equivalent under a symmetry have equal
             distances to the central state, so exploring only one of them makes the beam cover more distinct states
             (in effect, this multiplies the beam width by up to the number of symmetries). Deduplication happens after
-            the check whether the central state is reached, so the path is never lost. Defaults to None, which means
-            states are deduplicated only by equality, as usual.
+            the check whether the central state is reached, so the path is never lost. The symmetries must really be a
+            group of symmetries of this graph (:meth:`cayleypy.SymmetryGroup.verify` is called to check that), because
+            deduplication by a set that is not a group throws away states that are not duplicates. Defaults to None,
+            which means states are deduplicated only by equality, as usual.
         :param non_backtracking: Whether to ban the move inverse to the move by which a state was reached. Such a move
             leads back to a state on the previous layer, so banning it makes the beam cover more distinct states. This
             is similar to `history_depth=1` in "advanced" mode, but it needs no memory to store hashes of the previous
@@ -348,6 +350,9 @@ class BeamSearchAlgorithm:
             predictor = Predictor(graph, "hamming")
         if canonical_dedup is not None:
             _check_symmetries_match_graph(graph, canonical_dedup)
+            # Two states have equal canonical forms if and only if the symmetries form a group, so without this check a
+            # set of symmetries that is not a group would silently drop states that are not duplicates of anything.
+            canonical_dedup.verify()
         if (lower_bound is None) != (prune_above is None):
             raise ValueError(
                 "lower_bound and prune_above must be specified together: without a lower bound there is nothing to "
@@ -433,8 +438,6 @@ class BeamSearchAlgorithm:
                     # No state can be on a path of length at most `prune_above`, so there is no such path.
                     return BeamSearchResult(False, 0, None, debug_scores, graph.definition)
 
-            layer2_moves = expanded.moves if expanded is not None else None
-
             # Pick `beam_width` states with lowest scores.
             if len(layer2) >= beam_width:
                 if expanded is not None and use_child_scores:
@@ -442,11 +445,11 @@ class BeamSearchAlgorithm:
                 else:
                     scores = predictor(graph.decode_states(layer2))
                 idx = torch.argsort(scores)[:beam_width]
-                layer2 = layer2[idx, :]
-                layer2_hashes = layer2_hashes[idx]
-                if layer2_moves is not None:
-                    layer2_moves = layer2_moves[idx]
                 best_score = float(scores[idx[0]].detach())
+                # Provenance is reordered along with the states, so it keeps describing the states next to it.
+                layer2, layer2_hashes = layer2[idx, :], layer2_hashes[idx]
+                if expanded is not None:
+                    expanded = _ExpandedLayer(layer2, layer2_hashes, expanded.moves[idx], expanded.source_index[idx])
                 debug_scores[i] = best_score
                 if graph.verbose >= 2:
                     print(f"Iteration {i}, best score {best_score}.")
@@ -454,8 +457,8 @@ class BeamSearchAlgorithm:
             layer1 = layer2
             layer1_hashes = layer2_hashes
             if non_backtracking:
-                assert inverse_generators is not None and layer2_moves is not None
-                banned_moves = inverse_generators[layer2_moves]
+                assert inverse_generators is not None and expanded is not None
+                banned_moves = inverse_generators[expanded.moves]
             if return_path:
                 all_layers_hashes.append(layer1_hashes)
 
