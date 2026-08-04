@@ -133,8 +133,9 @@ class Trainer:
         self.epoch = 0
         self.n_steps = 0
 
-    @staticmethod
+    @classmethod
     def from_checkpoint(
+        cls,
         path: PathType,
         graph: "CayleyGraph",
         config: Optional[TrainConfig] = None,
@@ -144,6 +145,9 @@ class Trainer:
         Only weights are stored in checkpoints, so the optimizer, the learning rate schedule and the EMA copy start
         anew (the EMA copy starts from the weights that were loaded).
 
+        Subclasses of the trainer are created as well, so this is also the way to fine-tune a pretrained model with
+        another training scheme, e.g. :meth:`cayleypy.train.BellmanTrainer.from_checkpoint`.
+
         :param path: Path to a checkpoint written by :func:`cayleypy.models.save_checkpoint` (e.g. by :meth:`save`).
         :param graph: Graph for which to continue training. If the checkpoint says which graph the model was trained
             for, it must be this graph.
@@ -151,7 +155,7 @@ class Trainer:
         :return: The trainer.
         """
         model, model_config = load_checkpoint(path, device=str(graph.device), graph_def=graph.definition)
-        return Trainer(graph, model_config, config=config, model=model)
+        return cls(graph, model_config, config=config, model=model)
 
     @property
     def learning_rate(self) -> float:

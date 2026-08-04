@@ -9,6 +9,8 @@ from .models import ModelConfig, load_checkpoint, save_checkpoint
 from .predictor import Predictor
 from .puzzles import Puzzles, GapPuzzles
 from .train import (
+    BellmanTargets,
+    BellmanTrainer,
     BfsAnchors,
     DataSource,
     Loss,
@@ -22,5 +24,6 @@ from .train import (
     Trainer,
     TrainingData,
     TrainResult,
+    bellman_targets,
     make_loss,
 )
