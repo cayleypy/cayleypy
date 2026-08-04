@@ -43,6 +43,7 @@ class EnsemblePredictor(Predictor):
         :param members: Predictors to combine. They must be for the same graph, which is checked by comparing the
             mathematical definitions of their graphs (see :func:`cayleypy.models.graph_hash`) - members for different
             graphs would have their scores of unrelated children summed up.
+            All members must have the same number of outputs, which becomes `n_outputs` of the ensemble.
         :param weights: Weight of each member (optional). Score of member ``i`` is multiplied by ``weights[i]``, and
             the products are summed up, without any normalization. If None, defaults to ``1/len(members)`` for every
             member, which makes the ensemble compute the average of its members.
@@ -79,9 +80,19 @@ class EnsemblePredictor(Predictor):
                     "different)."
                 )
 
+        n_outputs = members[0].n_outputs
+        for i, member in enumerate(members):
+            if member.n_outputs != n_outputs:
+                raise ValueError(
+                    f"All members of an ensemble must have the same number of outputs, but member 0 has {n_outputs} "
+                    f"and member {i} has {member.n_outputs}."
+                )
+
         self.members = list(members)
         self.weights = [float(w) for w in weights]
         super().__init__(members[0].graph, self._predict_ensemble)
+        # An ensemble of Q-models is a Q-model: callers dispatch on this to score children instead of states.
+        self.n_outputs = n_outputs
 
     def _predict_ensemble(self, states: torch.Tensor) -> torch.Tensor:
         ans = self.weights[0] * self.members[0](states)

@@ -177,3 +177,37 @@ def test_member_that_is_not_predictor_is_rejected():
     graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
     with pytest.raises(TypeError, match="wrapped in Predictor"):
         EnsemblePredictor([Predictor(graph, "hamming"), "hamming"])  # type: ignore[list-item]
+
+
+class _QModel(torch.nn.Module):
+    """Model with one output per generator, whose scores depend on the state so that averaging is visible."""
+
+    def __init__(self, n_outputs: int, shift: float):
+        super().__init__()
+        self.n_outputs = n_outputs
+        self.shift = shift
+
+    def forward(self, states: torch.Tensor) -> torch.Tensor:
+        return states[:, :1].float() + torch.arange(self.n_outputs, dtype=torch.float32) + self.shift
+
+
+def test_ensemble_of_q_models_is_a_q_model():
+    """Test that an ensemble reports the outputs of its members, so callers score children rather than states."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    n_generators = graph.definition.n_generators
+    members = [Predictor(graph, _QModel(n_generators, 0.0)), Predictor(graph, _QModel(n_generators, 4.0))]
+
+    ensemble = EnsemblePredictor(members)
+
+    assert ensemble.n_outputs == n_generators
+    expected = (members[0].score_children(STATES) + members[1].score_children(STATES)) / 2
+    assert torch.allclose(ensemble.score_children(STATES), expected)
+
+
+def test_ensemble_rejects_members_with_different_number_of_outputs():
+    """Test that a Q-model and a single-output model are not ensembled (their scores are of different things)."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    members = [Predictor(graph, "hamming"), Predictor(graph, _QModel(graph.definition.n_generators, 0.0))]
+
+    with pytest.raises(ValueError, match="same number of outputs"):
+        EnsemblePredictor(members)
