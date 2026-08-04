@@ -1,9 +1,18 @@
+import numpy as np
 import pytest
 import torch
 
 from .cayley_graph import CayleyGraph
 from .graphs_lib import PermutationGroups
 from .predictor import Predictor
+
+
+class SklearnStyleModel:
+    """Model with a `predict` method returning a NumPy array, as an sklearn estimator does."""
+
+    @staticmethod
+    def predict(states: torch.Tensor) -> np.ndarray:
+        return np.asarray(states[:, 0], dtype=np.float32)
 
 
 class MultiOutputModel(torch.nn.Module):
@@ -97,6 +106,22 @@ def test_score_children_with_batching():
     states = torch.tensor([[i % 5, (i + 1) % 5, 2, 3, 4] for i in range(7)])
 
     # There are 7*3=21 children, so they are scored in several batches.
+    scores = predictor.score_children(states)
+    assert scores.shape == (7, graph_def.n_generators)
+    for i in range(graph_def.n_generators):
+        assert torch.equal(scores[:, i], predictor(graph.apply_path(states, [i])))
+
+
+@pytest.mark.parametrize("batch_size", [1024, 4])
+def test_predictor_converts_output_of_a_model_not_written_in_torch(batch_size):
+    """A model with a `predict` method is a supported predictor, and sklearn estimators return NumPy arrays."""
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu", batch_size=batch_size)
+    predictor = Predictor(graph, SklearnStyleModel())
+    states = torch.tensor([[i % 5, (i + 1) % 5, 2, 3, 4] for i in range(7)])
+
+    assert isinstance(predictor.predict_batched(states), torch.Tensor)
+    # score_children applies operations that a NumPy array does not have, so the conversion must happen before them.
     scores = predictor.score_children(states)
     assert scores.shape == (7, graph_def.n_generators)
     for i in range(graph_def.n_generators):
