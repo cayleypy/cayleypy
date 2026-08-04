@@ -1,5 +1,6 @@
 """Tests for beam search algorithm."""
 
+import itertools
 import os
 
 import numpy as np
@@ -7,7 +8,7 @@ import pytest
 import torch
 
 from ..cayley_graph import CayleyGraph
-
+from ..cayley_graph_def import CayleyGraphDef
 from ..graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 from ..predictor import Predictor
 from ..puzzles import Puzzles
@@ -441,6 +442,237 @@ def test_beam_search_canonical_dedup_not_supported_in_advanced_mode():
 
     with pytest.raises(ValueError, match="only in 'simple' beam mode"):
         graph.beam_search(start_state=[4, 1, 0, 2, 3], beam_mode="advanced", canonical_dedup=symmetry_group)
+
+
+# =============================================================================
+# Tests for non-backtracking in "simple" beam search mode
+# =============================================================================
+
+
+def _expand_with_non_backtracking(graph: CayleyGraph, states: torch.Tensor):
+    """Expands `states` once without bans, then expands the result banning moves undoing the previous move."""
+    inverse_map = graph.definition.generators_inverse_map
+    assert inverse_map is not None
+    layer1 = _expand_layer(graph, states)
+    banned_moves = torch.tensor(inverse_map)[layer1.moves]
+    return layer1, _expand_layer(graph, layer1.states), _expand_layer(graph, layer1.states, banned_moves)
+
+
+def test_expand_layer_bans_moves():
+    """Test that banned generators are not applied, and provenance of the remaining states stays correct."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    parents = [[0, 1, 2, 3, 4], [1, 0, 2, 3, 4], [2, 3, 4, 0, 1]]
+    banned_moves = [0, 1, 2]
+
+    expanded = _expand_layer(graph, graph.encode_states(parents), torch.tensor(banned_moves))
+
+    expected = {
+        tuple(graph.apply_path(parents[p], [g]).reshape((-1)).tolist())
+        for p in range(len(parents))
+        for g in range(3)
+        if g != banned_moves[p]
+    }
+    assert {tuple(x) for x in graph.decode_states(expanded.states).tolist()} == expected
+    assert len(expanded.states) == len(expected)
+    for i in range(len(expanded.states)):
+        parent_id = int(expanded.source_index[i]) % len(parents)
+        assert int(expanded.moves[i]) != banned_moves[parent_id]
+
+
+def test_expand_layer_keeps_state_reachable_by_allowed_move():
+    """Test that a state is banned only along the banned move, and survives if another move also produces it."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    # X applied to the first state and L applied to the second state both give [1, 0, 2, 3, 4].
+    parents = graph.encode_states([[0, 1, 2, 3, 4], [4, 1, 0, 2, 3]])
+
+    expanded = _expand_layer(graph, parents, torch.tensor([2, 2]))
+
+    states = [tuple(x) for x in graph.decode_states(expanded.states).tolist()]
+    # [1, 0, 2, 3, 4] is still there, produced by generator 0 (L) from the second state (index 1 in the layer).
+    assert (1, 0, 2, 3, 4) in states
+    i = states.index((1, 0, 2, 3, 4))
+    assert int(expanded.moves[i]) == 0
+    assert int(expanded.source_index[i]) == 1
+    # [1, 4, 0, 2, 3] was produced only by the banned move (X applied to the second state), so it is gone.
+    assert (1, 4, 0, 2, 3) not in states
+    assert (1, 4, 0, 2, 3) in [tuple(x) for x in graph.decode_states(_expand_layer(graph, parents).states).tolist()]
+
+
+def test_expand_layer_banned_moves_remove_previous_layer():
+    """Test that the states removed by banning are exactly the states of the previous layer."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    start_state = (0, 1, 2, 3, 4)
+
+    _, plain, non_backtracking = _expand_with_non_backtracking(graph, graph.encode_states(list(start_state)))
+
+    plain_states = {tuple(x) for x in graph.decode_states(plain.states).tolist()}
+    nbt_states = {tuple(x) for x in graph.decode_states(non_backtracking.states).tolist()}
+    # Undoing the move that produced a state leads exactly to the state it was produced from.
+    assert plain_states - nbt_states == {start_state}
+
+
+def test_expand_layer_banned_moves_with_involutions():
+    """Test banning when every generator is its own inverse, so the banned move is the move itself."""
+    graph_def = PermutationGroups.cyclic_coxeter(5)
+    graph = CayleyGraph(graph_def, device="cpu")
+    assert graph_def.generators_inverse_map == [0, 1, 2, 3, 4]
+    start_state = (0, 1, 2, 3, 4)
+
+    layer1, plain, non_backtracking = _expand_with_non_backtracking(graph, graph.encode_states(list(start_state)))
+
+    assert len(layer1.states) == 5
+    # Applying the same transposition twice returns to the start state, and only that state is banned.
+    assert len(plain.states) == 16 and len(non_backtracking.states) == 15
+    assert start_state not in {tuple(x) for x in graph.decode_states(non_backtracking.states).tolist()}
+
+
+def test_beam_search_simple_non_backtracking_solves_more_states():
+    """Test that with a narrow beam, banning moves that undo the previous move solves much more states."""
+    n = 5
+    graph = CayleyGraph(PermutationGroups.lrx(n), device="cpu")
+    all_states = [list(p) for p in itertools.permutations(range(n))]
+
+    lengths = {}
+    for non_backtracking in [False, True]:
+        results = [
+            graph.beam_search(start_state=s, beam_width=1, max_steps=30, non_backtracking=non_backtracking)
+            for s in all_states
+        ]
+        lengths[non_backtracking] = [r.path_length if r.path_found else None for r in results]
+
+    # With beam width 1, the plain search can only follow the Hamming heuristic downhill and gets stuck almost
+    # immediately, while the non-backtracking search is forced to explore.
+    assert sum(x is not None for x in lengths[False]) < 15
+    assert sum(x is not None for x in lengths[True]) > 40
+    # No state solved by the plain search is solved worse (or not at all) by the non-backtracking one.
+    for plain_length, nbt_length in zip(lengths[False], lengths[True]):
+        if plain_length is not None:
+            assert nbt_length is not None and nbt_length <= plain_length
+
+
+def test_beam_search_simple_non_backtracking_finds_valid_path():
+    """Test that the path found with non-backtracking is a valid path."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+
+    result = graph.beam_search(
+        start_state=start_state, beam_width=10, max_steps=50, return_path=True, non_backtracking=True
+    )
+
+    _validate_beam_search_result(graph, start_state, result)
+
+
+def test_beam_search_simple_non_backtracking_disabled_by_default():
+    """Test that non_backtracking=False is exactly the old behavior."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+
+    result1 = graph.beam_search(start_state=start_state, beam_width=10, max_steps=50, return_path=True)
+    result2 = graph.beam_search(
+        start_state=start_state, beam_width=10, max_steps=50, return_path=True, non_backtracking=False
+    )
+
+    _validate_beam_search_result(graph, start_state, result1)
+    assert result1.path == result2.path
+    assert len(result1.debug_scores) > 0
+    assert result1.debug_scores == result2.debug_scores
+
+
+def test_beam_search_simple_non_backtracking_with_child_scores():
+    """Test that banned moves keep scores of children matched with the states they belong to."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+    kwargs = {"beam_width": 10, "max_steps": 50, "return_path": True, "non_backtracking": True}
+
+    result_scalar = graph.beam_search(start_state=start_state, predictor=Predictor(graph, "hamming"), **kwargs)
+    result_q = graph.beam_search(
+        start_state=start_state, predictor=_ChildrenHammingPredictor(graph), use_child_scores=True, **kwargs
+    )
+
+    _validate_beam_search_result(graph, start_state, result_q)
+    assert result_scalar.path == result_q.path
+    assert len(result_scalar.debug_scores) > 0
+    assert result_scalar.debug_scores == result_q.debug_scores
+
+
+def test_beam_search_simple_non_backtracking_with_canonical_dedup():
+    """Test that banned moves stay matched with their states when the beam is deduplicated by symmetries."""
+    graph_def = PermutationGroups.lrx(8)
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+    kwargs = {
+        "beam_width": 10,
+        "max_steps": 50,
+        "return_path": True,
+        "non_backtracking": True,
+        "canonical_dedup": symmetry_group,
+    }
+
+    result_scalar = graph.beam_search(start_state=start_state, predictor=Predictor(graph, "hamming"), **kwargs)
+    result_q = graph.beam_search(
+        start_state=start_state, predictor=_ChildrenHammingPredictor(graph), use_child_scores=True, **kwargs
+    )
+
+    # Both deduplication by symmetries and banning of moves reorder and filter the expanded layer. If moves or score
+    # indexes were not filtered along with the states, they would be assigned to wrong states.
+    _validate_beam_search_result(graph, start_state, result_scalar)
+    assert result_scalar.path == result_q.path
+    assert len(result_scalar.debug_scores) > 0
+    assert result_scalar.debug_scores == result_q.debug_scores
+
+
+def test_beam_search_simple_non_backtracking_with_meet_in_the_middle():
+    """Test that non-backtracking works together with meet-in-the-middle."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+    bfs_result = graph.bfs(max_diameter=3, return_all_hashes=True)
+
+    result = graph.beam_search(
+        start_state=start_state,
+        beam_width=10,
+        max_steps=50,
+        return_path=True,
+        bfs_result_for_mitm=bfs_result,
+        non_backtracking=True,
+    )
+
+    _validate_beam_search_result(graph, start_state, result)
+
+
+def test_beam_search_simple_non_backtracking_all_moves_banned():
+    """Test that the search stops when every move from every state of the beam is banned."""
+    # The only generator is its own inverse, so from the second step on there is nowhere to go.
+    graph_def = CayleyGraphDef.create([[1, 0, 2, 3]], generator_names=["S"], central_state=[0, 1, 2, 3])
+    graph = CayleyGraph(graph_def, device="cpu")
+    start_state = [0, 1, 3, 2]
+
+    result = graph.beam_search(start_state=start_state, beam_width=1, max_steps=10, non_backtracking=True)
+    plain_result = graph.beam_search(start_state=start_state, beam_width=1, max_steps=10)
+
+    assert not result.path_found
+    # The central state is not reachable at all, but the plain search keeps oscillating until it runs out of steps.
+    assert not plain_result.path_found
+    assert len(result.debug_scores) == 1
+    assert len(plain_result.debug_scores) == 10
+
+
+def test_beam_search_simple_non_backtracking_requires_inverse_closed_generators():
+    """Test that non-backtracking is rejected when the inverse of a generator is not a generator."""
+    graph_def = PermutationGroups.lx(5)
+    assert graph_def.generators_inverse_map is None
+    graph = CayleyGraph(graph_def, device="cpu")
+
+    with pytest.raises(ValueError, match="inverse-closed"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], non_backtracking=True)
+
+
+def test_beam_search_non_backtracking_not_supported_in_advanced_mode():
+    """Test that non-backtracking is rejected in "advanced" mode, which has history_depth for this."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+
+    with pytest.raises(ValueError, match="only in 'simple' beam mode"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], beam_mode="advanced", non_backtracking=True)
 
 
 # =============================================================================
