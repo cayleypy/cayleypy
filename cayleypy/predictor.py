@@ -70,15 +70,18 @@ class Predictor:
 
     def _apply_batched(self, func: Callable[[torch.Tensor], torch.Tensor], states: torch.Tensor) -> torch.Tensor:
         """Applies `func` to `states`, splitting them into batches if there are too many."""
-        num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
-        if num_batches > 1:
-            ans = []  # type: list[torch.Tensor]
-            for batch in states.tensor_split(num_batches, dim=0):
-                ans.append(func(batch))
-            # Batches must be concatenated along dimension 0, otherwise outputs of multi-output models are mangled.
-            return torch.cat(ans, dim=0)
-        else:
-            return func(states)
+        # A predictor is only ever used for inference, and building the graph for a backward pass that never happens
+        # costs memory proportional to the size of the model - which is significant when the whole beam is scored.
+        with torch.no_grad():
+            num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
+            if num_batches > 1:
+                ans = []  # type: list[torch.Tensor]
+                for batch in states.tensor_split(num_batches, dim=0):
+                    ans.append(func(batch))
+                # Batches must be concatenated along dimension 0, otherwise outputs of multi-output models are mangled.
+                return torch.cat(ans, dim=0)
+            else:
+                return func(states)
 
     def predict_batched(self, states: torch.Tensor) -> torch.Tensor:
         """Applies the underlying model to `states`, splitting them into batches if there are too many.
