@@ -38,9 +38,10 @@ class TrainConfig:
     :param anchors_depth: Depth of the breadth-first search producing anchors - states with exact distances that are
         mixed into the data, see :class:`cayleypy.train.BfsAnchors`. 0 (the default) means no anchors. Note that memory
         needed for the search grows quickly with this depth.
-    :param anchors_fraction: Share of anchors in the data of one epoch (ignored if `anchors_depth` is 0). A few per cent
-        is what helps; a large share (10% and more, empirically) makes the model good near the central state and worse
-        where beam search actually spends its time.
+    :param anchors_fraction: Share of anchors in the data of one epoch (ignored if `anchors_depth` is 0, but still
+        required to be strictly between 0 and 1 - to train without anchors, leave `anchors_depth` at 0 and this field at
+        its default). A few per cent is what helps; a large share (10% and more, empirically) makes the model good near
+        the central state and worse where beam search actually spends its time.
     :param batch_size: Number of states in one training batch.
     :param lr: Initial learning rate.
     :param lr_min: Learning rate at the end of training. The learning rate follows a cosine schedule from `lr` to
