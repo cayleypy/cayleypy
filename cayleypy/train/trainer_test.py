@@ -427,10 +427,10 @@ def test_ema_copies_non_float_entries_of_the_state_dict():
     model = _ModelWithIntegerBuffer()
     trainer = Trainer(_lrx5(), MLP_CONFIG, config, model=model)
     assert trainer.ema_model is not None
-    states, targets = trainer.generate_data()
+    data = trainer.generate_data()
 
-    trainer.train_step(states, targets)
-    trainer.train_step(states, targets)
+    trainer.train_step(data.states, data.targets)
+    trainer.train_step(data.states, data.targets)
 
     # Averaging an integer entry in place would fail outright, and its value must follow the model exactly.
     assert int(model.n_batches) == 2
