@@ -34,7 +34,8 @@ class TrainConfig:
         fastest, meaning the number of steps is the closest estimate of the true distance. Ignored when training a
         Q-model: its data comes from :class:`cayleypy.train.SparseQSampler`, which needs walks to be paths and
         therefore always uses "classic" walks.
-    :param nbt_history_depth: For "nbt" mode, how many previous levels to remember and ban from revisiting.
+    :param nbt_history_depth: For "nbt" mode, how many previous levels to remember and ban from revisiting. Must be at
+        least 1 in that mode, because a walk that bans nothing never counts a step.
     :param anchors_depth: Depth of the breadth-first search producing anchors - states with exact distances that are
         mixed into the data, see :class:`cayleypy.train.BfsAnchors`. 0 (the default) means no anchors. Note that memory
         needed for the search grows quickly with this depth.
@@ -83,6 +84,13 @@ class TrainConfig:
             raise ValueError(f'Unknown rw_mode: "{self.rw_mode}". Supported modes are: {RANDOM_WALK_MODES}.')
         if self.nbt_history_depth < 0:
             raise ValueError(f"nbt_history_depth must be non-negative, got {self.nbt_history_depth}.")
+        if self.rw_mode == "nbt" and self.nbt_history_depth == 0:
+            # The step counter of a non-backtracking walk only advances when the walk moves to a state that is not
+            # banned, so with nothing banned it never advances and every generated state gets target distance 0.
+            raise ValueError(
+                'nbt_history_depth must be at least 1 in "nbt" mode, got 0. A walk that remembers no previous levels '
+                "never counts a step, so every state it generates would be labelled with distance 0."
+            )
         if self.anchors_depth < 0:
             raise ValueError(f"anchors_depth must be non-negative, got {self.anchors_depth}.")
         if not 0.0 < self.anchors_fraction < 1.0:
