@@ -448,3 +448,18 @@ def test_symmetrized_predictor_rejects_group_for_other_graph():
     symmetry_group = SymmetryGroup.reflections(PermutationGroups.lrx(5).with_central_state([0, 0, 1, 1, 1]))
     with pytest.raises(ValueError, match="different graph"):
         SymmetrizedPredictor(predictor, symmetry_group)
+
+
+def test_symmetrized_predictor_rejects_symmetries_that_are_not_a_group():
+    """Test that TTA over a set that is not a group is rejected (its predictions would not be symmetric)."""
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu")
+    predictor = Predictor(graph, "hamming")
+
+    # A permutation that is not a symmetry of this graph (its conjugate of L is not a generator).
+    with pytest.raises(ValueError, match="conjugate of generator L"):
+        SymmetrizedPredictor(predictor, SymmetryGroup([[0, 1, 2, 3, 4], [1, 2, 0, 3, 4]], graph_def))
+
+    # A genuine symmetry, but the set does not contain the identity, so it is not a group.
+    with pytest.raises(ValueError, match="Identity permutation"):
+        SymmetrizedPredictor(predictor, SymmetryGroup([[1, 0, 4, 3, 2]], graph_def))
