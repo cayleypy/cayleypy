@@ -113,6 +113,23 @@ def test_output_does_not_depend_on_batch_size():
         assert torch.allclose(scores[i], model(states[i]), atol=1e-6)
 
 
+def test_output_depends_on_the_state():
+    # Shapes and batch independence hold for a model that ignores its input, and such a model is useless as a
+    # predictor, so it is checked that different states get different scores.
+    torch.manual_seed(0)
+    graph_def = Puzzles.mini_pyramorphix()
+    model = _config(n_outputs=graph_def.n_generators).build_model()
+    model.eval()
+    states = _random_states(graph_def, 6)
+    n_distinct_states = len({tuple(state) for state in states.tolist()})
+    assert n_distinct_states > 1
+
+    scores = model(states)
+    assert len({tuple(row) for row in scores.tolist()}) == n_distinct_states
+    # The same state always gets the same scores.
+    assert torch.allclose(model(states[2]), scores[2], atol=1e-6)
+
+
 def test_checkpoint_round_trip(tmp_path):
     torch.manual_seed(0)
     graph_def = Puzzles.mini_pyramorphix()
