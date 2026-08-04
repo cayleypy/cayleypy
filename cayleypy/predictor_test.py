@@ -109,3 +109,18 @@ def test_score_children_rejects_2d_output():
     predictor = Predictor(graph, MultiOutputModel(graph_def.n_generators))
     with pytest.raises(ValueError, match="score_children"):
         predictor.score_children(torch.tensor([[0, 1, 2, 3, 4]]))
+
+
+def test_predict_batched_does_not_track_gradients():
+    """Test that inference does not build the graph for a backward pass (which would only waste memory)."""
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu", batch_size=4)
+    model = torch.nn.Sequential(torch.nn.Linear(5, 1), torch.nn.Flatten(0, 1))
+    predictor = Predictor(graph, lambda states: model(states.to(torch.float32)))
+    states = torch.tensor([[i % 5, (i + 1) % 5, 2, 3, 4] for i in range(7)])
+
+    # Weights require gradients, so an output that does not is proof that no graph was built.
+    assert model[0].weight.requires_grad
+    assert not predictor.predict_batched(states).requires_grad
+    assert not predictor(states).requires_grad
+    assert not predictor.score_children(states).requires_grad
