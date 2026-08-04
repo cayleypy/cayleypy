@@ -70,6 +70,12 @@ def _values(graph: "CayleyGraph", target: Predictor, encoded_states: torch.Tenso
     with torch.no_grad():
         output = target.predict_batched(graph.decode_states(encoded_states))
     if output.dim() == 2:
+        n_generators = graph.definition.n_generators
+        if output.shape[1] != n_generators:
+            raise ValueError(
+                f"Target model returned {output.shape[1]} scores per state, but a model estimating distances of the "
+                f"children of a state must return one score per generator, of which this graph has {n_generators}."
+            )
         # A Q-model estimates distances of children, and a state is one move away from its nearest child.
         values = 1.0 + output.min(dim=1).values
     elif output.dim() == 1:
@@ -197,7 +203,9 @@ class BellmanTargets(DataSource):
 
     def _frozen_copy(self, model: TargetModel) -> Predictor:
         """Copies the given model and makes it usable for computing targets only."""
-        target = copy.deepcopy(model)
+        # A Predictor holds the graph, which is not what is being copied here (and copying it would duplicate the
+        # generators and the hasher on the device), so only the model inside it is taken.
+        target = copy.deepcopy(model.predict if isinstance(model, Predictor) else model)
         if isinstance(target, nn.Module):
             target.eval()
             for parameter in target.parameters():

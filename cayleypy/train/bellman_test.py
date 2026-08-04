@@ -176,6 +176,30 @@ def test_bellman_targets_accept_a_predictor():
     assert torch.all(from_predictor >= 0)
 
 
+def test_bellman_targets_reject_target_scoring_a_wrong_number_of_children():
+    graph = _lrx5()
+    # Two scores per state, while a model estimating distances of children of this graph must return three.
+    target = _ConstantModel(1.0, n_outputs=2)
+    with pytest.raises(ValueError, match="one score per generator"):
+        bellman_targets(graph, graph.central_state.reshape(1, -1), target)
+
+
+def test_target_given_as_predictor_is_frozen_and_does_not_copy_the_graph():
+    graph = _lrx5()
+    model = _QModel()
+    for parameter in model.parameters():
+        parameter.requires_grad_(True)
+
+    source = BellmanTargets(graph, _FixedStates(graph.central_state.reshape(1, -1)), Predictor(graph, model), 3)
+
+    assert source.target.graph is graph
+    frozen = source.target.predict
+    assert isinstance(frozen, torch.nn.Module)
+    assert frozen is not model
+    assert not frozen.training
+    assert all(not parameter.requires_grad for parameter in frozen.parameters())
+
+
 def test_bellman_targets_split_large_input_into_batches():
     # Children of these states do not fit in one batch, so the target model is applied several times.
     graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu", batch_size=7)
