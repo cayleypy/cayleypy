@@ -584,6 +584,9 @@ def test_beam_search_simple_cube222_canonical_dedup():
     graph_def = Puzzles.rubik_cube(2, metric="QTM")
     graph = CayleyGraph(graph_def, device="cpu")
     symmetry_group = SymmetryGroup.rubik_cube_rotations(graph_def)
+    # Fixed seed: a scramble that happens to land close to the central state is solved in a few steps, and then there
+    # are too few layers to compare.
+    torch.manual_seed(0)
     start_state = _scramble(graph, 100)
 
     predictor = _OrbitRecordingPredictor(graph, symmetry_group)
