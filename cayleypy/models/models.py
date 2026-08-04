@@ -79,7 +79,21 @@ class ModelConfig:
             raise ValueError("Unknown model type: " + self.model_type)
 
     def load(self, device="cpu") -> nn.Module:
-        """Creates model described by this config and loads weights."""
+        """Creates model described by this config and loads weights.
+
+        Weights are loaded from `weights_path`. A config with neither `weights_path` nor `weights_kaggle_id` describes
+        an untrained model, and the returned model has randomly initialized weights.
+
+        :param device: PyTorch device to load the model to.
+        :return: The model.
+        """
+        if self.weights_path is None and self.weights_kaggle_id is not None:
+            # A Kaggle model is a directory, so without weights_path there is no way to tell which file in it holds the
+            # weights - and silently returning a randomly initialized model instead is much worse than failing here.
+            raise ValueError(
+                f'Config has weights_kaggle_id="{self.weights_kaggle_id}" but no weights_path, so it is not known '
+                "which file of that Kaggle model holds the weights. Set weights_path to the name of that file."
+            )
         model = self.build_model()
         if self.weights_path is not None:
             path = self.weights_path
