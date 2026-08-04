@@ -404,3 +404,34 @@ def test_model_trained_on_random_walks_solves_all_states():
         result = graph.beam_search(start_state=states[i], predictor=predictor, beam_width=5, return_path=True)
         assert result.path_found, f"No path found for {states[i].tolist()}."
         assert torch.equal(graph.apply_path(states[i], result.path).reshape((-1,)), graph.central_state)
+
+
+class _ModelWithIntegerBuffer(torch.nn.Module):
+    """Model whose state dict has a non-float entry, as batch normalization has (its counter of batches)."""
+
+    n_batches: torch.Tensor
+
+    def __init__(self):
+        super().__init__()
+        self.layer = torch.nn.Linear(5, 1)
+        self.register_buffer("n_batches", torch.zeros(1, dtype=torch.int64))
+
+    def forward(self, states: torch.Tensor) -> torch.Tensor:
+        self.n_batches += 1
+        return self.layer(states.to(torch.float32)).squeeze(-1)
+
+
+def test_ema_copies_non_float_entries_of_the_state_dict():
+    """Test that entries with no meaningful average (e.g. counters of batch normalization) are copied, not averaged."""
+    config = TrainConfig(ema_decay=0.9, lr=0.01, n_walks=4, rw_length=3, batch_size=8, seed=0)
+    model = _ModelWithIntegerBuffer()
+    trainer = Trainer(_lrx5(), MLP_CONFIG, config, model=model)
+    assert trainer.ema_model is not None
+    states, targets = trainer.generate_data()
+
+    trainer.train_step(states, targets)
+    trainer.train_step(states, targets)
+
+    # Averaging an integer entry in place would fail outright, and its value must follow the model exactly.
+    assert int(model.n_batches) == 2
+    assert int(trainer.ema_model.state_dict()["n_batches"]) == 2
