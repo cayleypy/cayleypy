@@ -31,18 +31,20 @@ class TrainConfig:
     :param rw_length: Length of every random walk. Must be at least 2. Should be at least as large as the diameter of
         the graph, otherwise the model never sees distant states.
     :param rw_mode: Mode of random walk generation - one of "classic", "bfs", "nbt". Defaults to "nbt", which mixes
-        fastest, meaning the number of steps is the closest estimate of the true distance. Ignored when training a
-        Q-model: its data comes from :class:`cayleypy.train.SparseQSampler`, which needs walks to be paths and
-        therefore always uses "classic" walks.
+        fastest, meaning the number of steps is the closest estimate of the true distance. Ignored by
+        :class:`cayleypy.train.Trainer` when training a Q-model: its data comes from
+        :class:`cayleypy.train.SparseQSampler`, which needs walks to be paths and therefore always uses "classic" walks.
+        :class:`cayleypy.train.BellmanTrainer` honors it for Q-models too, because Bellman targets label every output of
+        a state and so do not need walks to be paths.
     :param nbt_history_depth: For "nbt" mode, how many previous levels to remember and ban from revisiting.
     :param anchors_depth: Depth of the breadth-first search producing anchors - states with exact distances that are
         mixed into the data, see :class:`cayleypy.train.BfsAnchors`. 0 (the default) means no anchors. Note that memory
         needed for the search grows quickly with this depth.
     :param anchors_fraction: Share of anchors in the data of one epoch (ignored if `anchors_depth` is 0, but still
-        required to be strictly between 0 and 1 - to train without anchors, leave `anchors_depth` at 0 and this field at
-        its default; :class:`cayleypy.train.BellmanTrainer` always uses it, because anchors are mandatory there). A few
-        per cent is what helps; a large share (10% and more, empirically) makes the model good near the central state and
-        worse where beam search actually spends its time.
+        required to be strictly between 0 and 1 - to train without anchors, leave `anchors_depth` at 0 and this field
+        at its default; :class:`cayleypy.train.BellmanTrainer` always uses it, because anchors are mandatory there). A
+        few per cent is what helps; a large share (10% and more, empirically) makes the model good near the central
+        state and worse where beam search actually spends its time.
     :param bellman_anchors_depth: Depth of the breadth-first search producing anchors for
         :class:`cayleypy.train.BellmanTrainer`, which needs them (unlike the walk-based trainer, where `anchors_depth`
         is 0 by default): bootstrapped targets only say how far states are from each other, so without exactly known

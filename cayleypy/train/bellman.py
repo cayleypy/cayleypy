@@ -13,6 +13,12 @@ algorithm does, and it is why anchors (states whose exact distance is known) mus
 targets say how far states are from each other, and something has to say where the goal is, otherwise the whole scale
 drifts. :class:`BellmanTrainer` mixes anchors in and refreshes the target for you.
 
+The recursion above looks at where the moves from a state lead, so it bootstraps the distance to the central state,
+while the anchors it is mixed with come from a search starting at the central state and measure the distance from it.
+These are the same distance only for inverse-closed generators, which is why :class:`BellmanTrainer` requires them - for
+a graph whose generators are not inverse closed, train on the graph returned by
+``CayleyGraph.with_inverted_generators``.
+
 Example:
 
 >>> import torch
@@ -101,8 +107,8 @@ def bellman_targets(
 ) -> TrainingData:
     """Computes Bellman targets for given states with a target model.
 
-    The target of a state is one more than the smallest estimated distance of its children, and 0 for the central state
-    (see the module docstring). For a Q-model, whose outputs are estimated distances of the children themselves, the
+    The target of a state is one more than the smallest estimated distance of its children, and 0 for the central state.
+    For a Q-model, whose outputs are estimated distances of the children themselves, the
     target of output ``a`` is the estimated distance of ``child_a(s)`` - so unlike targets from a random walk (see
     :class:`cayleypy.train.SparseQSampler`), all outputs are labeled.
 
@@ -203,14 +209,16 @@ class BellmanTargets(DataSource):
 
     def _frozen_copy(self, model: TargetModel) -> Predictor:
         """Copies the given model and makes it usable for computing targets only."""
-        # A Predictor holds the graph, which is not what is being copied here (and copying it would duplicate the
-        # generators and the hasher on the device), so only the model inside it is taken.
-        target = copy.deepcopy(model.predict if isinstance(model, Predictor) else model)
-        if isinstance(target, nn.Module):
-            target.eval()
-            for parameter in target.parameters():
-                parameter.requires_grad_(False)
-        return Predictor(self.graph, target)
+        # The graph is shared rather than copied: it is not what is being frozen here, and copying it would duplicate
+        # the generators and the hasher on the device. Seeding the memo with it is what makes deepcopy share it - which
+        # matters for a Predictor (and for an ensemble of them), because a Predictor holds the graph.
+        target = copy.deepcopy(model, {id(self.graph): self.graph})
+        inner = target.predict if isinstance(target, Predictor) else target
+        if isinstance(inner, nn.Module):
+            inner.eval()
+            inner.requires_grad_(False)
+        # A Predictor is returned as it is, so that a predictor which scores children itself keeps doing that.
+        return target if isinstance(target, Predictor) else Predictor(self.graph, target)
 
 
 class BellmanTrainer(Trainer):
@@ -234,6 +242,8 @@ class BellmanTrainer(Trainer):
     distance - and the reason to do it is that the estimates are loose exactly where beam search spends its time.
     Fine-tuning starts from a checkpoint (:meth:`from_checkpoint`) with a learning rate lower than the one used for
     pretraining: targets move as the model moves, and a large step in that feedback loop makes training oscillate.
+
+    Generators must be inverse closed (see the module docstring).
 
     Q-models (one output per generator) are trained here as well, and get more out of it than models with one output: a
     random walk labels two outputs of a state (see :class:`cayleypy.train.SparseQSampler`), while Bellman targets label
@@ -270,6 +280,13 @@ class BellmanTrainer(Trainer):
         :param states_source: Where to take states to compute targets for (optional). Defaults to random walks
             described by `config`. Its targets are ignored - only states are used.
         """
+        if not graph.definition.generators_inverse_closed:
+            # Bellman targets are the distance to the central state, the mandatory anchors are the distance from it.
+            raise ValueError(
+                "BellmanTrainer requires inverse-closed generators (for every generator, its inverse must also be a "
+                "generator), because its targets measure the distance to the central state while the anchors it mixes "
+                "them with measure the distance from it. Train on CayleyGraph.with_inverted_generators instead."
+            )
         self._states_source = states_source
         super().__init__(graph, model_config, config=config, model=model)
 

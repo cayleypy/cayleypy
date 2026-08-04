@@ -479,3 +479,24 @@ def test_bellman_training_from_scratch_learns_exact_distances():
     # Predicting the mean distance for every state would give an error of 1.47 on this graph.
     assert _mean_absolute_error(graph, trainer.predictor()) < 0.5
     assert abs(_prediction_at_central_state(graph, trainer.predictor())) < 0.3
+
+
+def test_bellman_trainer_honors_the_walk_mode_for_a_q_model():
+    """Test that walks are generated in the configured mode for a Q-model too (unlike in `Trainer`)."""
+    graph = _lrx5()
+    config = TrainConfig(n_epochs=1, n_walks=4, rw_length=3, batch_size=8, rw_mode="bfs", seed=0)
+
+    trainer = BellmanTrainer(graph, Q_CONFIG, config, model=_QModel())
+
+    states_source = trainer.bellman_source.states_source
+    assert isinstance(states_source, RandomWalksSource)
+    assert states_source.mode == "bfs"
+
+
+def test_bellman_trainer_rejects_graph_without_inverse_closed_generators():
+    """Test that a graph whose distances go one way only is rejected, instead of training on mixed directions."""
+    graph = CayleyGraph(PermutationGroups.lx(5), device="cpu")
+    model_config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8])
+
+    with pytest.raises(ValueError, match="inverse-closed generators"):
+        BellmanTrainer(graph, model_config, TrainConfig(n_epochs=1, n_walks=4, rw_length=3))
