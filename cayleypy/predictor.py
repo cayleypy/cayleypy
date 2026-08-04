@@ -83,16 +83,25 @@ class Predictor:
             else:
                 return func(states)
 
+    def _predict_as_tensor(self, states: torch.Tensor) -> torch.Tensor:
+        """Applies the underlying model to `states` and returns its output as a tensor on the graph's device.
+
+        A model does not have to be written in torch - an sklearn estimator, for example, is a supported predictor and
+        its `predict` returns a NumPy array, which has only some of the operations the callers of this method use.
+        """
+        return torch.as_tensor(self.predict(states), device=self.graph.device)
+
     def predict_batched(self, states: torch.Tensor) -> torch.Tensor:
         """Applies the underlying model to `states`, splitting them into batches if there are too many.
 
-        Output of the model is returned as is. It has shape ``[n_states]`` for usual (single-output) models, and shape
-        ``[n_states, n_outputs]`` for multi-output models (e.g. models predicting one score per generator).
+        The shape of the output is the shape the model returns: ``[n_states]`` for usual (single-output) models, and
+        ``[n_states, n_outputs]`` for multi-output models (e.g. models predicting one score per generator). Output of a
+        model that does not return tensors is converted to one.
 
         :param states: States (in decoded representation) to apply the model to.
         :return: Output of the model for `states`.
         """
-        return self._apply_batched(self.predict, states)
+        return self._apply_batched(self._predict_as_tensor, states)
 
     def __call__(self, states: torch.Tensor) -> torch.Tensor:
         ans = self.predict_batched(states)
