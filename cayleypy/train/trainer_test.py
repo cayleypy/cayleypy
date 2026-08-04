@@ -194,6 +194,8 @@ def test_train_config_rejects_invalid_values():
         TrainConfig(rw_mode="random")
     with pytest.raises(ValueError, match="nbt_history_depth must be non-negative"):
         TrainConfig(nbt_history_depth=-1)
+    with pytest.raises(ValueError, match='nbt_history_depth must be at least 1 in "nbt" mode'):
+        TrainConfig(rw_mode="nbt", nbt_history_depth=0)
     with pytest.raises(ValueError, match="lr_min must be between 0 and lr"):
         TrainConfig(lr=0.001, lr_min=0.01)
     with pytest.raises(ValueError, match="weight_decay must be non-negative"):

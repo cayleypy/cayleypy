@@ -32,7 +32,8 @@ class TrainConfig:
         the graph, otherwise the model never sees distant states.
     :param rw_mode: Mode of random walk generation - one of "classic", "bfs", "nbt". Defaults to "nbt", which mixes
         fastest, meaning the number of steps is the closest estimate of the true distance.
-    :param nbt_history_depth: For "nbt" mode, how many previous levels to remember and ban from revisiting.
+    :param nbt_history_depth: For "nbt" mode, how many previous levels to remember and ban from revisiting. Must be at
+        least 1 in that mode, because a walk that bans nothing never counts a step.
     :param batch_size: Number of states in one training batch.
     :param lr: Initial learning rate.
     :param lr_min: Learning rate at the end of training. The learning rate follows a cosine schedule from `lr` to
@@ -72,6 +73,13 @@ class TrainConfig:
             raise ValueError(f'Unknown rw_mode: "{self.rw_mode}". Supported modes are: {RANDOM_WALK_MODES}.')
         if self.nbt_history_depth < 0:
             raise ValueError(f"nbt_history_depth must be non-negative, got {self.nbt_history_depth}.")
+        if self.rw_mode == "nbt" and self.nbt_history_depth == 0:
+            # The step counter of a non-backtracking walk only advances when the walk moves to a state that is not
+            # banned, so with nothing banned it never advances and every generated state gets target distance 0.
+            raise ValueError(
+                'nbt_history_depth must be at least 1 in "nbt" mode, got 0. A walk that remembers no previous levels '
+                "never counts a step, so every state it generates would be labelled with distance 0."
+            )
         if not 0.0 <= self.lr_min <= self.lr:
             raise ValueError(f"lr_min must be between 0 and lr={self.lr}, got {self.lr_min}.")
         if self.weight_decay < 0:
