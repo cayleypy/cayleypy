@@ -39,7 +39,7 @@ import torch
 from torch import nn
 
 from .config import TrainConfig
-from .data import BfsAnchors, DataSource, MixtureDataSource, RandomWalksSource, TrainingData
+from .data import BfsAnchors, DataSource, RandomWalksSource, TrainingData
 from .trainer import Trainer
 from ..predictor import Predictor
 
@@ -221,6 +221,39 @@ class BellmanTargets(DataSource):
         return target if isinstance(target, Predictor) else Predictor(self.graph, target)
 
 
+class _BellmanWithAnchors(DataSource):
+    """Bellman targets with a share of anchors sized from the states that were actually generated.
+
+    The size of an epoch is not known before it is generated, because the source of states is arbitrary - it can be a
+    source the caller passed to :class:`BellmanTrainer`. Sizing the anchors in advance from `n_walks` and `rw_length`
+    and mixing with :class:`cayleypy.train.MixtureDataSource` would cut a source that generates more states than that
+    down to what the anchors can support, so most of what it generated would never be trained on. Here the anchors are
+    sized from the data instead, and nothing is thrown away - they are sampled with repetitions, so any number of them
+    can be asked for.
+    """
+
+    def __init__(self, bellman_source: BellmanTargets, anchors: BfsAnchors, anchors_fraction: float):
+        """Initializes _BellmanWithAnchors.
+
+        :param bellman_source: Source of states with bootstrapped targets.
+        :param anchors: Anchors to mix in. Their `size` is set on every call to :meth:`generate`.
+        :param anchors_fraction: Share of anchors in the generated data.
+        """
+        self.bellman_source = bellman_source
+        self.anchors = anchors
+        self.anchors_fraction = anchors_fraction
+
+    def generate(self) -> TrainingData:
+        """Generates Bellman targets and adds the anchors' share of them.
+
+        :return: Bellman targets and anchors, in one piece.
+        """
+        data = self.bellman_source.generate()
+        fraction = self.anchors_fraction
+        self.anchors.size = max(1, int(round(fraction / (1 - fraction) * len(data))))
+        return TrainingData.concat([data, self.anchors.generate()])
+
+
 class BellmanTrainer(Trainer):
     """Trains a model on Bellman targets, refreshing the target as training goes (the DAVI algorithm).
 
@@ -306,12 +339,10 @@ class BellmanTrainer(Trainer):
         # The model itself is the first target: the EMA copy does not exist yet (it is created after the data source)
         # and it starts as a copy of the model anyway.
         self.bellman_source = BellmanTargets(self.graph, states_source, self.model, n_outputs=n_outputs)
-        # Anchors sample exactly their share of what the states source generates, so the mixture has nothing to throw
-        # away. There are few states with exact distances near the central state, so they are sampled with repetitions.
-        fraction = config.anchors_fraction
-        size = max(1, int(round(fraction / (1 - fraction) * config.n_walks * config.rw_length)))
-        anchors = BfsAnchors(self.graph, depth=config.bellman_anchors_depth, size=size, n_outputs=n_outputs)
-        return MixtureDataSource([self.bellman_source, anchors], [1 - fraction, fraction])
+        # The anchors are sized when data is generated, from the number of states the source actually produced - see
+        # _BellmanWithAnchors for why that cannot be decided here.
+        anchors = BfsAnchors(self.graph, depth=config.bellman_anchors_depth, n_outputs=n_outputs)
+        return _BellmanWithAnchors(self.bellman_source, anchors, config.anchors_fraction)
 
     def train_epoch(self) -> float:
         """Refreshes the target if it is due, then generates data for one epoch and makes one pass over it.

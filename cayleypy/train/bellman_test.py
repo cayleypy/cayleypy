@@ -3,9 +3,9 @@ import os
 import pytest
 import torch
 
-from .bellman import BellmanTargets, BellmanTrainer, bellman_targets
+from .bellman import BellmanTargets, BellmanTrainer, _BellmanWithAnchors, bellman_targets
 from .config import TrainConfig
-from .data import BfsAnchors, DataSource, MixtureDataSource, RandomWalksSource, TrainingData
+from .data import BfsAnchors, DataSource, RandomWalksSource, TrainingData
 from .trainer import Trainer
 from ..cayley_graph import CayleyGraph
 from ..graphs_lib import PermutationGroups
@@ -273,11 +273,35 @@ def test_bellman_trainer_mixes_bellman_targets_with_anchors():
     config = TrainConfig(n_epochs=1, n_walks=4, rw_length=5, batch_size=8, anchors_fraction=0.5, seed=0)
     trainer = BellmanTrainer(graph, MLP_CONFIG, config)
     source = trainer.data_source
-    assert isinstance(source, MixtureDataSource)
-    assert isinstance(source.sources[0], BellmanTargets)
-    assert isinstance(source.sources[1], BfsAnchors)
-    assert source.fractions == [0.5, 0.5]
-    assert source.sources[0] is trainer.bellman_source
+    assert isinstance(source, _BellmanWithAnchors)
+    assert isinstance(source.bellman_source, BellmanTargets)
+    assert isinstance(source.anchors, BfsAnchors)
+    assert source.anchors_fraction == 0.5
+    assert source.bellman_source is trainer.bellman_source
+
+
+class _FixedStatesSource(DataSource):
+    """Source generating a fixed number of states, unrelated to any `n_walks` and `rw_length`."""
+
+    def __init__(self, graph: CayleyGraph, size: int):
+        self.graph = graph
+        self.size = size
+
+    def generate(self) -> TrainingData:
+        states = self.graph.random_walks(width=self.size, length=2)[0][: self.size]
+        return TrainingData(states=states, targets=torch.zeros(self.size))
+
+
+def test_bellman_trainer_sizes_anchors_from_a_custom_states_source():
+    graph = _lrx5()
+    # The config says 4*3=12 states per epoch, but the source generates 120. Sizing the anchors from the config would
+    # leave them able to support only 50 states, and all but 49 of the source's states would be thrown away.
+    config = TrainConfig(n_epochs=1, n_walks=4, rw_length=3, anchors_fraction=0.02, seed=0)
+    trainer = BellmanTrainer(graph, MLP_CONFIG, config, states_source=_FixedStatesSource(graph, 120))
+    data = trainer.generate_data()
+    # Every state of the source is kept, and 2% of the epoch on top of them are anchors.
+    assert len(data) == 122
+    assert trainer.data_source.anchors.size == 2
 
 
 def test_bellman_trainer_anchors_have_exact_targets():
