@@ -3,6 +3,7 @@
 import copy
 import math
 import typing
+import warnings
 from dataclasses import dataclass
 from typing import Optional
 
@@ -56,6 +57,20 @@ def _validate_model_config(model_config: ModelConfig, graph: "CayleyGraph") -> N
             )
 
 
+def _warn_if_not_inverse_closed(graph: "CayleyGraph") -> None:
+    """Warns that targets generated for this graph need not measure the distance a predictor is asked about."""
+    if graph.definition.generators_inverse_closed:
+        return
+    warnings.warn(
+        "Generators of this graph are not inverse closed, so the random walks used for training measure the distance "
+        "from the central state, which need not be the distance to it - and a predictor is asked for the latter. To "
+        "get targets in the direction a predictor is asked about, train on CayleyGraph.with_inverted_generators. This "
+        "check looks at the generators alone, so it is a false alarm for a graph whose induced action on states is "
+        "symmetric anyway.",
+        stacklevel=3,
+    )
+
+
 class Trainer:
     """Trains a model to estimate distance from the central state of a Cayley graph.
 
@@ -75,6 +90,10 @@ class Trainer:
     :meth:`predictor` and :meth:`save` use by default.
 
     Training progress is reported with `print` when `TrainConfig.verbose` is at least 1.
+
+    Walks start at the central state, so what their targets measure is the distance from it, while a predictor is asked
+    for the distance to it. These are the same distance when the generators of the graph are inverse closed, and the
+    trainer warns when they are not.
 
     Example:
 
@@ -111,6 +130,7 @@ class Trainer:
             anything else, e.g. on paths found by beam search, or on a mixture including them.
         """
         _validate_model_config(model_config, graph)
+        _warn_if_not_inverse_closed(graph)
         self.graph = graph
         self.model_config = model_config
         self.config = config if config is not None else TrainConfig()
