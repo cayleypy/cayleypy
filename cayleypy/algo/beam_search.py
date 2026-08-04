@@ -240,8 +240,10 @@ class BeamSearchAlgorithm:
             on the next layer, keeping only one state from each orbit. States equivalent under a symmetry have equal
             distances to the central state, so exploring only one of them makes the beam cover more distinct states
             (in effect, this multiplies the beam width by up to the number of symmetries). Deduplication happens after
-            the check whether the central state is reached, so the path is never lost. Defaults to None, which means
-            states are deduplicated only by equality, as usual.
+            the check whether the central state is reached, so the path is never lost. The symmetries must really be a
+            group of symmetries of this graph (:meth:`cayleypy.SymmetryGroup.verify` is called to check that), because
+            deduplication by a set that is not a group throws away states that are not duplicates. Defaults to None,
+            which means states are deduplicated only by equality, as usual.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         graph = self.graph
@@ -249,6 +251,9 @@ class BeamSearchAlgorithm:
             predictor = Predictor(graph, "hamming")
         if canonical_dedup is not None:
             _check_symmetries_match_graph(graph, canonical_dedup)
+            # Two states have equal canonical forms if and only if the symmetries form a group, so without this check a
+            # set of symmetries that is not a group would silently drop states that are not duplicates of anything.
+            canonical_dedup.verify()
 
         start_states = graph.encode_states(start_state)
         layer1, layer1_hashes = graph.get_unique_states(start_states)
