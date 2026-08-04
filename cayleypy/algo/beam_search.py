@@ -14,6 +14,7 @@ from ..torch_utils import isin_via_searchsorted
 
 if TYPE_CHECKING:
     from ..cayley_graph import CayleyGraph
+    from ..lower_bound import LowerBound
     from ..symmetries import SymmetryGroup
 
 
@@ -125,6 +126,43 @@ def _dedup_by_canonical_form(graph: "CayleyGraph", states: torch.Tensor, symmetr
     return _unique_index(graph.hasher.make_hashes(graph.encode_states(canonical_states)))
 
 
+def _states_within_budget(
+    graph: "CayleyGraph", states: torch.Tensor, lower_bound: "LowerBound", budget: int
+) -> torch.Tensor:
+    """Returns mask of states from which the central state can still be reached in `budget` steps or less.
+
+    :param graph: The Cayley graph.
+    :param states: States to filter (in internal representation).
+    :param lower_bound: Admissible lower bound on distance from a state to the central state.
+    :param budget: How many steps are left, i.e. the maximal allowed distance from a state to the central state.
+    :return: Boolean mask of states to keep.
+    """
+    bounds = lower_bound.lb(graph.decode_states(states))
+    if tuple(bounds.shape) != (int(states.shape[0]),):
+        raise ValueError(
+            f"lower_bound.lb returned bounds of shape {tuple(bounds.shape)}, but shape {(int(states.shape[0]),)} "
+            "was expected."
+        )
+    return bounds <= budget
+
+
+def _filter_layer(
+    keep: torch.Tensor, states: torch.Tensor, hashes: torch.Tensor, expanded: Optional[_ExpandedLayer]
+) -> tuple[torch.Tensor, torch.Tensor, Optional[_ExpandedLayer]]:
+    """Keeps only some states of a layer, keeping their provenance matched with them.
+
+    :param keep: Indexes of states to keep, or a boolean mask of states to keep.
+    :param states: States of the layer (in internal representation).
+    :param hashes: Hashes of `states`.
+    :param expanded: Provenance of `states`, or None if it is not tracked.
+    :return: The remaining states, their hashes and their provenance.
+    """
+    states, hashes = states[keep, :], hashes[keep]
+    if expanded is not None:
+        expanded = _ExpandedLayer(states, hashes, expanded.moves[keep], expanded.source_index[keep])
+    return states, hashes, expanded
+
+
 def _score_children(graph: "CayleyGraph", predictor: Predictor, states: torch.Tensor) -> torch.Tensor:
     """Estimates scores of all children of `states`, calling the predictor once per state (not once per child).
 
@@ -175,6 +213,8 @@ class BeamSearchAlgorithm:
         use_child_scores: bool = False,
         canonical_dedup: Optional["SymmetryGroup"] = None,
         non_backtracking: bool = False,
+        lower_bound: Optional["LowerBound"] = None,
+        prune_above: Optional[int] = None,
         verbose: int = 0,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to destination state using Beam Search algorithm.
@@ -205,6 +245,10 @@ class BeamSearchAlgorithm:
             (see :meth:`search_simple`). Defaults to None, which means no deduplication by symmetries.
         :param non_backtracking: For "simple" mode, whether to ban moves undoing the previous move
             (see :meth:`search_simple`). In "advanced" mode, use `history_depth` instead. Defaults to False.
+        :param lower_bound: For "simple" mode, admissible lower bound on distance to the central state, used together
+            with `prune_above` (see :meth:`search_simple`). Defaults to None, which means no pruning.
+        :param prune_above: For "simple" mode, maximal length of a path we are interested in
+            (see :meth:`search_simple`). Defaults to None, which means no pruning.
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
@@ -219,6 +263,8 @@ class BeamSearchAlgorithm:
                 use_child_scores=use_child_scores,
                 canonical_dedup=canonical_dedup,
                 non_backtracking=non_backtracking,
+                lower_bound=lower_bound,
+                prune_above=prune_above,
             )
         elif beam_mode == "advanced":
             if use_child_scores:
@@ -227,6 +273,8 @@ class BeamSearchAlgorithm:
                 raise ValueError("canonical_dedup is supported only in 'simple' beam mode.")
             if non_backtracking:
                 raise ValueError("non_backtracking is supported only in 'simple' beam mode, use history_depth here.")
+            if lower_bound is not None or prune_above is not None:
+                raise ValueError("lower_bound and prune_above are supported only in 'simple' beam mode.")
             return self.search_advanced(
                 start_state=start_state,
                 destination_state=destination_state,
@@ -251,6 +299,8 @@ class BeamSearchAlgorithm:
         use_child_scores: bool = False,
         canonical_dedup: Optional["SymmetryGroup"] = None,
         non_backtracking: bool = False,
+        lower_bound: Optional["LowerBound"] = None,
+        prune_above: Optional[int] = None,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
 
@@ -284,6 +334,15 @@ class BeamSearchAlgorithm:
             another state of the beam), it stays. This pays off when the beam is narrow enough to be truncated; for a
             beam wide enough to hold the whole layer, banning only removes states from it. Requires the generators to
             be inverse-closed. Defaults to False.
+        :param lower_bound: Admissible lower bound on distance from a state to the central state
+            (see :class:`cayleypy.LowerBound`), used to drop states that cannot be on a path of length at most
+            `prune_above`. Dropping them makes room in the beam for states that still can. Must be specified together
+            with `prune_above`. Defaults to None, which means no pruning.
+        :param prune_above: Maximal length of a path we are interested in, usually a path length from a previous run
+            that we want to improve on. A state reached in `k` steps is dropped when ``k + lower_bound(state)`` is
+            greater than this. Paths longer than this may still be found (pruning only guarantees that no path of
+            length at most `prune_above` is lost). Must be specified together with `lower_bound`. Defaults to None,
+            which means no pruning.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         graph = self.graph
@@ -294,6 +353,13 @@ class BeamSearchAlgorithm:
             # Two states have equal canonical forms if and only if the symmetries form a group, so without this check a
             # set of symmetries that is not a group would silently drop states that are not duplicates of anything.
             canonical_dedup.verify()
+        if (lower_bound is None) != (prune_above is None):
+            raise ValueError(
+                "lower_bound and prune_above must be specified together: without a lower bound there is nothing to "
+                "compare with prune_above, and without prune_above the lower bound has no effect."
+            )
+        if prune_above is not None and prune_above < 0:
+            raise ValueError(f"prune_above must be non-negative, got {prune_above}.")
         inverse_generators = _inverse_generators(graph) if non_backtracking else None
 
         start_states = graph.encode_states(start_state)
@@ -361,9 +427,16 @@ class BeamSearchAlgorithm:
                 # start state in `i+1` steps through kept states of the previous layers, so path restoration and the
                 # reported path length remain correct.
                 keep = _dedup_by_canonical_form(graph, layer2, canonical_dedup)
-                layer2, layer2_hashes = layer2[keep, :], layer2_hashes[keep]
-                if expanded is not None:
-                    expanded = _ExpandedLayer(layer2, layer2_hashes, expanded.moves[keep], expanded.source_index[keep])
+                layer2, layer2_hashes, expanded = _filter_layer(keep, layer2, layer2_hashes, expanded)
+
+            if lower_bound is not None and prune_above is not None:
+                # Drop states from which the central state cannot be reached within the remaining budget of steps.
+                # States of this layer were reached in `i+1` steps, so `prune_above-(i+1)` steps are left.
+                keep = _states_within_budget(graph, layer2, lower_bound, prune_above - (i + 1))
+                layer2, layer2_hashes, expanded = _filter_layer(keep, layer2, layer2_hashes, expanded)
+                if layer2.shape[0] == 0:
+                    # No state can be on a path of length at most `prune_above`, so there is no such path.
+                    return BeamSearchResult(False, 0, None, debug_scores, graph.definition)
 
             # Pick `beam_width` states with lowest scores.
             if len(layer2) >= beam_width:
@@ -373,10 +446,7 @@ class BeamSearchAlgorithm:
                     scores = predictor(graph.decode_states(layer2))
                 idx = torch.argsort(scores)[:beam_width]
                 best_score = float(scores[idx[0]].detach())
-                # Provenance is reordered along with the states, so it keeps describing the states next to it.
-                layer2, layer2_hashes = layer2[idx, :], layer2_hashes[idx]
-                if expanded is not None:
-                    expanded = _ExpandedLayer(layer2, layer2_hashes, expanded.moves[idx], expanded.source_index[idx])
+                layer2, layer2_hashes, expanded = _filter_layer(idx, layer2, layer2_hashes, expanded)
                 debug_scores[i] = best_score
                 if graph.verbose >= 2:
                     print(f"Iteration {i}, best score {best_score}.")
