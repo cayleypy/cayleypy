@@ -217,8 +217,9 @@ def test_beam_search_simple_child_scores_same_as_default():
 
     _validate_beam_search_result(graph, start_state, result1)
     assert result1.path == result2.path
-    # Scores are recorded on every step where the beam was truncated, so this compares whole beams, not only the
-    # answer. Hamming distance is computed in integer arithmetic, so scores must match exactly.
+    # One score is recorded per step where the beam was truncated - the best score of that step - so this compares the
+    # two searches step by step, not only their answers. Hamming distance is computed in integer arithmetic, so the
+    # scores must match exactly.
     assert len(result1.debug_scores) > 0
     assert result1.debug_scores == result2.debug_scores
 
@@ -423,6 +424,27 @@ def test_beam_search_simple_canonical_dedup_with_trivial_group():
     _validate_beam_search_result(graph, start_state, result2)
     assert result1.path == result2.path
     assert result1.debug_scores == result2.debug_scores
+
+
+def test_beam_search_canonical_dedup_rejects_symmetries_that_are_not_a_group():
+    """Test that a set of symmetries that is not a group is rejected instead of silently dropping states.
+
+    Canonical forms of two states are equal if and only if the symmetries form a group. With a set that is not a group,
+    states of one orbit can get different canonical forms, so deduplication throws away states that are the only route
+    to the central state - and the search reports that there is no path.
+    """
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu")
+
+    # A permutation of positions that is not a symmetry of this graph (its conjugate of L is not a generator).
+    not_a_symmetry = SymmetryGroup([[0, 1, 2, 3, 4], [0, 2, 1, 3, 4]], graph_def)
+    with pytest.raises(ValueError, match="conjugate of generator L"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], canonical_dedup=not_a_symmetry)
+
+    # A genuine symmetry, but the set is not closed under composition (it does not contain the identity).
+    not_closed = SymmetryGroup([[1, 0, 4, 3, 2]], graph_def)
+    with pytest.raises(ValueError, match="Identity permutation"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], canonical_dedup=not_closed)
 
 
 def test_beam_search_canonical_dedup_rejects_group_for_other_graph():
