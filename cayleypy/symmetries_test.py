@@ -147,6 +147,72 @@ def test_transport_actions_against_exact_bfs():
                 assert distances[tuple(int(x) for x in child)] == distances[tuple(int(x) for x in transported_child)]
 
 
+def canonical_by_brute_force(symmetry_group: SymmetryGroup, state) -> list[int]:
+    """Returns lexicographically smallest image of `state`, computed with plain Python."""
+    state = [int(x) for x in state]
+    images = []
+    for sigma, element_map in zip(symmetry_group.symmetries, symmetry_group.element_maps):
+        images.append([element_map[state[sigma[i]]] for i in range(len(state))])
+    return min(images)
+
+
+def test_canonical_single_state_and_batch():
+    graph_def = PermutationGroups.lrx(5)
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+
+    # The reflection maps [0, 2, 1, 3, 4] to [4, 1, 2, 3, 0], so the first of them is the canonical form of both.
+    assert symmetry_group.canonical(torch.tensor([0, 2, 1, 3, 4])).tolist() == [0, 2, 1, 3, 4]
+    assert symmetry_group.canonical(torch.tensor([4, 1, 2, 3, 0])).tolist() == [0, 2, 1, 3, 4]
+    states = torch.tensor([[0, 2, 1, 3, 4], [4, 1, 2, 3, 0]])
+    assert symmetry_group.canonical(states).tolist() == [[0, 2, 1, 3, 4], [0, 2, 1, 3, 4]]
+
+    # The central state is preserved by every symmetry, so it is its own canonical form.
+    assert symmetry_group.canonical(torch.tensor(graph_def.central_state)).tolist() == graph_def.central_state
+
+
+def test_canonical_matches_brute_force():
+    graph_def = Puzzles.rubik_cube(2, metric="QTM")
+    graph = CayleyGraph(graph_def, device="cpu", random_seed=0)
+    symmetry_group = SymmetryGroup.rubik_cube_rotations(graph_def)
+    states = graph.random_walks(width=20, length=6)[0]
+
+    canonical = symmetry_group.canonical(states)
+    assert canonical.shape == states.shape
+    for state, actual in zip(states, canonical):
+        assert actual.tolist() == canonical_by_brute_force(symmetry_group, state)
+
+
+def test_canonical_is_the_same_within_orbit():
+    graph_def = PermutationGroups.lrx(6)
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+    states = torch.tensor(list(exact_distances(graph).keys()))
+    assert states.shape[0] == 720
+
+    canonical = symmetry_group.canonical(states)
+    images = torch.stack([symmetry_group.apply(states, i) for i in range(symmetry_group.n_symmetries)])
+    # The canonical form of a state is one of its images, and it is the same for all states of one orbit.
+    assert torch.all(torch.any(torch.all(images == canonical, dim=2), dim=0))
+    for i in range(symmetry_group.n_symmetries):
+        assert torch.equal(symmetry_group.canonical(images[i]), canonical)
+
+
+def test_canonical_splits_states_into_orbits():
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+    states = torch.tensor(list(exact_distances(graph).keys()))
+    assert states.shape[0] == 120
+
+    canonical = symmetry_group.canonical(states)
+    orbits = {tuple(canonical_by_brute_force(symmetry_group, state)) for state in states}
+    assert {tuple(int(x) for x in state) for state in canonical} == orbits
+
+    # The reflection is a product of 2 transpositions, so 8 of 120 permutations commute with it (and are fixed by the
+    # symmetry). The remaining 112 permutations are split into orbits of size 2, which gives 8 + 56 = 64 orbits.
+    assert len(orbits) == 64
+
+
 def test_cube_rotations_map_bfs_layers_onto_themselves():
     graph_def = Puzzles.rubik_cube(2, metric="QTM")
     graph = CayleyGraph(graph_def, device="cpu")
@@ -351,6 +417,14 @@ def test_apply_rejects_invalid_input():
         symmetry_group.apply(torch.tensor(0), 0)
     with pytest.raises(ValueError, match="Expected states of size 5"):
         symmetry_group.apply(torch.zeros((2, 2, 5), dtype=torch.int64), 0)
+
+
+def test_canonical_rejects_invalid_input():
+    symmetry_group = SymmetryGroup.reflections(PermutationGroups.lrx(5))
+    with pytest.raises(ValueError, match="Expected states of size 5"):
+        symmetry_group.canonical(torch.tensor([0, 1, 2, 3]))
+    with pytest.raises(ValueError, match="Expected states of size 5"):
+        symmetry_group.canonical(torch.zeros((2, 2, 5), dtype=torch.int64))
 
 
 def test_transport_scores_rejects_invalid_input():

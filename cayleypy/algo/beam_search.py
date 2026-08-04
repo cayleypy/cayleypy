@@ -14,6 +14,7 @@ from ..torch_utils import isin_via_searchsorted
 
 if TYPE_CHECKING:
     from ..cayley_graph import CayleyGraph
+    from ..symmetries import SymmetryGroup
 
 
 class _ExpandedLayer(NamedTuple):
@@ -38,6 +39,20 @@ class _ExpandedLayer(NamedTuple):
     """Index of each state in the output of `CayleyGraph.get_neighbors`, used to look up score of that state."""
 
 
+def _unique_index(hashes: torch.Tensor) -> torch.Tensor:
+    """Returns indexes of the first state with each distinct hash, sorted by hash.
+
+    :param hashes: Hashes of states, one per state.
+    :return: Indexes of states to keep, so that no two of them have equal hashes.
+    """
+    hashes_sorted, idx = torch.sort(hashes, stable=True)
+    # Compute mask of first occurrences for each unique value.
+    mask = torch.ones(hashes_sorted.size(0), dtype=torch.bool, device=hashes_sorted.device)
+    if hashes_sorted.size(0) > 1:
+        mask[1:] = hashes_sorted[1:] != hashes_sorted[:-1]
+    return idx[mask]
+
+
 def _expand_layer(graph: "CayleyGraph", states: torch.Tensor) -> _ExpandedLayer:
     """Applies all generators to `states` and removes duplicates, remembering where each state came from.
 
@@ -52,16 +67,36 @@ def _expand_layer(graph: "CayleyGraph", states: torch.Tensor) -> _ExpandedLayer:
     n_states = int(states.shape[0])
     neighbors = graph.get_neighbors(states)
     hashes = graph.hasher.make_hashes(neighbors)
-    hashes_sorted, idx = torch.sort(hashes, stable=True)
-    # Compute mask of first occurrences for each unique value.
-    mask = torch.ones(hashes_sorted.size(0), dtype=torch.bool, device=hashes_sorted.device)
-    if hashes_sorted.size(0) > 1:
-        mask[1:] = hashes_sorted[1:] != hashes_sorted[:-1]
-    unique_idx = idx[mask]
+    unique_idx = _unique_index(hashes)
     # `get_neighbors` writes neighbors in generator-major order: rows [i*n_states, (i+1)*n_states) are obtained by
     # applying generator i, so the id of that generator is the row index divided by the number of states.
     moves = torch.div(unique_idx, n_states, rounding_mode="floor")
     return _ExpandedLayer(neighbors[unique_idx], hashes[unique_idx], moves, unique_idx)
+
+
+def _check_symmetries_match_graph(graph: "CayleyGraph", symmetry_group: "SymmetryGroup") -> None:
+    """Checks that `symmetry_group` was created for `graph` (and not for some other graph)."""
+    graph_def = graph.definition
+    symmetries_def = symmetry_group.graph_def
+    if (
+        graph_def.generators_permutations != symmetries_def.generators_permutations
+        or graph_def.central_state != symmetries_def.central_state
+    ):
+        raise ValueError("Symmetry group was created for a different graph than the one being searched.")
+
+
+def _dedup_by_canonical_form(graph: "CayleyGraph", states: torch.Tensor, symmetry_group: "SymmetryGroup"):
+    """Returns indexes of states to keep, so that exactly one state from each orbit under symmetries remains.
+
+    Which state of an orbit is kept is unspecified (it is the first one in the order of hashes of canonical forms).
+
+    :param graph: The Cayley graph.
+    :param states: States to deduplicate (in internal representation).
+    :param symmetry_group: Symmetries of the graph. States equivalent under these are considered duplicates.
+    :return: Indexes of states to keep.
+    """
+    canonical_states = symmetry_group.canonical(graph.decode_states(states))
+    return _unique_index(graph.hasher.make_hashes(graph.encode_states(canonical_states)))
 
 
 def _score_children(graph: "CayleyGraph", predictor: Predictor, states: torch.Tensor) -> torch.Tensor:
@@ -112,6 +147,7 @@ class BeamSearchAlgorithm:
         return_path: bool = False,
         bfs_result_for_mitm: Optional[BfsResult] = None,
         use_child_scores: bool = False,
+        canonical_dedup: Optional["SymmetryGroup"] = None,
         verbose: int = 0,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to destination state using Beam Search algorithm.
@@ -138,6 +174,8 @@ class BeamSearchAlgorithm:
             for meet-in-the-middle optimization. Defaults to None.
         :param use_child_scores: For "simple" mode, whether to score states using `Predictor.score_children`
             (see :meth:`search_simple`). Defaults to False.
+        :param canonical_dedup: For "simple" mode, symmetries by which to deduplicate the beam
+            (see :meth:`search_simple`). Defaults to None, which means no deduplication by symmetries.
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
@@ -150,10 +188,13 @@ class BeamSearchAlgorithm:
                 return_path=return_path,
                 bfs_result_for_mitm=bfs_result_for_mitm,
                 use_child_scores=use_child_scores,
+                canonical_dedup=canonical_dedup,
             )
         elif beam_mode == "advanced":
             if use_child_scores:
                 raise ValueError("use_child_scores is supported only in 'simple' beam mode.")
+            if canonical_dedup is not None:
+                raise ValueError("canonical_dedup is supported only in 'simple' beam mode.")
             return self.search_advanced(
                 start_state=start_state,
                 destination_state=destination_state,
@@ -176,6 +217,7 @@ class BeamSearchAlgorithm:
         return_path=False,
         bfs_result_for_mitm: Optional[BfsResult] = None,
         use_child_scores: bool = False,
+        canonical_dedup: Optional["SymmetryGroup"] = None,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
 
@@ -194,11 +236,24 @@ class BeamSearchAlgorithm:
             Scores are the same, but the predictor is called once per state of the current layer instead of once per
             state of the next layer, which is much cheaper for models having one output per generator (Q-models).
             Defaults to False, which means the predictor is applied to states on the next layer.
+        :param canonical_dedup: Symmetries of the graph (created for the same graph) by which to deduplicate states
+            on the next layer, keeping only one state from each orbit. States equivalent under a symmetry have equal
+            distances to the central state, so exploring only one of them makes the beam cover more distinct states
+            (in effect, this multiplies the beam width by up to the number of symmetries). Deduplication happens after
+            the check whether the central state is reached, so the path is never lost. The symmetries must really be a
+            group of symmetries of this graph (:meth:`cayleypy.SymmetryGroup.verify` is called to check that), because
+            deduplication by a set that is not a group throws away states that are not duplicates. Defaults to None,
+            which means states are deduplicated only by equality, as usual.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         graph = self.graph
         if predictor is None:
             predictor = Predictor(graph, "hamming")
+        if canonical_dedup is not None:
+            _check_symmetries_match_graph(graph, canonical_dedup)
+            # Two states have equal canonical forms if and only if the symmetries form a group, so without this check a
+            # set of symmetries that is not a group would silently drop states that are not duplicates of anything.
+            canonical_dedup.verify()
 
         start_states = graph.encode_states(start_state)
         layer1, layer1_hashes = graph.get_unique_states(start_states)
@@ -250,6 +305,15 @@ class BeamSearchAlgorithm:
                 # Path found.
                 path = _restore_path(bfs_layer_id)
                 return BeamSearchResult(True, i + bfs_layer_id + 1, path, debug_scores, graph.definition)
+
+            if canonical_dedup is not None:
+                # Keep only one state from each orbit under symmetries. Every kept state is still reachable from the
+                # start state in `i+1` steps through kept states of the previous layers, so path restoration and the
+                # reported path length remain correct.
+                keep = _dedup_by_canonical_form(graph, layer2, canonical_dedup)
+                layer2, layer2_hashes = layer2[keep, :], layer2_hashes[keep]
+                if expanded is not None:
+                    expanded = _ExpandedLayer(layer2, layer2_hashes, expanded.moves[keep], expanded.source_index[keep])
 
             # Pick `beam_width` states with lowest scores.
             if len(layer2) >= beam_width:
