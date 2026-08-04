@@ -15,9 +15,9 @@ from .transformer import TransformerModel
 class ModelConfig:
     """Configuration used to describe ML model.
 
-    Fields `n_outputs`, `tokenizer_groups` and `graph_hash` describe capabilities added after the first version of this
-    class. Their defaults describe a single-output model without tokenization, which is not tied to a particular graph,
-    so configs written before these fields existed keep working.
+    Fields `n_outputs`, `tokenizer_groups`, `graph_hash`, `n_heads` and `dim_feedforward` describe capabilities added
+    after the first version of this class. Their defaults describe a single-output model without tokenization, which is
+    not tied to a particular graph, so configs written before these fields existed keep working.
 
     :param model_type: Type of the model, e.g. "MLP".
     :param input_size: Number of elements in one state.

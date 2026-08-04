@@ -142,6 +142,10 @@ def test_checkpoint_round_trip(tmp_path):
     save_checkpoint(path, model, config, graph_def)
     loaded_model, loaded_config = load_checkpoint(path, graph_def=graph_def)
 
+    # Token types are derived from `tokenizer_groups`, so they must not be in the state dict: a published checkpoint
+    # written with them in it would not load into a model built by a version that derives them.
+    assert "token_type_ids" not in model.state_dict()
+
     assert isinstance(loaded_model, TransformerModel)
     assert loaded_config.n_heads == 4
     assert loaded_config.dim_feedforward == 48
