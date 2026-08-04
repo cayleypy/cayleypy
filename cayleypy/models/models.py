@@ -38,22 +38,33 @@ def _download_from_kaggle(kaggle_id: str) -> str:
         ) from error
 
 
-def _load_state_dict(path: str, device: str) -> dict[str, Any]:
+def _load_state_dict(path: str, device: str, config: "ModelConfig") -> dict[str, Any]:
     """Loads state dict from a file with weights.
 
     Both bare state dicts and self-describing checkpoints written by :func:`cayleypy.models.save_checkpoint` are
-    accepted, so weights saved in either format can be used for a model of :data:`PREDICTOR_MODELS`.
+    accepted, so weights saved in either format can be used for a model of :data:`PREDICTOR_MODELS`. A checkpoint says
+    which graph it was trained for, and that is checked against `config`.
 
     :param path: Path to the file with weights.
     :param device: PyTorch device to load the weights to.
+    :param config: Config of the model the weights are being loaded into.
     :return: The state dict.
     """
     # `weights_only=True` is passed explicitly: files with weights contain only tensors and primitive values, so we
     # never need to unpickle arbitrary objects from them (and must not, because they are downloaded from the internet).
     data = torch.load(path, map_location=device, weights_only=True)
-    if isinstance(data, dict) and "state_dict" in data:
-        return data["state_dict"]
-    return data
+    if not isinstance(data, dict) or "state_dict" not in data:
+        # A bare state dict says nothing about itself, so there is nothing to check.
+        return data
+    stored_config = data.get("config")
+    stored_hash = stored_config.get("graph_hash") if isinstance(stored_config, dict) else None
+    if stored_hash is not None and config.graph_hash is not None and stored_hash != config.graph_hash:
+        # Shapes of the weights can match while they mean nothing for this graph, so this must not pass silently.
+        raise ValueError(
+            f"Checkpoint {path} was trained for another graph (hash in the checkpoint is {stored_hash}, hash in the "
+            f"config of the model is {config.graph_hash})."
+        )
+    return data["state_dict"]
 
 
 @dataclass(frozen=True)
@@ -138,7 +149,7 @@ class ModelConfig:
             path = self.weights_path
             if self.weights_kaggle_id is not None:
                 path = os.path.join(_download_from_kaggle(self.weights_kaggle_id), path)
-            model.load_state_dict(_load_state_dict(path, device))
+            model.load_state_dict(_load_state_dict(path, device, self))
         return model.to(device)
 
 

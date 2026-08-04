@@ -1,9 +1,10 @@
 import os
+from dataclasses import replace
 
 import pytest
 import torch
 
-from .checkpoint import graph_hash
+from .checkpoint import graph_hash, save_checkpoint
 from .models import ModelConfig
 from .models_lib import PREDICTOR_MODELS
 from .. import prepare_graph, Predictor, CayleyGraph
@@ -72,3 +73,23 @@ def test_pretrained_rejects_model_for_another_graph(monkeypatch):
     monkeypatch.setitem(PREDICTOR_MODELS, "lrx-5", config)
     with pytest.raises(ValueError, match="was trained for another graph"):
         Predictor.pretrained(graph)
+
+
+def test_load_rejects_checkpoint_trained_for_another_graph(tmp_path):
+    """Test that weights of a model trained for another graph are not loaded silently.
+
+    A checkpoint says which graph it was trained for, so a file that happens to have weights of the right shape can
+    still be detected as the wrong file - which is what keeps a `PREDICTOR_MODELS` entry from shipping nonsense.
+    """
+    config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8])
+    other_graph = PermutationGroups.lrx(5, k=2)
+    path = tmp_path / "weights.pt"
+    save_checkpoint(path, config.build_model(), config, other_graph)
+
+    for_this_graph = replace(config, weights_path=str(path), graph_hash=graph_hash(PermutationGroups.lrx(5)))
+    with pytest.raises(ValueError, match="trained for another graph"):
+        for_this_graph.load()
+
+    # The same checkpoint loads when the config says it is for the graph the weights were trained for.
+    for_that_graph = replace(config, weights_path=str(path), graph_hash=graph_hash(other_graph))
+    assert for_that_graph.load() is not None
