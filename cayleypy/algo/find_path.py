@@ -56,6 +56,9 @@ def find_path(graph: CayleyGraph, start_state: AnyStateType, **kwargs) -> Option
     # If we have pre-trained model for beam search, use beam search with that predictor.
     if graph.definition.name in PREDICTOR_MODELS:
         predictor = Predictor.pretrained(graph)
+        # A model having one output per generator (Q-model) estimates distances of the children of a state rather than
+        # of the state itself, and can only be used to score children.
+        kwargs.setdefault("use_child_scores", predictor.n_outputs != 1)
         result = graph.beam_search(
             start_state=start_state,
             predictor=predictor,

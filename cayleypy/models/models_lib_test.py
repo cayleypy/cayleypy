@@ -48,8 +48,9 @@ def test_lrx_14_model_finds_paths():
         assert result.path_found
         assert result.path is not None
         assert torch.equal(graph.apply_path(start_state, result.path).reshape((-1)), graph.central_state)
-        # Diameter of this graph is 91, and the model should be much better than the worst case.
-        assert result.path_length <= 91
+        # Diameter of this graph is 91, and the model is much better than the worst case: the longest of these ten
+        # paths was 71 moves when this model was added.
+        assert result.path_length <= 80
 
 
 def test_pretrained_without_model():
