@@ -124,8 +124,8 @@ class SymmetryGroup:
 
     Symmetry is defined by a permutation ``sigma`` of state positions. It maps state ``s`` to state ``T(s)`` where
     ``T(s)[i] = element_map[s[sigma[i]]]``, and ``element_map`` is the relabeling of state elements induced by `sigma`
-    (see :func:`_derive_element_map`). For a graph where the central state is a permutation itself, `element_map` is
-    inverse of `sigma`, so ``T`` is conjugation by `sigma`. For puzzles where elements of the state are colors,
+    (see the :attr:`element_maps` property). For a graph where the central state is a permutation itself, `element_map`
+    is inverse of `sigma`, so ``T`` is conjugation by `sigma`. For puzzles where elements of the state are colors,
     `element_map` is the permutation of colors: for example, rotating the whole 2x2x2 cube also permutes its faces.
 
     For this to be a symmetry (that is, a graph automorphism fixing the central state), two conditions are required:
@@ -159,6 +159,7 @@ class SymmetryGroup:
         self.symmetries = symmetries
         self.state_size = n
         self.n_symmetries = len(symmetries)
+        self._verified = False
 
     @cached_property
     def element_maps(self) -> list[list[int]]:
@@ -237,8 +238,11 @@ class SymmetryGroup:
     def verify(self) -> None:
         """Checks that these permutations form a group of symmetries of the graph.
 
-        Raises ValueError explaining the problem if they do not.
+        Raises ValueError explaining the problem if they do not. The check costs `n_symmetries` squared compositions,
+        so its result is remembered: calling this again on a group that passed it costs nothing.
         """
+        if self._verified:
+            return
         # These raise ValueError if some permutation does not preserve the central state or does not permute generators.
         _ = self.element_maps
         _ = self.action_maps
@@ -253,6 +257,7 @@ class SymmetryGroup:
                         f"Symmetries are not closed under composition: composition of {sigma1} and {sigma2} "
                         "is not one of the symmetries."
                     )
+        self._verified = True
 
     @staticmethod
     def derive(graph_def: CayleyGraphDef, *, max_state_size: int = 8) -> "SymmetryGroup":
@@ -321,7 +326,8 @@ class SymmetrizedPredictor(Predictor):
 
     This is test-time augmentation (TTA): because symmetries preserve distances from the central state, predictions for
     all images of a state are predictions for the same true distance, so averaging them reduces error of an imperfect
-    model. Predictions of this predictor are symmetric by construction: they are equal for all states in one orbit.
+    model. Predictions of this predictor are symmetric by construction: they are equal for all states in one orbit
+    (which is why the symmetries are verified to form a group, see :meth:`SymmetryGroup.verify`).
 
     The price is `n_symmetries` times more model evaluations.
 
@@ -334,7 +340,8 @@ class SymmetrizedPredictor(Predictor):
         """Initializes SymmetrizedPredictor.
 
         :param base: Predictor to symmetrize.
-        :param symmetry_group: Symmetries of the graph to average over. Must be created for the same graph as `base`.
+        :param symmetry_group: Symmetries of the graph to average over. Must be created for the same graph as `base`,
+            and must really be a group of symmetries of it (:meth:`SymmetryGroup.verify` is called to check that).
         """
         base_def = base.graph.definition
         symmetries_def = symmetry_group.graph_def
@@ -343,6 +350,9 @@ class SymmetrizedPredictor(Predictor):
             or base_def.central_state != symmetries_def.central_state
         ):
             raise ValueError("Symmetry group was created for a different graph than the base predictor.")
+        # Averaging over a set that is not a group of symmetries gives predictions that are not symmetric, which is the
+        # one thing this predictor promises - so the group is verified here instead of being trusted.
+        symmetry_group.verify()
         self.base = base
         self.symmetry_group = symmetry_group
         super().__init__(base.graph, self._predict_symmetrized)
