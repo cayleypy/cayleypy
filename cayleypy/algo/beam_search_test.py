@@ -200,8 +200,9 @@ def test_beam_search_simple_child_scores_same_as_default():
 
     _validate_beam_search_result(graph, start_state, result1)
     assert result1.path == result2.path
-    # Scores are recorded on every step where the beam was truncated, so this compares whole beams, not only the
-    # answer. Hamming distance is computed in integer arithmetic, so scores must match exactly.
+    # One score is recorded per step where the beam was truncated - the best score of that step - so this compares the
+    # two searches step by step, not only their answers. Hamming distance is computed in integer arithmetic, so the
+    # scores must match exactly.
     assert len(result1.debug_scores) > 0
     assert result1.debug_scores == result2.debug_scores
 
