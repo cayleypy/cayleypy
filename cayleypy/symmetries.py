@@ -26,6 +26,19 @@ def _mean(tensors: list[torch.Tensor]) -> torch.Tensor:
     return ans.mean(dim=0)
 
 
+def _is_lexicographically_smaller(a: torch.Tensor, b: torch.Tensor) -> torch.Tensor:
+    """Compares rows of two tensors of the same shape lexicographically.
+
+    :param a: Tensor of shape ``[n, m]``.
+    :param b: Tensor of shape ``[n, m]``.
+    :return: Boolean tensor of shape ``[n]``, telling for each row whether row of `a` is smaller than row of `b`.
+    """
+    differs = a != b
+    # In every row, this is True only in the first column where the rows differ (and nowhere, if rows are equal).
+    first_difference = differs & (torch.cumsum(differs.to(torch.int32), dim=1) == 1)
+    return torch.any((a < b) & first_difference, dim=1)
+
+
 def _conjugate(generator: Sequence[int], sigma: Sequence[int], sigma_inv: Sequence[int]) -> tuple[int, ...]:
     """Returns conjugate of `generator` by `sigma`, that is, permutation ``sigma^-1 * generator * sigma``."""
     return tuple(sigma_inv[generator[sigma[i]]] for i in range(len(sigma)))
@@ -200,6 +213,28 @@ class SymmetryGroup:
         sigma = self._sigma_tensors[symmetry_id].to(states.device)
         element_map = self._element_map_tensors[symmetry_id].to(states.device)
         ans = element_map[states.reshape((-1, self.state_size))[:, sigma]]
+        return ans.reshape(states.shape)
+
+    def canonical(self, states: torch.Tensor) -> torch.Tensor:
+        """Returns canonical representative of the orbit of each given state.
+
+        Canonical form of a state is the lexicographically smallest of its images under all symmetries in this group.
+        Two states have equal canonical forms if and only if one is an image of the other, so canonical forms can be
+        used to deduplicate states that are equivalent under symmetries (see ``canonical_dedup`` option of
+        :meth:`cayleypy.algo.BeamSearchAlgorithm.search_simple`). This requires the symmetries to form a group (see
+        :meth:`verify`): otherwise, two states of the same orbit may have different canonical forms.
+
+        All images are computed, so this costs `n_symmetries` applications of :meth:`apply`.
+
+        :param states: One state (1-D tensor) or multiple states (2-D tensor), in decoded representation.
+        :return: Canonical forms of `states`, in the same shape as `states`.
+        """
+        states = torch.as_tensor(states)
+        ans = self.apply(states, 0).reshape((-1, self.state_size))
+        for i in range(1, self.n_symmetries):
+            image = self.apply(states, i).reshape((-1, self.state_size))
+            is_smaller = _is_lexicographically_smaller(image, ans).reshape((-1, 1))
+            ans = torch.where(is_smaller, image, ans)
         return ans.reshape(states.shape)
 
     def transport_actions(self, symmetry_id: int) -> list[int]:

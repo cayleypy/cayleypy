@@ -10,7 +10,9 @@ from ..cayley_graph import CayleyGraph
 
 from ..graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 from ..predictor import Predictor
-from .beam_search import _expand_layer, _score_children
+from ..puzzles import Puzzles
+from ..symmetries import SymmetryGroup
+from .beam_search import _dedup_by_canonical_form, _expand_layer, _score_children
 from .beam_search_result import BeamSearchResult
 
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
@@ -58,6 +60,20 @@ class _BrokenChildrenPredictor(Predictor):
 
     def score_children(self, states: torch.Tensor) -> torch.Tensor:
         return torch.zeros((states.shape[0], self.graph.definition.n_generators + 1))
+
+
+class _OrbitRecordingPredictor(Predictor):
+    """Hamming distance predictor that remembers how many distinct orbits were among the states it scored."""
+
+    def __init__(self, graph: CayleyGraph, symmetry_group: SymmetryGroup):
+        self.symmetry_group = symmetry_group
+        self.layers: list[tuple[int, int]] = []
+        super().__init__(graph, self._predict)
+
+    def _predict(self, states: torch.Tensor) -> torch.Tensor:
+        canonical = self.symmetry_group.canonical(states)
+        self.layers.append((int(states.shape[0]), len({tuple(x.tolist()) for x in canonical})))
+        return torch.sum(states != self.graph.central_state, dim=1)
 
 
 # =============================================================================
@@ -262,6 +278,172 @@ def test_beam_search_child_scores_not_supported_in_advanced_mode():
 
 
 # =============================================================================
+# Tests for deduplication by symmetries in "simple" beam search mode
+# =============================================================================
+
+
+def test_dedup_by_canonical_form_keeps_one_state_per_orbit():
+    """Test that deduplication keeps exactly one state from each orbit, on a hand-computed example."""
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+    # The reflection maps [0, 2, 1, 3, 4] to [4, 1, 2, 3, 0] and [2, 0, 1, 3, 4] to [1, 4, 2, 3, 0], and it preserves
+    # the identity permutation. So, these 5 states form 3 orbits.
+    states = graph.encode_states([[0, 2, 1, 3, 4], [4, 1, 2, 3, 0], [2, 0, 1, 3, 4], [1, 4, 2, 3, 0], [0, 1, 2, 3, 4]])
+
+    keep = _dedup_by_canonical_form(graph, states, symmetry_group)
+
+    assert len(keep) == 3
+    kept_states = graph.decode_states(states[keep, :])
+    canonical_kept = [tuple(x.tolist()) for x in symmetry_group.canonical(kept_states)]
+    # Exactly one state from each of the 3 orbits was kept.
+    assert len(set(canonical_kept)) == 3
+    assert set(canonical_kept) == {(0, 2, 1, 3, 4), (1, 4, 2, 3, 0), (0, 1, 2, 3, 4)}
+
+
+def test_dedup_by_canonical_form_compresses_bfs_layer():
+    """Test deduplication of a set of states that is closed under symmetries: a whole BFS layer."""
+    graph_def = Puzzles.rubik_cube(2, metric="QTM")
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.rubik_cube_rotations(graph_def)
+    layer = graph.bfs(max_layer_size_to_store=None, max_diameter=4).layers[4]
+    assert layer.shape[0] == 6539
+
+    keep = _dedup_by_canonical_form(graph, graph.encode_states(layer), symmetry_group)
+
+    # Rotations of the whole cube preserve distances, so this layer consists of whole orbits. There are 24 rotations,
+    # hence the layer shrinks by almost 24 times (exactly 24 for states that no rotation preserves).
+    assert len(keep) == len({tuple(x.tolist()) for x in symmetry_group.canonical(layer)}) == 294
+
+
+def test_beam_search_simple_canonical_dedup_finds_path_where_plain_search_fails():
+    """Test that deduplication by symmetries makes the beam cover more distinct states."""
+    graph_def = PermutationGroups.lrx(6)
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+    start_state = [5, 4, 3, 2, 1, 0]
+
+    predictor = _OrbitRecordingPredictor(graph, symmetry_group)
+    result = graph.beam_search(
+        start_state=start_state,
+        predictor=predictor,
+        beam_width=200,
+        max_steps=20,
+        return_path=True,
+        canonical_dedup=symmetry_group,
+    )
+    plain_predictor = _OrbitRecordingPredictor(graph, symmetry_group)
+    plain_result = graph.beam_search(
+        start_state=start_state, predictor=plain_predictor, beam_width=200, max_steps=20, return_path=True
+    )
+
+    # Almost half of the states of the plain beam are equivalent to some other state in it, so it hits the beam width
+    # and gets truncated - and then the (weak) Hamming heuristic never recovers the path.
+    assert min(orbits / states for states, orbits in plain_predictor.layers) < 0.6
+    assert not plain_result.path_found
+    # With deduplication, the same beam width is enough to hold all distinct orbits, and the path is found.
+    _validate_beam_search_result(graph, start_state, result)
+    assert result.path_length == 13
+
+
+def test_beam_search_simple_canonical_dedup_leaves_no_equivalent_states_in_beam():
+    """Test that with deduplication, no two states scored on the same step are equivalent under symmetries."""
+    graph_def = PermutationGroups.lrx(8)
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+    start_state = [7, 6, 5, 4, 3, 2, 1, 0]
+
+    predictor = _OrbitRecordingPredictor(graph, symmetry_group)
+    graph.beam_search(
+        start_state=start_state, predictor=predictor, beam_width=300, max_steps=25, canonical_dedup=symmetry_group
+    )
+    plain_predictor = _OrbitRecordingPredictor(graph, symmetry_group)
+    graph.beam_search(start_state=start_state, predictor=plain_predictor, beam_width=300, max_steps=25)
+
+    assert len(predictor.layers) > 10
+    assert all(states == orbits for states, orbits in predictor.layers)
+    # Without deduplication, every one of these layers contains states equivalent to other states in the same layer.
+    assert all(orbits < states for states, orbits in plain_predictor.layers)
+
+
+def test_beam_search_simple_canonical_dedup_with_child_scores():
+    """Test that deduplication keeps scores of children matched with the states they belong to."""
+    graph_def = PermutationGroups.lrx(8)
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+    kwargs = {"beam_width": 10, "max_steps": 50, "return_path": True, "canonical_dedup": symmetry_group}
+
+    result_scalar = graph.beam_search(start_state=start_state, predictor=Predictor(graph, "hamming"), **kwargs)
+    result_q = graph.beam_search(
+        start_state=start_state, predictor=_ChildrenHammingPredictor(graph), use_child_scores=True, **kwargs
+    )
+
+    _validate_beam_search_result(graph, start_state, result_q)
+    # Scores of children are looked up by index in the expanded layer, and deduplication reorders that layer. If the
+    # indexes were not updated, scores would be assigned to wrong states and the beams would diverge.
+    assert result_scalar.path == result_q.path
+    assert len(result_scalar.debug_scores) > 0
+    assert result_scalar.debug_scores == result_q.debug_scores
+
+
+def test_beam_search_simple_canonical_dedup_with_meet_in_the_middle():
+    """Test that deduplication works together with meet-in-the-middle."""
+    graph_def = PermutationGroups.lrx(8)
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+    bfs_result = graph.bfs(max_diameter=3, return_all_hashes=True)
+
+    result = graph.beam_search(
+        start_state=start_state,
+        beam_width=10,
+        max_steps=50,
+        return_path=True,
+        bfs_result_for_mitm=bfs_result,
+        canonical_dedup=symmetry_group,
+    )
+
+    _validate_beam_search_result(graph, start_state, result)
+
+
+def test_beam_search_simple_canonical_dedup_with_trivial_group():
+    """Test that deduplication by the group consisting of the identity alone changes nothing."""
+    graph_def = PermutationGroups.lrx(8)
+    graph = CayleyGraph(graph_def, device="cpu")
+    trivial_group = SymmetryGroup([list(range(8))], graph_def)
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+
+    result1 = graph.beam_search(start_state=start_state, beam_width=10, max_steps=50, return_path=True)
+    result2 = graph.beam_search(
+        start_state=start_state, beam_width=10, max_steps=50, return_path=True, canonical_dedup=trivial_group
+    )
+
+    _validate_beam_search_result(graph, start_state, result2)
+    assert result1.path == result2.path
+    assert result1.debug_scores == result2.debug_scores
+
+
+def test_beam_search_canonical_dedup_rejects_group_for_other_graph():
+    """Test that symmetries of another graph are rejected (they would deduplicate wrong states)."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    symmetry_group = SymmetryGroup.reflections(PermutationGroups.lrx(5, k=2))
+
+    with pytest.raises(ValueError, match="different graph"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], canonical_dedup=symmetry_group)
+
+
+def test_beam_search_canonical_dedup_not_supported_in_advanced_mode():
+    """Test that deduplication by symmetries is rejected in "advanced" mode, where it is not implemented."""
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.reflections(graph_def)
+
+    with pytest.raises(ValueError, match="only in 'simple' beam mode"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], beam_mode="advanced", canonical_dedup=symmetry_group)
+
+
+# =============================================================================
 # Tests for "advanced" beam search mode
 # =============================================================================
 
@@ -394,6 +576,31 @@ def test_beam_search_simple_cube222():
     bs_result = graph.beam_search(start_state=start_state, beam_mode="simple", beam_width=10**7, return_path=True)
     assert bs_result.path_length <= 14
     _validate_beam_search_result(graph, start_state, bs_result)
+
+
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
+def test_beam_search_simple_cube222_canonical_dedup():
+    """Test deduplication by all 24 rotations of the whole cube on a real puzzle."""
+    graph_def = Puzzles.rubik_cube(2, metric="QTM")
+    graph = CayleyGraph(graph_def, device="cpu")
+    symmetry_group = SymmetryGroup.rubik_cube_rotations(graph_def)
+    start_state = _scramble(graph, 100)
+
+    predictor = _OrbitRecordingPredictor(graph, symmetry_group)
+    graph.beam_search(
+        start_state=start_state,
+        predictor=predictor,
+        beam_width=10**4,
+        max_steps=10,
+        canonical_dedup=symmetry_group,
+    )
+    plain_predictor = _OrbitRecordingPredictor(graph, symmetry_group)
+    graph.beam_search(start_state=start_state, predictor=plain_predictor, beam_width=10**4, max_steps=10)
+
+    assert len(predictor.layers) >= 4
+    assert all(states == orbits for states, orbits in predictor.layers)
+    # Without deduplication, a third or more of the beam is spent on states equivalent to other states in it.
+    assert min(orbits / states for states, orbits in plain_predictor.layers) < 0.7
 
 
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
