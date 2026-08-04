@@ -389,3 +389,22 @@ def test_symmetrized_predictor_rejects_symmetries_that_are_not_a_group():
     # A genuine symmetry, but the set does not contain the identity, so it is not a group.
     with pytest.raises(ValueError, match="Identity permutation"):
         SymmetrizedPredictor(predictor, SymmetryGroup([[1, 0, 4, 3, 2]], graph_def))
+
+
+def test_symmetrized_q_model_is_a_q_model():
+    """Test that TTA over a Q-model reports its outputs, so callers score children rather than states."""
+    graph_def = PermutationGroups.lrx(6)
+    graph = CayleyGraph(graph_def, device="cpu")
+    n_generators = graph_def.n_generators
+
+    class _QModel(torch.nn.Module):
+        n_outputs = n_generators
+
+        def forward(self, states: torch.Tensor) -> torch.Tensor:
+            return states[:, :1].float() + torch.arange(n_generators, dtype=torch.float32)
+
+    base = Predictor(graph, _QModel())
+    symmetrized = SymmetrizedPredictor(base, SymmetryGroup.reflections(graph_def))
+
+    assert symmetrized.n_outputs == n_generators
+    assert symmetrized.score_children(torch.tensor([[1, 0, 2, 3, 4, 5]])).shape == (1, n_generators)
