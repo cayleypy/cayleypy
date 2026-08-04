@@ -361,9 +361,32 @@ def test_path_data_source_from_tsv_reads_only_requested_puzzle(tmp_path):
         assert torch.equal(data.states[0], path.start_state)
 
 
+def test_path_data_source_from_tsv_skips_rows_shorter_than_the_header(tmp_path):
+    graph = _lrx5()
+    path = _solved_path(graph, [2, 0, 1, 4, 3])
+    solution = graph.definition.path_to_string(path.edges)
+    file = tmp_path / "solutions.tsv"
+    # A row that does not reach the last columns has nothing (not even an empty string) in them.
+    file.write_text(f"solution\tpuzzle_id\n{solution}\n{solution}\t8\n", encoding="utf-8")
+
+    data = PathDataSource.from_tsv(file, graph, puzzle_id="8").generate()
+    assert len(data) == len(path.edges) + 1
+    assert torch.equal(data.states[0], path.start_state)
+
+
 def test_path_data_source_from_tsv_rejects_bad_files(tmp_path):
     graph = _lrx5()
     file = tmp_path / "solutions.tsv"
+
+    # Missing columns are reported even when no row is read at all, so a typo in a column name is not reported as an
+    # empty file.
+    _write_tsv(file, ["7\t1\tL\tsomebody"])
+    with pytest.raises(ValueError, match='File has no column "moves"'):
+        PathDataSource.from_tsv(file, graph, column="moves", puzzle_id="42")
+
+    file.write_text("solution\nL\n", encoding="utf-8")
+    with pytest.raises(ValueError, match='File has no column "puzzle_id"'):
+        PathDataSource.from_tsv(file, graph, puzzle_id="7")
 
     _write_tsv(file, ["7\t2\tL.Z\tsomebody"])
     with pytest.raises(ValueError, match='uses move "Z", which is not a generator'):
@@ -416,6 +439,20 @@ def test_mixture_never_drops_a_source_completely():
     torch.manual_seed(0)
     data = MixtureDataSource([_ConstantSource(100, 1.0), _ConstantSource(1, 2.0)], [0.999, 0.001]).generate()
     assert int((data.targets == 2.0).sum()) == 1
+
+
+def test_mixture_with_a_source_that_generated_nothing():
+    torch.manual_seed(0)
+    # A source can legitimately run dry (e.g. a beam search that found no path), and that must not cut down the data of
+    # the other sources.
+    data = MixtureDataSource([_ConstantSource(100, 1.0), _ConstantSource(0, 2.0)], [0.5, 0.5]).generate()
+    assert len(data) == 100
+    assert int((data.targets == 1.0).sum()) == 100
+
+
+def test_mixture_where_all_sources_generated_nothing_is_rejected():
+    with pytest.raises(ValueError, match="generated no states"):
+        MixtureDataSource([_ConstantSource(0, 1.0), _ConstantSource(0, 2.0)]).generate()
 
 
 def test_mixture_of_sparse_and_dense_targets():
