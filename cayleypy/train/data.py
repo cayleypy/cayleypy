@@ -27,6 +27,7 @@ from typing import TYPE_CHECKING, Optional, Sequence
 
 import torch
 
+from .config import RANDOM_WALK_MODES, _check_positive
 from ..cayley_path import CayleyPath
 from ..models.checkpoint import PathType
 
@@ -41,11 +42,6 @@ _DEFAULT_SOLUTION_COLUMN = "solution"
 
 # Characters that spreadsheets add in front of a cell to keep it from being interpreted as something else.
 _CELL_PREFIXES = "'\"= "
-
-
-def _check_positive(name: str, value: float) -> None:
-    if value <= 0:
-        raise ValueError(f"{name} must be positive, got {value}.")
 
 
 @dataclass(frozen=True)
@@ -206,11 +202,15 @@ class RandomWalksSource(DataSource):
         :param graph: Graph to generate walks on.
         :param n_walks: Number of walks to generate (their `width`).
         :param rw_length: Length of every walk.
-        :param mode: Mode of random walk generation - see :class:`cayleypy.algo.RandomWalksGenerator`.
+        :param mode: Mode of random walk generation - one of "classic", "bfs", "nbt", see
+            :class:`cayleypy.algo.RandomWalksGenerator`.
         :param nbt_history_depth: For "nbt" mode, how many previous levels to remember and ban from revisiting.
         """
         _check_positive("n_walks", n_walks)
         _check_positive("rw_length", rw_length)
+        if mode not in RANDOM_WALK_MODES:
+            # Checked here rather than on the first walk, which happens after a whole trainer has been built.
+            raise ValueError(f'Unknown mode: "{mode}". Supported modes are: {RANDOM_WALK_MODES}.')
         self.graph = graph
         self.n_walks = int(n_walks)
         self.rw_length = int(rw_length)
@@ -346,16 +346,18 @@ class BfsAnchors(DataSource):
         """Initializes BfsAnchors and runs the breadth-first search (once - :meth:`generate` only samples from it).
 
         :param graph: Graph to search in. Its generators should be inverse closed - the search starts at the central
-            state, so without that its targets are distances from the central state, not to it (see the module
-            docstring).
-        :param depth: How many layers of breadth-first search to compute. Must be at least 1. Deeper means more states
-            with exact distances, and quickly more memory.
+            state, so without that its targets are distances from the central state, not to it; for such a graph, use
+            the graph returned by ``CayleyGraph.with_inverted_generators``.
+        :param depth: How many layers of anchors to produce. Must be at least 1. Deeper means more states with exact
+            distances, and quickly more memory. For a Q-model one more layer is searched, because a state is an anchor
+            only if all of its children have exact distances too.
         :param size: How many states :meth:`generate` returns, sampled with replacement. Defaults to None, meaning all
             states with exact distances.
         :param n_outputs: Number of outputs of the model to train - 1 for a model predicting the distance of a state,
             or the number of generators for a Q-model predicting distances of all children of a state.
-        :param max_table_states: Safety limit on the number of states with exact distances. The search stops when it is
-            exceeded and the constructor fails, instead of running the machine out of memory.
+        :param max_table_states: Safety limit on the number of states with exact distances: the search stops when it is
+            exceeded and the constructor fails. Note that it bounds the whole table, and is checked only after a layer
+            has been computed, so it does not protect against a single layer that does not fit in memory.
         """
         if depth < 1:
             raise ValueError(f"depth must be at least 1, got {depth}.")
@@ -383,10 +385,13 @@ class BfsAnchors(DataSource):
             exceeded_limit = n_states_found > self.max_table_states
             return exceeded_limit
 
-        bfs_result = graph.bfs(max_diameter=self.depth, max_layer_size_to_store=None, stop_condition=stop_condition)
+        # A Q-model needs exact distances of the children of an anchor, so the states of the deepest requested layer are
+        # anchors only if one more layer is known. Without that extra layer, `depth=1` would leave a single anchor.
+        bfs_depth = self.depth if self.n_outputs == 1 else self.depth + 1
+        bfs_result = graph.bfs(max_diameter=bfs_depth, max_layer_size_to_store=None, stop_condition=stop_condition)
         if exceeded_limit:
             raise ValueError(
-                f"Breadth-first search up to depth {self.depth} was stopped after it found {n_states_found} states, "
+                f"Breadth-first search up to depth {bfs_depth} was stopped after it found {n_states_found} states, "
                 f"which is more than max_table_states={self.max_table_states}. Use a smaller depth, or a larger limit "
                 "if this many states fit in memory."
             )
