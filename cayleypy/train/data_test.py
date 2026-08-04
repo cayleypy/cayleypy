@@ -80,6 +80,19 @@ def test_training_data_concat_fills_missing_mask_and_weights():
     assert without_mask.mask is None and without_mask.weights is None
 
 
+def test_training_data_concat_makes_targets_float():
+    """Test that integer targets (which a custom data source may produce) are concatenated as floats."""
+    states = torch.zeros((2, 5), dtype=torch.int64)
+    integer_targets = TrainingData(states, torch.ones(2, dtype=torch.int64))
+    float_targets = TrainingData(states, torch.zeros(2))
+
+    data = TrainingData.concat([integer_targets, float_targets])
+
+    # Concatenating an integer piece with a float one must not truncate the float targets to integers.
+    assert data.targets.dtype == torch.float32
+    assert TrainingData.concat([integer_targets]).targets.dtype == torch.float32
+
+
 def test_training_data_rejects_inconsistent_shapes():
     states = torch.zeros((3, 5), dtype=torch.int64)
     with pytest.raises(ValueError, match=r"states must have shape \[n_states, state_size\]"):
@@ -114,12 +127,26 @@ def test_random_walks_source():
     assert torch.equal(data.targets[:8], torch.zeros(8))
 
 
+def test_random_walks_source_passes_mode_and_history_depth_to_the_graph():
+    """Test that the walks are the walks the graph generates for the given mode, with the given history depth."""
+    graph = _lrx5()
+    for mode, history_depth in (("classic", 1), ("bfs", 1), ("nbt", 1), ("nbt", 3)):
+        torch.manual_seed(0)
+        data = RandomWalksSource(graph, n_walks=6, rw_length=5, mode=mode, nbt_history_depth=history_depth).generate()
+        torch.manual_seed(0)
+        states, distances = graph.random_walks(width=6, length=5, mode=mode, nbt_history_depth=history_depth)
+        assert torch.equal(data.states, states), f"mode {mode}, history depth {history_depth}"
+        assert torch.equal(data.targets, distances.to(torch.float32))
+
+
 def test_random_walks_source_rejects_invalid_values():
     graph = _lrx5()
     with pytest.raises(ValueError, match="n_walks must be positive"):
         RandomWalksSource(graph, n_walks=0)
     with pytest.raises(ValueError, match="rw_length must be positive"):
         RandomWalksSource(graph, rw_length=0)
+    with pytest.raises(ValueError, match='Unknown mode: "nbf"'):
+        RandomWalksSource(graph, mode="nbf")
 
 
 def test_sparse_q_sampler_labels_exactly_the_moves_along_the_walk():
@@ -213,14 +240,28 @@ def test_bfs_anchors_labels_all_children_for_q_model():
 def test_bfs_anchors_for_q_model_skips_states_with_unknown_children():
     graph = _lrx5()
     exact = _exact_distances(graph)
-    # The search stops at depth 3, so states at that depth have children it did not see and cannot be anchors.
-    data = BfsAnchors(graph, depth=3, n_outputs=3).generate()
-    assert max(exact[tuple(state.tolist())] for state in data.states) == 2
+    # One layer more than `depth` is searched, so every anchor has all of its children in the table - and the states of
+    # that extra layer, whose own children were not seen, are not anchors themselves.
+    anchors = BfsAnchors(graph, depth=3, n_outputs=3)
+    assert max(exact[tuple(state.tolist())] for state in anchors.generate().states) == 3
+    assert anchors.n_states_with_exact_distance == 36
 
     # When the search explored the whole graph, every state can be an anchor.
     anchors = BfsAnchors(graph, depth=LRX5_SIZE, n_outputs=3)
     assert anchors.n_states_with_exact_distance == LRX5_SIZE
     assert len(anchors.generate()) == LRX5_SIZE
+
+
+def test_bfs_anchors_for_q_model_cover_the_same_states_as_for_one_output():
+    """Test that a Q-model gets anchors for every state within `depth`, depth 1 (a BellmanTrainer default) included."""
+    graph = _lrx5()
+
+    for depth in (1, 2, 3):
+        states = {tuple(s.tolist()) for s in BfsAnchors(graph, depth=depth).generate().states}
+        q_states = {tuple(s.tolist()) for s in BfsAnchors(graph, depth=depth, n_outputs=3).generate().states}
+        # Without the extra layer of search, depth 1 would leave the central state as the only anchor.
+        assert q_states == states, f"depth {depth}"
+    assert len({tuple(s.tolist()) for s in BfsAnchors(graph, depth=1, n_outputs=3).generate().states}) == 4
 
 
 def test_bfs_anchors_samples_requested_number_of_states():
@@ -285,12 +326,14 @@ def test_path_data_source_marks_targets_as_upper_bounds():
 def test_path_data_source_labels_the_move_of_the_path_for_q_model():
     graph = _lrx5()
     path = _solved_path(graph, [2, 0, 1, 4, 3])
-    data = PathDataSource(graph, [path], n_outputs=3).generate()
+    data = PathDataSource(graph, [path], n_outputs=3, weight=0.25).generate()
 
     path_length = len(path.edges)
     # The central state takes no move, so it is not in the data.
     assert len(data) == path_length
     assert data.targets.shape == (path_length, 3)
+    # Targets from a path are upper bounds, so the loss must weigh them as asked for a Q-model too.
+    assert torch.equal(data.weights, torch.full_like(data.targets, 0.25))
     for p in range(path_length):
         labeled = data.mask[p].nonzero().flatten().tolist()
         assert labeled == [path.edges[p]]

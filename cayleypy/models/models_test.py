@@ -225,3 +225,23 @@ def test_build_resmlp_model_without_blocks():
     config = ModelConfig(model_type="RESMLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[])
     with pytest.raises(ValueError, match="at least one block"):
         config.build_model()
+
+
+def test_load_rejects_kaggle_id_without_weights_path():
+    """Test that a config naming a Kaggle model but no file in it fails instead of loading nothing."""
+    config = ModelConfig(
+        model_type="MLP",
+        input_size=5,
+        num_classes_for_one_hot=5,
+        layers_sizes=[8],
+        weights_kaggle_id="no/such/model/1",
+    )
+    with pytest.raises(ValueError, match="weights_path"):
+        config.load()
+
+
+def test_load_without_weights_returns_untrained_model():
+    """Test that a config with no weights at all is still loadable (it describes an untrained model)."""
+    config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8])
+    model = config.load()
+    assert isinstance(model, MlpModel)
