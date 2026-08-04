@@ -1,4 +1,5 @@
 import os
+import warnings
 
 import pytest
 import torch
@@ -6,6 +7,7 @@ import torch
 from .config import TrainConfig
 from .trainer import Trainer
 from ..cayley_graph import CayleyGraph
+from ..cayley_graph_def import CayleyGraphDef
 from ..graphs_lib import PermutationGroups
 from ..models.checkpoint import graph_hash, load_checkpoint
 from ..models.models import ModelConfig
@@ -224,6 +226,21 @@ def test_trainer_rejects_model_with_too_few_classes():
     config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=3, layers_sizes=[16])
     with pytest.raises(ValueError, match="which is not enough for this graph"):
         Trainer(_lrx5(), config, TINY_CONFIG)
+
+
+def test_trainer_warns_when_generators_are_not_inverse_closed():
+    # Directed 5-cycle - the inverse of its only generator is not a generator, so reaching the central state from the
+    # state one step away from it takes 4 steps, not 1.
+    graph = CayleyGraph(CayleyGraphDef.create([[1, 2, 3, 4, 0]]), device="cpu")
+    with pytest.warns(UserWarning, match="not inverse closed"):
+        Trainer(graph, MLP_CONFIG, TINY_CONFIG)
+
+
+def test_trainer_does_not_warn_about_direction_for_inverse_closed_generators():
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always")
+        Trainer(_lrx5(), MLP_CONFIG, TINY_CONFIG)
+    assert not any("inverse closed" in str(warning.message) for warning in caught)
 
 
 def test_train_on_data_rejects_empty_data():
