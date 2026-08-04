@@ -64,15 +64,18 @@ class Predictor:
         :param states: States (in decoded representation) to apply the model to.
         :return: Output of the model for `states`.
         """
-        num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
-        if num_batches > 1:
-            ans = []  # type: list[torch.Tensor]
-            for batch in states.tensor_split(num_batches, dim=0):
-                ans.append(self.predict(batch))
-            # Batches must be concatenated along dimension 0, otherwise outputs of multi-output models are mangled.
-            return torch.cat(ans, dim=0)
-        else:
-            return self.predict(states)
+        # A predictor is only ever used for inference, and building the graph for a backward pass that never happens
+        # costs memory proportional to the size of the model - which is significant when the whole beam is scored.
+        with torch.no_grad():
+            num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
+            if num_batches > 1:
+                ans = []  # type: list[torch.Tensor]
+                for batch in states.tensor_split(num_batches, dim=0):
+                    ans.append(self.predict(batch))
+                # Batches must be concatenated along dimension 0, otherwise outputs of multi-output models are mangled.
+                return torch.cat(ans, dim=0)
+            else:
+                return self.predict(states)
 
     def __call__(self, states: torch.Tensor) -> torch.Tensor:
         ans = self.predict_batched(states)
