@@ -20,7 +20,6 @@ from typing import Optional
 import torch
 
 
-
 def _check_shape(name: str, tensor: torch.Tensor, predictions: torch.Tensor) -> None:
     if tensor.shape != predictions.shape:
         raise ValueError(
