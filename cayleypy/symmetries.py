@@ -359,6 +359,10 @@ class SymmetrizedPredictor(Predictor):
     model. Predictions of this predictor are symmetric by construction: they are equal for all states in one orbit.
 
     The price is `n_symmetries` times more model evaluations.
+
+    A `base` that scores children of a state instead of the state itself (a Q-model) is symmetrized through
+    :meth:`score_children` only: like the model itself, it has nothing to say about a state, so :meth:`__call__` needs
+    `base` to return one score per state.
     """
 
     def __init__(self, base: Predictor, symmetry_group: SymmetryGroup):
