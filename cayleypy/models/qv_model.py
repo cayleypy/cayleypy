@@ -30,6 +30,11 @@ class QVModel(nn.Module):
     children that both heads agree about. The penalty is not used during training: it only reranks children, and with
     ``v_consistency_weight=0`` (the default) scores are the Q-values as is.
 
+    The penalty is only meaningful for weights whose V-head was supervised. Training that fits :meth:`forward`, i.e.
+    the Q-head alone, leaves V at its initialization, and rescoring children against such a head makes predictions
+    worse, not better - so ``v_consistency_weight`` must stay 0 unless the loss that produced the weights had a term
+    for V.
+
     :meth:`forward` returns the Q-values, so this model is used through :meth:`cayleypy.Predictor.score_children` (which
     calls :meth:`score_children` of this model, so the penalty is applied). Estimates for the states themselves are
     available through :meth:`v`.
