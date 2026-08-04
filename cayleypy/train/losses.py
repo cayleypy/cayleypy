@@ -19,10 +19,6 @@ from typing import Optional
 
 import torch
 
-# Lower bound for the denominator of the weighted mean, so that a batch where nothing is labeled gives 0 instead of
-# NaN. Masks are usually indicators, in which case the denominator is a count of labeled elements and never gets
-# anywhere near this value.
-_MIN_DENOMINATOR = 1e-12
 
 
 def _check_shape(name: str, tensor: torch.Tensor, predictions: torch.Tensor) -> None:
@@ -37,13 +33,19 @@ def _weighted_mean(values: torch.Tensor, mask: Optional[torch.Tensor], weights: 
     """Computes mean of values, weighted by mask and weights (either of which may be absent)."""
     element_weight: Optional[torch.Tensor] = None
     if mask is not None:
-        element_weight = mask.to(values.dtype)
+        # Only whether an element is labeled matters, so a mask given as numbers is reduced to an indicator - its
+        # magnitude would otherwise act as a second set of weights.
+        element_weight = (mask != 0).to(values.dtype)
     if weights is not None:
         weights = weights.to(values.dtype)
         element_weight = weights if element_weight is None else element_weight * weights
     if element_weight is None:
         return values.mean()
-    return (values * element_weight).sum() / element_weight.sum().clamp_min(_MIN_DENOMINATOR)
+    # The denominator is kept away from zero so that a batch where nothing is labeled gives 0 instead of NaN. The
+    # smallest positive normal number of the dtype is used because it is representable in all of them - a fixed
+    # constant such as 1e-12 rounds to zero in float16 and leaves the division unguarded.
+    denominator = element_weight.sum().clamp_min(torch.finfo(values.dtype).tiny)
+    return (values * element_weight).sum() / denominator
 
 
 class Loss(abc.ABC):
@@ -97,6 +99,10 @@ class Loss(abc.ABC):
         _check_shape("targets", targets, predictions)
         if mask is not None:
             _check_shape("mask", mask, predictions)
+            # Targets of unlabeled elements are documented to be arbitrary, and a non-finite one would survive being
+            # multiplied by a zero weight (0 * NaN is NaN) and poison both the sum and the gradient. Replacing them
+            # here keeps them out of the graph altogether.
+            targets = torch.where(mask != 0, targets, torch.zeros_like(targets))
         if weights is not None:
             _check_shape("weights", weights, predictions)
         return _weighted_mean(self.elementwise(predictions, targets), mask, weights)
