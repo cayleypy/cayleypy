@@ -53,7 +53,9 @@ def _unique_index(hashes: torch.Tensor) -> torch.Tensor:
     return idx[mask]
 
 
-def _expand_layer(graph: "CayleyGraph", states: torch.Tensor) -> _ExpandedLayer:
+def _expand_layer(
+    graph: "CayleyGraph", states: torch.Tensor, banned_moves: Optional[torch.Tensor] = None
+) -> _ExpandedLayer:
     """Applies all generators to `states` and removes duplicates, remembering where each state came from.
 
     This is a variant of `CayleyGraph.get_unique_states` that additionally keeps the link between a state on the next
@@ -62,16 +64,40 @@ def _expand_layer(graph: "CayleyGraph", states: torch.Tensor) -> _ExpandedLayer:
 
     :param graph: The Cayley graph.
     :param states: States of the current layer (in internal representation).
+    :param banned_moves: Id of one generator per state, which must not be applied to that state. Banned moves are
+        excluded before deduplication, so a state that is also produced by some allowed move is still returned.
+        Defaults to None, which means all generators are applied to all states.
     :return: States of the next layer, with provenance of each state.
     """
     n_states = int(states.shape[0])
     neighbors = graph.get_neighbors(states)
     hashes = graph.hasher.make_hashes(neighbors)
-    unique_idx = _unique_index(hashes)
     # `get_neighbors` writes neighbors in generator-major order: rows [i*n_states, (i+1)*n_states) are obtained by
     # applying generator i, so the id of that generator is the row index divided by the number of states.
+    if banned_moves is None:
+        unique_idx = _unique_index(hashes)
+    else:
+        allowed = torch.ones((graph.definition.n_generators, n_states), dtype=torch.bool, device=states.device)
+        allowed[banned_moves, torch.arange(n_states, device=states.device)] = False
+        allowed_idx = allowed.reshape(-1).nonzero().reshape(-1)
+        unique_idx = allowed_idx[_unique_index(hashes[allowed_idx])]
     moves = torch.div(unique_idx, n_states, rounding_mode="floor")
     return _ExpandedLayer(neighbors[unique_idx], hashes[unique_idx], moves, unique_idx)
+
+
+def _inverse_generators(graph: "CayleyGraph") -> torch.Tensor:
+    """Returns id of the inverse generator for each generator, as a tensor indexed by generator id.
+
+    :param graph: The Cayley graph.
+    :return: Tensor of shape `[n_generators]`, where element i is id of the generator inverse to generator i.
+    """
+    inverse_map = graph.definition.generators_inverse_map
+    if inverse_map is None:
+        raise ValueError(
+            "non_backtracking requires inverse-closed generators (for every generator, its inverse must also be a "
+            "generator), which is not the case for this graph."
+        )
+    return torch.tensor(inverse_map, dtype=torch.int64, device=graph.device)
 
 
 def _check_symmetries_match_graph(graph: "CayleyGraph", symmetry_group: "SymmetryGroup") -> None:
@@ -148,6 +174,7 @@ class BeamSearchAlgorithm:
         bfs_result_for_mitm: Optional[BfsResult] = None,
         use_child_scores: bool = False,
         canonical_dedup: Optional["SymmetryGroup"] = None,
+        non_backtracking: bool = False,
         verbose: int = 0,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to destination state using Beam Search algorithm.
@@ -176,6 +203,8 @@ class BeamSearchAlgorithm:
             (see :meth:`search_simple`). Defaults to False.
         :param canonical_dedup: For "simple" mode, symmetries by which to deduplicate the beam
             (see :meth:`search_simple`). Defaults to None, which means no deduplication by symmetries.
+        :param non_backtracking: For "simple" mode, whether to ban moves undoing the previous move
+            (see :meth:`search_simple`). In "advanced" mode, use `history_depth` instead. Defaults to False.
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
@@ -189,12 +218,15 @@ class BeamSearchAlgorithm:
                 bfs_result_for_mitm=bfs_result_for_mitm,
                 use_child_scores=use_child_scores,
                 canonical_dedup=canonical_dedup,
+                non_backtracking=non_backtracking,
             )
         elif beam_mode == "advanced":
             if use_child_scores:
                 raise ValueError("use_child_scores is supported only in 'simple' beam mode.")
             if canonical_dedup is not None:
                 raise ValueError("canonical_dedup is supported only in 'simple' beam mode.")
+            if non_backtracking:
+                raise ValueError("non_backtracking is supported only in 'simple' beam mode, use history_depth here.")
             return self.search_advanced(
                 start_state=start_state,
                 destination_state=destination_state,
@@ -218,6 +250,7 @@ class BeamSearchAlgorithm:
         bfs_result_for_mitm: Optional[BfsResult] = None,
         use_child_scores: bool = False,
         canonical_dedup: Optional["SymmetryGroup"] = None,
+        non_backtracking: bool = False,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
 
@@ -244,6 +277,13 @@ class BeamSearchAlgorithm:
             group of symmetries of this graph (:meth:`cayleypy.SymmetryGroup.verify` is called to check that), because
             deduplication by a set that is not a group throws away states that are not duplicates. Defaults to None,
             which means states are deduplicated only by equality, as usual.
+        :param non_backtracking: Whether to ban the move inverse to the move by which a state was reached. Such a move
+            leads back to a state on the previous layer, so banning it makes the beam cover more distinct states. This
+            is similar to `history_depth=1` in "advanced" mode, but it needs no memory to store hashes of the previous
+            layer. A state is banned only along the recorded move: if it is also produced by another move (from
+            another state of the beam), it stays. This pays off when the beam is narrow enough to be truncated; for a
+            beam wide enough to hold the whole layer, banning only removes states from it. Requires the generators to
+            be inverse-closed. Defaults to False.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         graph = self.graph
@@ -254,6 +294,7 @@ class BeamSearchAlgorithm:
             # Two states have equal canonical forms if and only if the symmetries form a group, so without this check a
             # set of symmetries that is not a group would silently drop states that are not duplicates of anything.
             canonical_dedup.verify()
+        inverse_generators = _inverse_generators(graph) if non_backtracking else None
 
         start_states = graph.encode_states(start_state)
         layer1, layer1_hashes = graph.get_unique_states(start_states)
@@ -291,14 +332,23 @@ class BeamSearchAlgorithm:
             assert path2 is not None
             return path1 + path2
 
+        # Moves banned on the current layer (one per state), None if nothing is banned.
+        banned_moves: Optional[torch.Tensor] = None
+        # When children are scored through their parents, or when moves undoing the previous move are banned, we need to
+        # know which (state, generator) pair produced each state of the next layer.
+        need_provenance = use_child_scores or non_backtracking
+
         for i in range(max_steps):
-            # Create states on the next layer. When children are scored through their parents, we additionally need to
-            # know which (state, generator) pair produced each state of the next layer.
-            expanded = _expand_layer(graph, layer1) if use_child_scores else None
+            # Create states on the next layer.
+            expanded = _expand_layer(graph, layer1, banned_moves) if need_provenance else None
             if expanded is not None:
                 layer2, layer2_hashes = expanded.states, expanded.hashes
             else:
                 layer2, layer2_hashes = graph.get_unique_states(graph.get_neighbors(layer1))
+
+            if layer2.shape[0] == 0:
+                # Can happen only with non_backtracking: the only move from every state of the beam was banned.
+                return BeamSearchResult(False, 0, None, debug_scores, graph.definition)
 
             bfs_layer_id = _check_path_found(layer2_hashes)
             if bfs_layer_id != -1:
@@ -317,20 +367,25 @@ class BeamSearchAlgorithm:
 
             # Pick `beam_width` states with lowest scores.
             if len(layer2) >= beam_width:
-                if expanded is not None:
+                if expanded is not None and use_child_scores:
                     scores = _score_children(graph, predictor, layer1)[expanded.source_index]
                 else:
                     scores = predictor(graph.decode_states(layer2))
                 idx = torch.argsort(scores)[:beam_width]
-                layer2 = layer2[idx, :]
-                layer2_hashes = layer2_hashes[idx]
                 best_score = float(scores[idx[0]].detach())
+                # Provenance is reordered along with the states, so it keeps describing the states next to it.
+                layer2, layer2_hashes = layer2[idx, :], layer2_hashes[idx]
+                if expanded is not None:
+                    expanded = _ExpandedLayer(layer2, layer2_hashes, expanded.moves[idx], expanded.source_index[idx])
                 debug_scores[i] = best_score
                 if graph.verbose >= 2:
                     print(f"Iteration {i}, best score {best_score}.")
 
             layer1 = layer2
             layer1_hashes = layer2_hashes
+            if non_backtracking:
+                assert inverse_generators is not None and expanded is not None
+                banned_moves = inverse_generators[expanded.moves]
             if return_path:
                 all_layers_hashes.append(layer1_hashes)
 
