@@ -148,6 +148,31 @@ def test_members_with_different_state_size_are_rejected():
         EnsemblePredictor([Predictor(graph1, "hamming"), Predictor(graph2, "hamming")])
 
 
+def test_members_for_another_graph_of_the_same_shape_are_rejected():
+    graph1 = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    # The same three generators in another order: the shape of the graph is the same, but scores of children are not
+    # comparable between the two graphs.
+    permutations = PermutationGroups.lrx(5).generators_permutations
+    graph2 = CayleyGraph(CayleyGraphDef.create([list(p) for p in reversed(permutations)]), device="cpu")
+    assert graph1.definition.n_generators == graph2.definition.n_generators
+    assert graph1.definition.state_size == graph2.definition.state_size
+    with pytest.raises(ValueError, match="same graph"):
+        EnsemblePredictor([Predictor(graph1, "hamming"), Predictor(graph2, "hamming")])
+
+
+def test_predictions_of_ensemble_of_q_models_are_rejected():
+    # A Q-model has nothing to say about a state itself, so such an ensemble works through score_children only.
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+
+    class _QModel(torch.nn.Module):
+        def forward(self, states: torch.Tensor) -> torch.Tensor:
+            return torch.zeros((states.shape[0], graph.definition.n_generators))
+
+    ensemble = EnsemblePredictor([Predictor(graph, _QModel()), Predictor(graph, _QModel())])
+    with pytest.raises(ValueError, match="one score per state"):
+        ensemble(STATES)
+
+
 def test_member_that_is_not_predictor_is_rejected():
     graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
     with pytest.raises(TypeError, match="wrapped in Predictor"):

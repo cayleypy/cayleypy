@@ -4,6 +4,7 @@ from typing import Optional
 
 import torch
 
+from .models.checkpoint import graph_hash
 from .predictor import Predictor
 
 
@@ -18,10 +19,13 @@ class EnsemblePredictor(Predictor):
     sum. Weights are used as they are given and are not normalized, so it is up to the caller to make them sum to 1
     (which is what the default weights do).
 
-    Members can be any predictors, including multi-output (Q-) models. Both scoring methods are ensembled:
-    :meth:`__call__` combines scores of the states themselves, and :meth:`score_children` combines scores of their
-    children (asking every member for its own children scores, so members implementing the fast single-pass
-    :meth:`Predictor.score_children` keep using it).
+    Both scoring methods are ensembled: :meth:`__call__` combines scores of the states themselves, and
+    :meth:`score_children` combines scores of their children (asking every member for its own children scores, so
+    members implementing the fast single-pass :meth:`Predictor.score_children` keep using it).
+
+    Members scoring children of a state instead of the state itself (Q-models) can be ensembled through
+    :meth:`score_children` only - like the models themselves, they have nothing to say about a state, so
+    :meth:`__call__` needs every member to return one score per state.
 
     Example:
 
@@ -35,8 +39,9 @@ class EnsemblePredictor(Predictor):
     def __init__(self, members: list[Predictor], weights: Optional[list[float]] = None):
         """Initializes EnsemblePredictor.
 
-        :param members: Predictors to combine. They must be for the same graph (at least, the number of generators and
-            the state size must be the same).
+        :param members: Predictors to combine. They must be for the same graph, which is checked by comparing the
+            mathematical definitions of their graphs (see :func:`cayleypy.models.graph_hash`) - members for different
+            graphs would have their scores of unrelated children summed up.
         :param weights: Weight of each member (optional). Score of member ``i`` is multiplied by ``weights[i]``, and
             the products are summed up, without any normalization. If None, defaults to ``1/len(members)`` for every
             member, which makes the ensemble compute the average of its members.
@@ -55,6 +60,7 @@ class EnsemblePredictor(Predictor):
             raise ValueError(f"Ensemble has {len(members)} members, but {len(weights)} weights were given.")
 
         first = members[0].graph.definition
+        first_hash = graph_hash(first)
         for i, member in enumerate(members):
             other = member.graph.definition
             if other.n_generators != first.n_generators or other.state_size != first.state_size:
@@ -62,6 +68,14 @@ class EnsemblePredictor(Predictor):
                     "All members of an ensemble must be for the same graph, but member 0 has "
                     f"{first.n_generators} generators and state size {first.state_size}, while member {i} has "
                     f"{other.n_generators} generators and state size {other.state_size}."
+                )
+            # Graphs of the same shape can still be different graphs, and for members scoring children even a different
+            # order of the generators is enough to make the weighted sum meaningless.
+            if graph_hash(other) != first_hash:
+                raise ValueError(
+                    f"All members of an ensemble must be for the same graph, but member {i} is for another graph with "
+                    "the same number of generators and the same state size (its generators or its central state are "
+                    "different)."
                 )
 
         self.members = list(members)
