@@ -43,6 +43,8 @@ Beam search and ML
     cayleypy.algo.BeamSearchResult
     cayleypy.algo.RandomWalksGenerator
     cayleypy.models.ModelConfig
+    cayleypy.models.MlpModel
+    cayleypy.models.ResMlpModel
     cayleypy.models.graph_hash
     cayleypy.models.save_checkpoint
     cayleypy.models.load_checkpoint
