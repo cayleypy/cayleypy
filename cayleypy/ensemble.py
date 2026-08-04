@@ -29,6 +29,7 @@ class EnsemblePredictor(Predictor):
 
     Example:
 
+    >>> import torch
     >>> from cayleypy import CayleyGraph, EnsemblePredictor, PermutationGroups, Predictor
     >>> graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
     >>> ensemble = EnsemblePredictor([Predictor(graph, "hamming"), Predictor(graph, "zero")], [0.75, 0.25])
