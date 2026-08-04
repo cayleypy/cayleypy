@@ -391,6 +391,8 @@ class SymmetrizedPredictor(Predictor):
         self.base = base
         self.symmetry_group = symmetry_group
         super().__init__(base.graph, self._predict_symmetrized)
+        # Symmetrizing a Q-model leaves it a Q-model: callers dispatch on this to score children instead of states.
+        self.n_outputs = base.n_outputs
 
     def _predict_symmetrized(self, states: torch.Tensor) -> torch.Tensor:
         symmetries = range(self.symmetry_group.n_symmetries)
