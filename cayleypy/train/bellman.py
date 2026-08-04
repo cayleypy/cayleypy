@@ -73,8 +73,11 @@ def _values(graph: "CayleyGraph", target: Predictor, encoded_states: torch.Tenso
     :param encoded_states: States in internal representation.
     :return: Tensor of shape ``[n_states]`` with estimated distances.
     """
+    states = graph.decode_states(encoded_states)
     with torch.no_grad():
-        output = target.predict_batched(graph.decode_states(encoded_states))
+        # A Q-model, and any predictor wrapping one (an ensemble, or test-time augmentation), gives its outputs through
+        # score_children - unlike `predict_batched`, which those wrappers can only implement for one score per state.
+        output = target.score_children(states) if target.n_outputs != 1 else target.predict_batched(states)
     if output.dim() == 2:
         n_generators = graph.definition.n_generators
         if output.shape[1] != n_generators:
