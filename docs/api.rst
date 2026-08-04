@@ -70,6 +70,9 @@ Training
     cayleypy.train.BfsAnchors
     cayleypy.train.PathDataSource
     cayleypy.train.MixtureDataSource
+    cayleypy.train.bellman_targets
+    cayleypy.train.BellmanTargets
+    cayleypy.train.BellmanTrainer
 
 BFS algorithm and its variations
 ''''''''''''''''''''''''''''''''
