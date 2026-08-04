@@ -188,13 +188,56 @@ Each such model is a PyTorch neural network which consists of 3 parts:
 * Model architecture hyperparameters (such as input size or sizes of hidden layers) - defined by `models.ModelConfig`.
 * Model weights - these are stored on Kaggle.
 
+A model has either one output - an estimate of the distance of the state it is applied to - or one output per generator
+of the graph (a Q-model), which estimates distances of all children of a state in one forward pass. Beam search uses a
+Q-model when called with `use_child_scores=True`, see `Predictor.score_children`.
+
 List of currently available models is 
 [here](https://github.com/cayleypy/cayleypy/blob/main/cayleypy/models/models_lib.py).
+
+Models can be trained with `cayleypy.train`. For example, this is how the Q-model for "lrx-14" was trained (in about 3
+minutes on a CPU):
+
+```python
+from cayleypy import CayleyGraph, PermutationGroups
+from cayleypy.models import ModelConfig
+from cayleypy.train import TrainConfig, Trainer
+
+graph = CayleyGraph(PermutationGroups.lrx(14), device="cpu", random_seed=42)
+model_config = ModelConfig(
+    model_type="RESMLP",
+    input_size=14,
+    num_classes_for_one_hot=14,
+    layers_sizes=[512, 512, 512],
+    n_outputs=graph.definition.n_generators,  # One output per generator, i.e. a Q-model.
+)
+train_config = TrainConfig(
+    n_epochs=200,
+    n_walks=1024,
+    rw_length=92,  # Diameter of this graph is 91.
+    batch_size=1024,
+    lr=1e-3,
+    lr_min=1e-5,
+    ema_decay=0.999,
+    anchors_depth=6,  # Mix in states whose exact distance is known from a breadth-first search.
+    anchors_fraction=0.02,
+    seed=42,
+    verbose=1,
+)
+trainer = Trainer(graph, model_config, train_config)
+trainer.train()
+trainer.save("lrx_14_q_resmlp.pt")  # Self-describing checkpoint: it also stores the config and the hash of the graph.
+```
+
+With beam width 1000, this model finds a path for 50 out of 50 uniformly random permutations of 14 elements (mean path
+length 61.2, diameter of the graph is 91), while the Hamming distance heuristic finds none of them.
 
 ### How to add a new predictor model
 1. Train your model.
 2. Verify that when used with beam search, it reliably finds the paths.
-3. Export weights to a file (using `torch.save(model.state_dict(), path`).
+3. Export weights to a file - either as a bare state dict (`torch.save(model.state_dict(), path)`) or as a
+    self-describing checkpoint (`models.save_checkpoint`, which is also what `train.Trainer.save` writes). Both are
+    accepted by `ModelConfig.load`.
 4. Upload weights as model on Kaggle, make it public and use open source license (MIT license is recommended).
 5. Make sure the graph for which your model should be used has unique name (that is, `CayleyGraphDef.name`). For
     example, `PermutationGroups.lrx(16)` has name "lrx-16". Also `prepare_graph` given this name should return
@@ -203,6 +246,9 @@ List of currently available models is
     * `weights_kaggle_id` is identifier of your saved model on Kaggle. This is what you would pass to 
       `kagglehub.model_download`.
     * `weights_path` is the name of file with weights.
+    * `graph_hash` is hash of the graph your model was trained for (see `models.graph_hash`; a checkpoint written by
+        `train.Trainer.save` already stores it). Set it, and loading your model for a graph that has the expected name
+        but another definition will fail instead of silently returning nonsense.
     * If your can be exactly described by one of available model types in `models/models.py`, use that model type
         with appropriate hyperparameters. If needed, add new hyperparameters to ModelConfig.
     * If your model architecture is very different from we already have in library, define new model type for it.

@@ -6,7 +6,65 @@ from typing import Any, Optional
 
 import kagglehub
 import torch
+from kagglehub import exceptions as kagglehub_exceptions
 from torch import nn
+
+# Errors kagglehub raises when weights cannot be downloaded: no network, no credentials, no such model. They are
+# wrapped, because on their own they do not say which model of CayleyPy failed to load.
+_KAGGLEHUB_ERRORS = (
+    # Errors of the "requests" library, including kagglehub.exceptions.KaggleApiHTTPError, are subclasses of OSError.
+    OSError,
+    kagglehub_exceptions.BackendError,
+    kagglehub_exceptions.CredentialError,
+    kagglehub_exceptions.DataCorruptionError,
+    kagglehub_exceptions.NotFoundError,
+    kagglehub_exceptions.UnauthenticatedError,
+)
+
+
+def _download_from_kaggle(kaggle_id: str) -> str:
+    """Downloads Kaggle model with weights, reporting failures as errors naming that model.
+
+    :param kaggle_id: Id of the Kaggle model, as passed to `kagglehub.model_download`.
+    :return: Path to the directory the model was downloaded to.
+    """
+    try:
+        return kagglehub.model_download(kaggle_id)
+    except _KAGGLEHUB_ERRORS as error:
+        raise RuntimeError(
+            f'Could not download weights from Kaggle model "{kaggle_id}": {error}. Downloading weights needs network '
+            "access, and weights of a model that is not public also need Kaggle credentials to be configured (see "
+            "https://github.com/Kaggle/kagglehub)."
+        ) from error
+
+
+def _load_state_dict(path: str, device: str, config: "ModelConfig") -> dict[str, Any]:
+    """Loads state dict from a file with weights.
+
+    Both bare state dicts and self-describing checkpoints written by :func:`cayleypy.models.save_checkpoint` are
+    accepted, so weights saved in either format can be used for a model of :data:`PREDICTOR_MODELS`. A checkpoint says
+    which graph it was trained for, and that is checked against `config`.
+
+    :param path: Path to the file with weights.
+    :param device: PyTorch device to load the weights to.
+    :param config: Config of the model the weights are being loaded into.
+    :return: The state dict.
+    """
+    # `weights_only=True` is passed explicitly: files with weights contain only tensors and primitive values, so we
+    # never need to unpickle arbitrary objects from them (and must not, because they are downloaded from the internet).
+    data = torch.load(path, map_location=device, weights_only=True)
+    if not isinstance(data, dict) or "state_dict" not in data:
+        # A bare state dict says nothing about itself, so there is nothing to check.
+        return data
+    stored_config = data.get("config")
+    stored_hash = stored_config.get("graph_hash") if isinstance(stored_config, dict) else None
+    if stored_hash is not None and config.graph_hash is not None and stored_hash != config.graph_hash:
+        # Shapes of the weights can match while they mean nothing for this graph, so this must not pass silently.
+        raise ValueError(
+            f"Checkpoint {path} was trained for another graph (hash in the checkpoint is {stored_hash}, hash in the "
+            f"config of the model is {config.graph_hash})."
+        )
+    return data["state_dict"]
 
 
 @dataclass(frozen=True)
@@ -90,10 +148,8 @@ class ModelConfig:
         if self.weights_path is not None:
             path = self.weights_path
             if self.weights_kaggle_id is not None:
-                model_dir = kagglehub.model_download(self.weights_kaggle_id)
-                path = os.path.join(model_dir, path)
-            # Weights in this format are bare state dicts, so we never need to unpickle arbitrary objects from them.
-            model.load_state_dict(torch.load(path, map_location=device, weights_only=True))
+                path = os.path.join(_download_from_kaggle(self.weights_kaggle_id), path)
+            model.load_state_dict(_load_state_dict(path, device, self))
         return model.to(device)
 
 
