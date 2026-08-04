@@ -39,6 +39,8 @@ Beam search and ML
     :toctree: generated/
 
     cayleypy.Predictor
+    cayleypy.LowerBound
+    cayleypy.BfsLowerBound
     cayleypy.SymmetryGroup
     cayleypy.SymmetrizedPredictor
     cayleypy.algo.BeamSearchAlgorithm

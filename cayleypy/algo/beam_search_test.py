@@ -10,6 +10,7 @@ import torch
 from ..cayley_graph import CayleyGraph
 from ..cayley_graph_def import CayleyGraphDef
 from ..graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
+from ..lower_bound import BfsLowerBound
 from ..predictor import Predictor
 from ..puzzles import Puzzles
 from ..symmetries import SymmetryGroup
@@ -673,6 +674,243 @@ def test_beam_search_non_backtracking_not_supported_in_advanced_mode():
 
     with pytest.raises(ValueError, match="only in 'simple' beam mode"):
         graph.beam_search(start_state=[4, 1, 0, 2, 3], beam_mode="advanced", non_backtracking=True)
+
+
+# =============================================================================
+# Tests for lower bound pruning in "simple" beam search mode
+# =============================================================================
+
+
+def _exact_distances(graph: CayleyGraph) -> dict[tuple[int, ...], int]:
+    """Returns exact distances from all states to the central state, computed by BFS."""
+    bfs_result = graph.bfs(max_layer_size_to_store=None)
+    return {tuple(int(x) for x in s): d for d, layer in bfs_result.layers.items() for s in layer}
+
+
+def _exact_lower_bound(graph: CayleyGraph) -> BfsLowerBound:
+    """Returns lower bound that is exact for every state of the graph (full BFS)."""
+    return BfsLowerBound(graph, graph.bfs(return_all_hashes=True))
+
+
+class _WrongShapeLowerBound:
+    """Lower bound returning one value for the whole batch instead of one value per state."""
+
+    def lb(self, states: torch.Tensor) -> torch.Tensor:
+        assert states.shape[0] > 0
+        return torch.zeros((1,), dtype=torch.int64)
+
+
+def test_beam_search_lower_bound_with_exact_bound_finds_optimal_paths():
+    """Test that with an exact lower bound, the beam keeps only states on optimal paths.
+
+    A state reached in `k` steps is kept only if `k+lb(state) <= prune_above`. When the bound is exact and
+    `prune_above` is the true distance, this means the state is on some optimal path. So beam search finds an optimal
+    path from every state, even with beam width 1 (where it otherwise follows the Hamming heuristic and gets stuck).
+    """
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    lower_bound = _exact_lower_bound(graph)
+    solved_plain, solved_pruned = 0, 0
+
+    for state, distance in _exact_distances(graph).items():
+        if distance == 0:
+            continue
+        kwargs = {"start_state": list(state), "beam_width": 1, "max_steps": 30, "return_path": True}
+        plain = graph.beam_search(**kwargs)
+        pruned = graph.beam_search(lower_bound=lower_bound, prune_above=distance, **kwargs)
+        solved_plain += plain.path_found
+        assert pruned.path_found, f"No path found from {state}, but the optimal path was not pruned."
+        assert pruned.path_length == distance
+        _validate_beam_search_result(graph, list(state), pruned)
+        solved_pruned += 1
+
+    assert solved_plain < 15
+    assert solved_pruned == 119
+
+
+def test_beam_search_lower_bound_does_not_change_result_when_bound_is_not_binding():
+    """Test that pruning with a large `prune_above` changes nothing (nothing can be pruned)."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    lower_bound = BfsLowerBound(graph, graph.bfs(max_diameter=3, return_all_hashes=True))
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+    kwargs = {"start_state": start_state, "beam_width": 10, "max_steps": 50, "return_path": True}
+
+    result1 = graph.beam_search(**kwargs)
+    result2 = graph.beam_search(lower_bound=lower_bound, prune_above=1000, **kwargs)
+
+    _validate_beam_search_result(graph, start_state, result2)
+    assert result1.path == result2.path
+    assert len(result1.debug_scores) > 0
+    assert result1.debug_scores == result2.debug_scores
+
+
+def test_beam_search_lower_bound_disabled_by_default():
+    """Test that without `lower_bound` and `prune_above`, the search is exactly the old one."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+    kwargs = {"start_state": start_state, "beam_width": 10, "max_steps": 50, "return_path": True}
+
+    result1 = graph.beam_search(**kwargs)
+    result2 = graph.beam_search(lower_bound=None, prune_above=None, **kwargs)
+
+    assert result1.path == result2.path
+    assert len(result1.debug_scores) > 0
+    assert result1.debug_scores == result2.debug_scores
+
+
+def test_beam_search_prune_above_below_distance_fails_immediately():
+    """Test that the search stops as soon as the lower bound says the budget cannot be met."""
+    graph = CayleyGraph(PermutationGroups.lrx(6), device="cpu")
+    lower_bound = _exact_lower_bound(graph)
+    start_state = [5, 4, 3, 2, 1, 0]
+    distance = _exact_distances(graph)[tuple(start_state)]
+    assert distance == 13
+
+    result = graph.beam_search(
+        start_state=start_state, beam_width=100, max_steps=50, lower_bound=lower_bound, prune_above=distance
+    )
+
+    assert result.path_found and result.path_length == distance
+    for prune_above in range(distance):
+        pruned = graph.beam_search(
+            start_state=start_state, beam_width=100, max_steps=50, lower_bound=lower_bound, prune_above=prune_above
+        )
+        assert not pruned.path_found
+        # All states of the layer are pruned as soon as the remaining budget is less than the distance left to go.
+        assert len(pruned.debug_scores) <= prune_above
+
+
+def test_beam_search_prune_above_does_not_reject_a_found_path():
+    """Test that a path is not lost because it is longer than the budget: pruning happens after the path is found."""
+    graph = CayleyGraph(PermutationGroups.lrx(6), device="cpu")
+    lower_bound = _exact_lower_bound(graph)
+    kwargs = {"beam_width": 10, "max_steps": 50, "lower_bound": lower_bound, "prune_above": 0}
+
+    # The central state is one step away, and reaching it is noticed before anything is pruned.
+    result1 = graph.beam_search(start_state=[1, 0, 2, 3, 4, 5], **kwargs)
+    # Here it is two steps away, and everything is pruned after the first step.
+    result2 = graph.beam_search(start_state=[1, 2, 0, 3, 4, 5], **kwargs)
+
+    assert result1.path_found and result1.path_length == 1
+    assert not result2.path_found
+
+
+@pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
+def test_beam_search_lower_bound_from_partial_bfs_gets_stronger_with_radius():
+    """Test that a bound from a larger ball prunes more, so more states are solved optimally."""
+    graph = CayleyGraph(PermutationGroups.lrx(6), device="cpu")
+    distances = _exact_distances(graph)
+    solved = {}
+
+    for radius in [0, 3, 9]:
+        lower_bound = BfsLowerBound(graph, graph.bfs(max_diameter=radius, return_all_hashes=True))
+        solved[radius] = 0
+        for state, distance in distances.items():
+            if distance == 0:
+                continue
+            result = graph.beam_search(
+                start_state=list(state),
+                beam_width=3,
+                max_steps=30,
+                lower_bound=lower_bound,
+                prune_above=distance,
+            )
+            # Every path found under this bound has optimal length, because longer paths are pruned.
+            assert not result.path_found or result.path_length == distance
+            solved[radius] += result.path_found
+
+    # With radius 0, the bound is "0 for the central state, 1 for everything else" - almost nothing is pruned.
+    assert solved[0] < 50
+    assert solved[3] > 100
+    assert solved[9] > 600
+
+
+def test_beam_search_lower_bound_with_child_scores_dedup_and_non_backtracking():
+    """Test that pruning keeps scores and moves of children matched with the states they belong to."""
+    graph_def = PermutationGroups.lrx(8)
+    graph = CayleyGraph(graph_def, device="cpu")
+    lower_bound = BfsLowerBound(graph, graph.bfs(max_diameter=3, return_all_hashes=True))
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+    kwargs = {
+        "start_state": start_state,
+        "beam_width": 10,
+        "max_steps": 50,
+        "return_path": True,
+        "lower_bound": lower_bound,
+        "prune_above": 12,
+        "canonical_dedup": SymmetryGroup.reflections(graph_def),
+        "non_backtracking": True,
+    }
+
+    result_scalar = graph.beam_search(predictor=Predictor(graph, "hamming"), **kwargs)
+    result_q = graph.beam_search(predictor=_ChildrenHammingPredictor(graph), use_child_scores=True, **kwargs)
+
+    _validate_beam_search_result(graph, start_state, result_scalar)
+    assert result_scalar.path_length <= 12
+    assert result_scalar.path == result_q.path
+    assert len(result_scalar.debug_scores) > 0
+    assert result_scalar.debug_scores == result_q.debug_scores
+
+
+def test_beam_search_lower_bound_with_meet_in_the_middle():
+    """Test that pruning works together with meet-in-the-middle."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    bfs_result = graph.bfs(max_diameter=3, return_all_hashes=True)
+    lower_bound = BfsLowerBound(graph, bfs_result)
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+
+    result = graph.beam_search(
+        start_state=start_state,
+        beam_width=10,
+        max_steps=50,
+        return_path=True,
+        bfs_result_for_mitm=bfs_result,
+        lower_bound=lower_bound,
+        prune_above=12,
+    )
+
+    _validate_beam_search_result(graph, start_state, result)
+
+
+def test_beam_search_lower_bound_requires_prune_above():
+    """Test that a lower bound without a budget to compare it with is rejected."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    lower_bound = _exact_lower_bound(graph)
+
+    with pytest.raises(ValueError, match="must be specified together"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], lower_bound=lower_bound)
+
+
+def test_beam_search_prune_above_requires_lower_bound():
+    """Test that a budget without a lower bound to compare with it is rejected."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+
+    with pytest.raises(ValueError, match="must be specified together"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], prune_above=10)
+
+
+def test_beam_search_prune_above_must_be_non_negative():
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    lower_bound = _exact_lower_bound(graph)
+
+    with pytest.raises(ValueError, match="non-negative"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], lower_bound=lower_bound, prune_above=-1)
+
+
+def test_beam_search_lower_bound_rejects_wrong_shape():
+    """Test that a lower bound returning one value for the whole batch is rejected."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+
+    with pytest.raises(ValueError, match="shape"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], lower_bound=_WrongShapeLowerBound(), prune_above=10)
+
+
+def test_beam_search_lower_bound_not_supported_in_advanced_mode():
+    """Test that pruning is rejected in "advanced" mode, where it is not implemented."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    lower_bound = _exact_lower_bound(graph)
+
+    with pytest.raises(ValueError, match="only in 'simple' beam mode"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], beam_mode="advanced", lower_bound=lower_bound, prune_above=10)
 
 
 # =============================================================================
