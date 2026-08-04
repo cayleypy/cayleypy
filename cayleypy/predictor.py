@@ -105,8 +105,11 @@ class Predictor:
         :return: Tensor of shape ``[n_states, n_generators]`` with estimated distances for children.
         """
         n_generators = self.graph.definition.n_generators
-        encoded_states = self.graph.encode_states(states)
-        num_states = int(encoded_states.shape[0])
+        # The model consumes states in decoded representation, so they are only brought to the expected shape here. The
+        # internal representation is computed below, where it is needed - for `get_neighbors`.
+        decoded_shape = (-1,) + self.graph.definition.decoded_state_shape
+        states = torch.as_tensor(states, device=self.graph.device).reshape(decoded_shape)
+        num_states = int(states.shape[0])
         if self.n_outputs != 1:
             if self.n_outputs != n_generators:
                 raise ValueError(
@@ -114,14 +117,14 @@ class Predictor:
                     "score children must have either 1 output (for the state it is applied to), or one output per "
                     "generator (for every child of that state)."
                 )
-            scores = self.predict_batched(self.graph.decode_states(encoded_states))
+            scores = self.predict_batched(states)
             if tuple(scores.shape) != (num_states, n_generators):
                 raise ValueError(
                     f"Model returned output of shape {tuple(scores.shape)}, but shape "
                     f"({num_states}, {n_generators}) was expected."
                 )
             return scores
-        children = self.graph.decode_states(self.graph.get_neighbors(encoded_states))
+        children = self.graph.decode_states(self.graph.get_neighbors(self.graph.encode_states(states)))
         scores = self(children)
         # `get_neighbors` returns neighbors in generator-major order: rows [i*num_states, (i+1)*num_states) are children
         # obtained by applying generator i. Hence, the answer must be transposed.

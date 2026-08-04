@@ -5,6 +5,11 @@ walks are cheap but their targets are upper estimates, breadth-first search give
 central state, and paths found by beam search give targets for states nothing else reaches. Mixing them is what makes
 training work, and :class:`MixtureDataSource` does that in given proportions.
 
+Random walks and breadth-first search both start at the central state, so what their targets measure is the distance
+from it, while a predictor is asked for the distance to it. These are the same distance only when the generators of the
+graph are inverse closed - for a graph whose generators are not, train on the graph returned by
+``CayleyGraph.with_inverted_generators`` (the sources that cannot work at all without inverse closed generators say so).
+
 Example:
 
 >>> from cayleypy import CayleyGraph, PermutationGroups
@@ -340,7 +345,9 @@ class BfsAnchors(DataSource):
     ):
         """Initializes BfsAnchors and runs the breadth-first search (once - :meth:`generate` only samples from it).
 
-        :param graph: Graph to search in.
+        :param graph: Graph to search in. Its generators should be inverse closed - the search starts at the central
+            state, so without that its targets are distances from the central state, not to it (see the module
+            docstring).
         :param depth: How many layers of breadth-first search to compute. Must be at least 1. Deeper means more states
             with exact distances, and quickly more memory.
         :param size: How many states :meth:`generate` returns, sampled with replacement. Defaults to None, meaning all
@@ -537,11 +544,17 @@ class PathDataSource(DataSource):
         generator_ids = {name: i for i, name in enumerate(graph.definition.generator_names)}
         paths = []
         with open(path, "r", encoding="utf-8", newline="") as file:
-            for row_id, row in enumerate(csv.DictReader(file, delimiter="\t")):
-                if puzzle_id is not None and row.get("puzzle_id", "").strip(_CELL_PREFIXES) != puzzle_id:
+            reader = csv.DictReader(file, delimiter="\t")
+            # Columns are checked against the header, not against a row: a file whose rows are all filtered out (or
+            # which has no rows at all) must still say that the column it was asked for is not there.
+            columns = list(reader.fieldnames or [])
+            for needed in [column] + (["puzzle_id"] if puzzle_id is not None else []):
+                if needed not in columns:
+                    raise ValueError(f'File has no column "{needed}", its columns are: {sorted(columns)}.')
+            for row_id, row in enumerate(reader):
+                # A row shorter than the header has None in the columns it does not reach.
+                if puzzle_id is not None and (row["puzzle_id"] or "").strip(_CELL_PREFIXES) != puzzle_id:
                     continue
-                if column not in row:
-                    raise ValueError(f'File has no column "{column}", its columns are: {sorted(row)}.')
                 solution = (row[column] or "").strip(_CELL_PREFIXES)
                 if solution == "":
                     continue
@@ -663,7 +676,12 @@ class MixtureDataSource(DataSource):
         :return: Data from all sources, in one piece.
         """
         parts = [source.generate() for source in self.sources]
-        n_states = min(len(part) / fraction for part, fraction in zip(parts, self.fractions))
+        # A source that generated nothing is left out of this minimum: with 0 in it, every other source would be cut
+        # down to a single state, i.e. one dry source would silently reduce the whole epoch to almost no data.
+        sizes = [len(part) / fraction for part, fraction in zip(parts, self.fractions) if len(part) > 0]
+        if len(sizes) == 0:
+            raise ValueError("All data sources of this mixture generated no states.")
+        n_states = min(sizes)
         pieces = []
         for part, fraction in zip(parts, self.fractions):
             # Every source that generated something contributes at least one state, so that a source is never silently
