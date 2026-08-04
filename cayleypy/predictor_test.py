@@ -4,6 +4,7 @@ import torch
 
 from .cayley_graph import CayleyGraph
 from .graphs_lib import PermutationGroups
+from .models import ModelConfig
 from .predictor import Predictor
 
 
@@ -112,6 +113,21 @@ def test_score_children_with_batching():
         assert torch.equal(scores[:, i], predictor(graph.apply_path(states, [i])))
 
 
+class HammingQModel(torch.nn.Module):
+    """Q-model equivalent to the "hamming" heuristic: output j is Hamming distance of the j-th child."""
+
+    def __init__(self, graph: CayleyGraph):
+        super().__init__()
+        self.graph = graph
+        self.n_outputs = graph.definition.n_generators
+        self.num_calls = 0
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        self.num_calls += 1
+        children = [self.graph.apply_path(x, [i]) for i in range(self.n_outputs)]
+        return torch.stack([torch.sum(child != self.graph.central_state, dim=1) for child in children], dim=1)
+
+
 @pytest.mark.parametrize("batch_size", [1024, 4])
 def test_predictor_converts_output_of_a_model_not_written_in_torch(batch_size):
     """A model with a `predict` method is a supported predictor, and sklearn estimators return NumPy arrays."""
@@ -128,11 +144,82 @@ def test_predictor_converts_output_of_a_model_not_written_in_torch(batch_size):
         assert torch.equal(scores[:, i], predictor(graph.apply_path(states, [i])))
 
 
-def test_score_children_rejects_2d_output():
+def test_score_children_uses_q_model():
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu")
-    predictor = Predictor(graph, MultiOutputModel(graph_def.n_generators))
-    with pytest.raises(ValueError, match="score_children"):
+    states = torch.tensor([[0, 1, 2, 3, 4], [1, 2, 3, 4, 0], [4, 3, 2, 1, 0], [0, 2, 1, 3, 4]])
+    model = HammingQModel(graph)
+    q_predictor = Predictor(graph, model)
+    scalar_predictor = Predictor(graph, "hamming")
+
+    scores = q_predictor.score_children(states)
+    assert scores.shape == (4, graph_def.n_generators)
+
+    # A Q-model and its scalar equivalent must give the same scores, column by column.
+    expected = scalar_predictor.score_children(states)
+    for i in range(graph_def.n_generators):
+        assert torch.equal(scores[:, i], expected[:, i])
+
+    # Sanity check that this test can distinguish columns from each other.
+    assert len({tuple(scores[:, i].tolist()) for i in range(graph_def.n_generators)}) > 1
+
+    # The whole answer was computed by a single call to the model (the scalar path needs one call per generator).
+    assert model.num_calls == 1
+
+
+def test_score_children_by_q_model_with_batching():
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu", batch_size=3)
+    states = torch.tensor([[i % 5, (i + 1) % 5, 2, 3, 4] for i in range(7)])
+    predictor = Predictor(graph, HammingQModel(graph))
+
+    scores = predictor.score_children(states)
+    assert scores.shape == (7, graph_def.n_generators)
+    for i in range(graph_def.n_generators):
+        assert torch.equal(scores[:, i], Predictor(graph, "hamming")(graph.apply_path(states, [i])))
+
+
+def test_score_children_rejects_wrong_number_of_outputs():
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu")
+    predictor = Predictor(graph, MultiOutputModel(graph_def.n_generators + 1))
+    with pytest.raises(ValueError, match="but the graph has 3 generators"):
+        predictor.score_children(torch.tensor([[0, 1, 2, 3, 4]]))
+
+
+def test_score_children_with_q_model_from_config():
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu")
+    config = ModelConfig(
+        model_type="RESMLP",
+        input_size=5,
+        num_classes_for_one_hot=5,
+        layers_sizes=[8, 8],
+        n_outputs=graph_def.n_generators,
+    )
+
+    # Models built from a config declare their number of outputs, so no wrapper is needed to use them as Q-models.
+    predictor = Predictor(graph, config.build_model())
+    scores = predictor.score_children(torch.tensor([[0, 1, 2, 3, 4], [1, 2, 3, 4, 0]]))
+    assert scores.shape == (2, graph_def.n_generators)
+
+
+class WrongShapeModel(torch.nn.Module):
+    """Model that declares one output per generator, but returns one score per state."""
+
+    def __init__(self, n_outputs: int):
+        super().__init__()
+        self.n_outputs = n_outputs
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return torch.zeros((x.shape[0],))
+
+
+def test_score_children_rejects_wrong_output_shape():
+    graph_def = PermutationGroups.lrx(5)
+    graph = CayleyGraph(graph_def, device="cpu")
+    predictor = Predictor(graph, WrongShapeModel(graph_def.n_generators))
+    with pytest.raises(ValueError, match=r"but shape \(1, 3\) was expected"):
         predictor.score_children(torch.tensor([[0, 1, 2, 3, 4]]))
 
 
