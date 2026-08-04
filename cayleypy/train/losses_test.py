@@ -78,6 +78,39 @@ def test_mask_can_be_numeric():
     assert torch.allclose(loss(predictions, targets, mask=numeric_mask), loss(predictions, targets, mask=bool_mask))
 
 
+@pytest.mark.parametrize("bad_target", [float("nan"), float("inf"), float("-inf")])
+def test_mask_ignores_non_finite_targets_of_unlabeled_elements(bad_target):
+    """Targets of unlabeled elements are documented to be arbitrary, and that includes non-finite ones."""
+    loss = MseLoss()
+    predictions = torch.zeros((2, 2), requires_grad=True)
+    targets = torch.tensor([[1.0, bad_target], [2.0, 3.0]])
+    mask = torch.tensor([[True, False], [True, True]])
+    value = loss(predictions, targets, mask=mask)
+    # Only the errors of the labeled elements: 1, 4 and 9, over the 3 of them.
+    assert torch.allclose(value, torch.tensor(14.0 / 3))
+    value.backward()
+    assert predictions.grad is not None
+    assert not bool(torch.isnan(predictions.grad).any())
+    assert float(predictions.grad[0, 1]) == 0.0
+
+
+def test_mask_magnitude_does_not_reweight_labeled_elements():
+    """Nonzero in a mask means "labeled" and nothing else, so a 2 must not count an element twice."""
+    loss = MseLoss()
+    predictions = torch.zeros(2)
+    targets = torch.tensor([1.0, 3.0])
+    indicator = loss(predictions, targets, mask=torch.tensor([1.0, 1.0]))
+    assert torch.allclose(loss(predictions, targets, mask=torch.tensor([1.0, 2.0])), indicator)
+
+
+def test_fully_masked_batch_gives_zero_loss_in_half_precision():
+    """The lower bound on the denominator has to be representable in the dtype of the predictions."""
+    loss = MseLoss()
+    predictions = torch.zeros((1, 2), dtype=torch.float16)
+    targets = torch.ones((1, 2), dtype=torch.float16)
+    assert float(loss(predictions, targets, mask=torch.zeros((1, 2), dtype=torch.float16))) == 0.0
+
+
 def test_mask_blocks_gradient():
     predictions = torch.tensor([[1.0, 2.0, 3.0]], requires_grad=True)
     targets = torch.tensor([[2.0, 1e9, 1e9]])
