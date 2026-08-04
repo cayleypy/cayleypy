@@ -45,7 +45,7 @@ class BfsLowerBound:
     Example:
 
     >>> from cayleypy import BfsLowerBound, CayleyGraph, PermutationGroups
-    >>> graph = CayleyGraph(PermutationGroups.lrx(6))
+    >>> graph = CayleyGraph(PermutationGroups.lrx(6), device="cpu")
     >>> lower_bound = BfsLowerBound(graph, graph.bfs(max_diameter=2, return_all_hashes=True))
     >>> lower_bound.lb([[0, 1, 2, 3, 4, 5], [1, 0, 2, 3, 4, 5], [5, 4, 3, 2, 1, 0]]).tolist()
     [0, 1, 3]

@@ -446,10 +446,7 @@ class BeamSearchAlgorithm:
                     scores = predictor(graph.decode_states(layer2))
                 idx = torch.argsort(scores)[:beam_width]
                 best_score = float(scores[idx[0]].detach())
-                # Provenance is reordered along with the states, so it keeps describing the states next to it.
-                layer2, layer2_hashes = layer2[idx, :], layer2_hashes[idx]
-                if expanded is not None:
-                    expanded = _ExpandedLayer(layer2, layer2_hashes, expanded.moves[idx], expanded.source_index[idx])
+                layer2, layer2_hashes, expanded = _filter_layer(idx, layer2, layer2_hashes, expanded)
                 debug_scores[i] = best_score
                 if graph.verbose >= 2:
                     print(f"Iteration {i}, best score {best_score}.")
