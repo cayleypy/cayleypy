@@ -55,12 +55,64 @@ class Predictor:
         model = PREDICTOR_MODELS[graph.definition.name].load(graph.device)
         return Predictor(graph, model)
 
+    def _predict_as_tensor(self, states: torch.Tensor) -> torch.Tensor:
+        """Applies the underlying model to `states` and returns its output as a tensor on the graph's device.
+
+        A model does not have to be written in torch - an sklearn estimator, for example, is a supported predictor and
+        its `predict` returns a NumPy array, which has only some of the operations the callers of this method use.
+        """
+        return torch.as_tensor(self.predict(states), device=self.graph.device)
+
+    def predict_batched(self, states: torch.Tensor) -> torch.Tensor:
+        """Applies the underlying model to `states`, splitting them into batches if there are too many.
+
+        The shape of the output is the shape the model returns: ``[n_states]`` for usual (single-output) models, and
+        ``[n_states, n_outputs]`` for multi-output models (e.g. models predicting one score per generator). Output of a
+        model that does not return tensors is converted to one.
+
+        :param states: States (in decoded representation) to apply the model to.
+        :return: Output of the model for `states`.
+        """
+        # A predictor is only ever used for inference, and building the graph for a backward pass that never happens
+        # costs memory proportional to the size of the model - which is significant when the whole beam is scored.
+        with torch.no_grad():
+            num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
+            if num_batches > 1:
+                ans = []  # type: list[torch.Tensor]
+                for batch in states.tensor_split(num_batches, dim=0):
+                    ans.append(self._predict_as_tensor(batch))
+                # Batches must be concatenated along dimension 0, otherwise outputs of multi-output models are mangled.
+                return torch.cat(ans, dim=0)
+            else:
+                return self._predict_as_tensor(states)
+
     def __call__(self, states: torch.Tensor) -> torch.Tensor:
-        num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
-        if num_batches > 1:
-            ans = []  # type: list[torch.Tensor]
-            for batch in states.tensor_split(num_batches, dim=0):
-                ans.append(self.predict(batch))
-            return torch.hstack(ans)
-        else:
-            return self.predict(states)
+        ans = self.predict_batched(states)
+        if len(ans.shape) != 1:
+            raise ValueError(
+                f"Model returned output of shape {tuple(ans.shape)}, but one score per state (1-D output) was "
+                "expected. Models having one output per generator must implement Predictor.score_children instead."
+            )
+        return ans
+
+    def score_children(self, states: torch.Tensor) -> torch.Tensor:
+        """Estimates distances from central state to all children (neighbors) of given states.
+
+        Children are enumerated in the order of generators: element ``[i, j]`` of the answer is the estimated distance
+        for the state obtained by applying generator ``j`` to ``states[i]``.
+
+        This default implementation calls the underlying model for every child, so it needs `n_generators` times more
+        model evaluations than :meth:`__call__`. Models having one output per generator (Q-models) are expected to
+        override this method and compute the whole answer in a single forward pass.
+
+        :param states: States (in decoded representation) whose children to score.
+        :return: Tensor of shape ``[n_states, n_generators]`` with estimated distances for children.
+        """
+        n_generators = self.graph.definition.n_generators
+        encoded_states = self.graph.encode_states(states)
+        num_states = int(encoded_states.shape[0])
+        children = self.graph.decode_states(self.graph.get_neighbors(encoded_states))
+        scores = self(children)
+        # `get_neighbors` returns neighbors in generator-major order: rows [i*num_states, (i+1)*num_states) are children
+        # obtained by applying generator i. Hence, the answer must be transposed.
+        return scores.reshape((n_generators, num_states)).transpose(0, 1).contiguous()
