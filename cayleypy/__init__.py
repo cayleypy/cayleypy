@@ -8,3 +8,4 @@ from .graphs_lib import prepare_graph, PermutationGroups, MatrixGroups
 from .models import GroupTokenizer, ModelConfig, load_checkpoint, save_checkpoint
 from .predictor import Predictor
 from .puzzles import Puzzles, GapPuzzles
+from .train import Loss, MseLoss, PinballLoss, make_loss
