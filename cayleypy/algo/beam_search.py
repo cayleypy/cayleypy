@@ -1,7 +1,7 @@
 """Beam search algorithm for Cayley graphs."""
 
 import time
-from typing import TYPE_CHECKING, Optional
+from typing import NamedTuple, TYPE_CHECKING, Optional
 
 import numpy as np
 import torch
@@ -14,6 +14,74 @@ from ..torch_utils import isin_via_searchsorted
 
 if TYPE_CHECKING:
     from ..cayley_graph import CayleyGraph
+
+
+class _ExpandedLayer(NamedTuple):
+    """States obtained by applying all generators to states of the current layer, with duplicates removed.
+
+    All fields are parallel arrays, indexed by position of a state on the next layer.
+    """
+
+    states: torch.Tensor
+    """Unique states of the next layer (in internal representation)."""
+
+    hashes: torch.Tensor
+    """Hashes of `states`."""
+
+    moves: torch.Tensor
+    """Id of the generator that produced each state.
+
+    This is the provenance of a state, which is lost when the next layer is deduplicated as a flat set of states.
+    """
+
+    source_index: torch.Tensor
+    """Index of each state in the output of `CayleyGraph.get_neighbors`, used to look up score of that state."""
+
+
+def _expand_layer(graph: "CayleyGraph", states: torch.Tensor) -> _ExpandedLayer:
+    """Applies all generators to `states` and removes duplicates, remembering where each state came from.
+
+    This is a variant of `CayleyGraph.get_unique_states` that additionally keeps the link between a state on the next
+    layer and the generator that produced it. Deduplication is the same: states are sorted by hash, and the first
+    state with each hash is kept.
+
+    :param graph: The Cayley graph.
+    :param states: States of the current layer (in internal representation).
+    :return: States of the next layer, with provenance of each state.
+    """
+    n_states = int(states.shape[0])
+    neighbors = graph.get_neighbors(states)
+    hashes = graph.hasher.make_hashes(neighbors)
+    hashes_sorted, idx = torch.sort(hashes, stable=True)
+    # Compute mask of first occurrences for each unique value.
+    mask = torch.ones(hashes_sorted.size(0), dtype=torch.bool, device=hashes_sorted.device)
+    if hashes_sorted.size(0) > 1:
+        mask[1:] = hashes_sorted[1:] != hashes_sorted[:-1]
+    unique_idx = idx[mask]
+    # `get_neighbors` writes neighbors in generator-major order: rows [i*n_states, (i+1)*n_states) are obtained by
+    # applying generator i, so the id of that generator is the row index divided by the number of states.
+    moves = torch.div(unique_idx, n_states, rounding_mode="floor")
+    return _ExpandedLayer(neighbors[unique_idx], hashes[unique_idx], moves, unique_idx)
+
+
+def _score_children(graph: "CayleyGraph", predictor: Predictor, states: torch.Tensor) -> torch.Tensor:
+    """Estimates scores of all children of `states`, calling the predictor once per state (not once per child).
+
+    :param graph: The Cayley graph.
+    :param predictor: A heuristic that estimates scores for states.
+    :param states: States of the current layer (in internal representation).
+    :return: Scores of all children, flattened in the same order in which `CayleyGraph.get_neighbors` returns them.
+    """
+    n_states = int(states.shape[0])
+    n_generators = graph.definition.n_generators
+    scores = predictor.score_children(graph.decode_states(states))
+    if tuple(scores.shape) != (n_states, n_generators):
+        raise ValueError(
+            f"score_children returned scores of shape {tuple(scores.shape)}, but shape {(n_states, n_generators)} "
+            "was expected. Model used with child scoring must have exactly one output per generator."
+        )
+    # `score_children` returns scores state-major, while `get_neighbors` returns children generator-major.
+    return scores.transpose(0, 1).reshape(-1)
 
 
 class BeamSearchAlgorithm:
@@ -43,6 +111,7 @@ class BeamSearchAlgorithm:
         history_depth: int = 0,
         return_path: bool = False,
         bfs_result_for_mitm: Optional[BfsResult] = None,
+        use_child_scores: bool = False,
         verbose: int = 0,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to destination state using Beam Search algorithm.
@@ -67,6 +136,8 @@ class BeamSearchAlgorithm:
         :param return_path: For "simple" mode, whether to return path (consumes much more memory if True).
         :param bfs_result_for_mitm: For "simple" mode, BfsResult with pre-computed neighborhood of central state
             for meet-in-the-middle optimization. Defaults to None.
+        :param use_child_scores: For "simple" mode, whether to score states using `Predictor.score_children`
+            (see :meth:`search_simple`). Defaults to False.
         :param verbose: Verbosity level (0=quiet, 1=basic, 10=detailed, 100=profiling).
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
@@ -78,8 +149,11 @@ class BeamSearchAlgorithm:
                 max_steps=max_steps,
                 return_path=return_path,
                 bfs_result_for_mitm=bfs_result_for_mitm,
+                use_child_scores=use_child_scores,
             )
         elif beam_mode == "advanced":
+            if use_child_scores:
+                raise ValueError("use_child_scores is supported only in 'simple' beam mode.")
             return self.search_advanced(
                 start_state=start_state,
                 destination_state=destination_state,
@@ -101,6 +175,7 @@ class BeamSearchAlgorithm:
         max_steps=1000,
         return_path=False,
         bfs_result_for_mitm: Optional[BfsResult] = None,
+        use_child_scores: bool = False,
     ) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using simple Beam Search algorithm.
 
@@ -114,6 +189,11 @@ class BeamSearchAlgorithm:
             meet-in-the-middle modification of Beam Search. Beam search will terminate when any of states in that
             neighborhood is encountered. Defaults to None, which means no meet-in-the-middle (i.e. only search for the
             central state).
+        :param use_child_scores: Whether to score states on the next layer with `Predictor.score_children` applied to
+            states on the current layer, instead of applying the predictor to the states on the next layer themselves.
+            Scores are the same, but the predictor is called once per state of the current layer instead of once per
+            state of the next layer, which is much cheaper for models having one output per generator (Q-models).
+            Defaults to False, which means the predictor is applied to states on the next layer.
         :return: BeamSearchResult containing found path length and (optionally) the path itself.
         """
         graph = self.graph
@@ -157,8 +237,13 @@ class BeamSearchAlgorithm:
             return path1 + path2
 
         for i in range(max_steps):
-            # Create states on the next layer.
-            layer2, layer2_hashes = graph.get_unique_states(graph.get_neighbors(layer1))
+            # Create states on the next layer. When children are scored through their parents, we additionally need to
+            # know which (state, generator) pair produced each state of the next layer.
+            expanded = _expand_layer(graph, layer1) if use_child_scores else None
+            if expanded is not None:
+                layer2, layer2_hashes = expanded.states, expanded.hashes
+            else:
+                layer2, layer2_hashes = graph.get_unique_states(graph.get_neighbors(layer1))
 
             bfs_layer_id = _check_path_found(layer2_hashes)
             if bfs_layer_id != -1:
@@ -168,7 +253,10 @@ class BeamSearchAlgorithm:
 
             # Pick `beam_width` states with lowest scores.
             if len(layer2) >= beam_width:
-                scores = predictor(graph.decode_states(layer2))
+                if expanded is not None:
+                    scores = _score_children(graph, predictor, layer1)[expanded.source_index]
+                else:
+                    scores = predictor(graph.decode_states(layer2))
                 idx = torch.argsort(scores)[:beam_width]
                 layer2 = layer2[idx, :]
                 layer2_hashes = layer2_hashes[idx]
