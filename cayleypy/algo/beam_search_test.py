@@ -10,6 +10,7 @@ from ..cayley_graph import CayleyGraph
 
 from ..graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 from ..predictor import Predictor
+from .beam_search import _expand_layer, _score_children
 from .beam_search_result import BeamSearchResult
 
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
@@ -26,6 +27,37 @@ def _validate_beam_search_result(graph: CayleyGraph, start_state, bs_result: Bea
 def _scramble(graph: CayleyGraph, num_scrambles: int) -> torch.Tensor:
     """Create a scrambled state by applying random moves."""
     return graph.random_walks(width=1, length=num_scrambles + 1)[0][-1]
+
+
+class _ChildrenHammingModel(torch.nn.Module):
+    """Emulates a Q-model: returns Hamming distances of all children of a state, one output per generator."""
+
+    def __init__(self, graph: CayleyGraph):
+        super().__init__()
+        self.permutations = torch.as_tensor(graph.definition.generators_permutations, device=graph.device)
+        self.central_state = graph.central_state
+
+    def forward(self, states: torch.Tensor) -> torch.Tensor:
+        # children[i, j, :] is the state obtained by applying generator j to states[i].
+        children = states[:, self.permutations]
+        return torch.sum(children != self.central_state, dim=2)
+
+
+class _ChildrenHammingPredictor(Predictor):
+    """Predictor for a model that has one output per generator."""
+
+    def __init__(self, graph: CayleyGraph):
+        super().__init__(graph, _ChildrenHammingModel(graph))
+
+    def score_children(self, states: torch.Tensor) -> torch.Tensor:
+        return self.predict_batched(states)
+
+
+class _BrokenChildrenPredictor(Predictor):
+    """Predictor whose model has wrong number of outputs (one more than the number of generators)."""
+
+    def score_children(self, states: torch.Tensor) -> torch.Tensor:
+        return torch.zeros((states.shape[0], self.graph.definition.n_generators + 1))
 
 
 # =============================================================================
@@ -114,6 +146,120 @@ def test_beam_search_simple_not_found():
     start_state = np.random.permutation(n)
     bs_result = graph.beam_search(start_state=start_state, beam_mode="simple", beam_width=10, max_steps=10)
     assert not bs_result.path_found
+
+
+# =============================================================================
+# Tests for child scoring in "simple" beam search mode
+# =============================================================================
+
+
+def test_expand_layer_keeps_provenance():
+    """Test that layer expansion deduplicates as usual, but remembers which generator produced each state."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    parents = graph.encode_states([[0, 1, 2, 3, 4], [1, 0, 2, 3, 4], [2, 3, 4, 0, 1]])
+    n_parents = int(parents.shape[0])
+
+    expanded = _expand_layer(graph, parents)
+
+    expected_states, expected_hashes = graph.get_unique_states(graph.get_neighbors(parents))
+    assert torch.equal(expanded.states, expected_states)
+    assert torch.equal(expanded.hashes, expected_hashes)
+
+    # Applying generator `moves[i]` to the state that produced i-th state must give exactly that state.
+    decoded_parents = graph.decode_states(parents)
+    assert len(expanded.moves) == len(expanded.states)
+    for i in range(len(expanded.states)):
+        parent_id = int(expanded.source_index[i]) % n_parents
+        child = graph.apply_path(decoded_parents[parent_id], [int(expanded.moves[i])])
+        assert torch.equal(graph.encode_states(child), expanded.states[i : i + 1])
+
+
+def test_expand_layer_empty_frontier():
+    """Test that expanding and scoring an empty layer gives empty answers rather than an error."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+    no_states = torch.zeros((0, graph.encoded_state_size), dtype=torch.int64)
+
+    expanded = _expand_layer(graph, no_states)
+    assert expanded.states.shape == (0, graph.encoded_state_size)
+    assert len(expanded.hashes) == 0
+    assert len(expanded.moves) == 0
+    assert len(expanded.source_index) == 0
+
+    assert len(_score_children(graph, _ChildrenHammingPredictor(graph), no_states)) == 0
+
+
+def test_beam_search_simple_child_scores_same_as_default():
+    """Test that child scoring with the same predictor gives exactly the same beam."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+
+    result1 = graph.beam_search(start_state=start_state, beam_width=10, max_steps=50, return_path=True)
+    result2 = graph.beam_search(
+        start_state=start_state, beam_width=10, max_steps=50, return_path=True, use_child_scores=True
+    )
+
+    _validate_beam_search_result(graph, start_state, result1)
+    assert result1.path == result2.path
+    # One score is recorded per step where the beam was truncated - the best score of that step - so this compares the
+    # two searches step by step, not only their answers. Hamming distance is computed in integer arithmetic, so the
+    # scores must match exactly.
+    assert len(result1.debug_scores) > 0
+    assert result1.debug_scores == result2.debug_scores
+
+
+def test_beam_search_simple_child_scores_same_as_default_when_path_not_found():
+    """Test that child scoring does not change the beam even on a long unsuccessful search."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    start_state = [7, 6, 5, 4, 3, 2, 1, 0]
+
+    result1 = graph.beam_search(start_state=start_state, beam_width=20, max_steps=50)
+    result2 = graph.beam_search(start_state=start_state, beam_width=20, max_steps=50, use_child_scores=True)
+
+    assert not result1.path_found
+    assert not result2.path_found
+    assert len(result1.debug_scores) > 40
+    assert result1.debug_scores == result2.debug_scores
+
+
+def test_beam_search_simple_child_scores_q_model_parity():
+    """Test that a model with one output per generator gives the same beam as its scalar equivalent."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    start_state = [3, 0, 2, 4, 5, 6, 7, 1]
+
+    result_scalar = graph.beam_search(
+        start_state=start_state, predictor=Predictor(graph, "hamming"), beam_width=10, max_steps=50, return_path=True
+    )
+    result_q = graph.beam_search(
+        start_state=start_state,
+        predictor=_ChildrenHammingPredictor(graph),
+        beam_width=10,
+        max_steps=50,
+        return_path=True,
+        use_child_scores=True,
+    )
+
+    _validate_beam_search_result(graph, start_state, result_q)
+    assert result_scalar.path == result_q.path
+    assert result_scalar.debug_scores == result_q.debug_scores
+
+
+def test_beam_search_simple_child_scores_wrong_number_of_outputs():
+    """Test that a model with wrong number of outputs is reported clearly."""
+    graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
+    predictor = _BrokenChildrenPredictor(graph, "zero")
+
+    with pytest.raises(ValueError, match="one output per generator"):
+        graph.beam_search(
+            start_state=[7, 6, 5, 4, 3, 2, 1, 0], beam_width=3, max_steps=50, use_child_scores=True, predictor=predictor
+        )
+
+
+def test_beam_search_child_scores_not_supported_in_advanced_mode():
+    """Test that child scoring is rejected in "advanced" mode, where it is not implemented."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
+
+    with pytest.raises(ValueError, match="only in 'simple' beam mode"):
+        graph.beam_search(start_state=[4, 1, 0, 2, 3], beam_mode="advanced", use_child_scores=True)
 
 
 # =============================================================================
