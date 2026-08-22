@@ -17,10 +17,11 @@ class ModelConfig:
     class. Their defaults describe a single-output model without tokenization, which is not tied to a particular graph,
     so configs written before these fields existed keep working.
 
-    :param model_type: Type of the model, e.g. "MLP".
+    :param model_type: Type of the model, one of "MLP" (see :class:`MlpModel`) or "RESMLP"
+        (see :class:`ResMlpModel`).
     :param input_size: Number of elements in one state.
     :param num_classes_for_one_hot: Number of distinct values one element of a state can take.
-    :param layers_sizes: Sizes of hidden layers.
+    :param layers_sizes: Sizes of hidden layers (for "RESMLP" these are sizes of residual blocks).
     :param weights_kaggle_id: Id of the Kaggle model with weights (optional).
     :param weights_path: Path to the file with weights (optional).
     :param n_outputs: Number of outputs of the model. 1 means the model predicts distance for the state it is applied
@@ -64,6 +65,8 @@ class ModelConfig:
         """Creates model described by this config, with randomly initialized weights."""
         if self.model_type == "MLP":
             return MlpModel(self)
+        elif self.model_type == "RESMLP":
+            return ResMlpModel(self)
         else:
             raise ValueError("Unknown model type: " + self.model_type)
 
@@ -94,18 +97,34 @@ class ModelConfig:
         return model.to(device)
 
 
-class MlpModel(nn.Module):
-    """Multi-layer perceptron model."""
+def _one_hot_encode(states: torch.Tensor, num_classes: int) -> torch.Tensor:
+    """One-hot encodes elements of states and flattens the result, so it can be fed to a fully connected layer."""
+    return nn.functional.one_hot(states.long(), num_classes=num_classes).float().flatten(start_dim=-2)
 
-    def __init__(self, config):
+
+def _validate_n_outputs(config: ModelConfig) -> int:
+    if config.n_outputs < 1:
+        raise ValueError(f"n_outputs must be positive, got {config.n_outputs}.")
+    return config.n_outputs
+
+
+class MlpModel(nn.Module):
+    """Multi-layer perceptron model.
+
+    Consumes one-hot encoded states, applies hidden layers described by `layers_sizes` (each of them being
+    Linear+LayerNorm+ReLU), then a linear output layer with `n_outputs` neurons.
+
+    Output has shape ``[n_states]`` when ``n_outputs == 1``, and shape ``[n_states, n_outputs]`` otherwise.
+    """
+
+    def __init__(self, config: ModelConfig):
         super().__init__()
         assert config.model_type == "MLP"
-        if config.n_outputs != 1:
-            raise ValueError(f"MlpModel supports only n_outputs=1, got {config.n_outputs}.")
+        self.n_outputs = _validate_n_outputs(config)
         self.num_classes_for_one_hot = config.num_classes_for_one_hot
         self.input_layer_size = config.input_size * self.num_classes_for_one_hot
 
-        layers = []
+        layers: list[nn.Module] = []
         in_features = self.input_layer_size
         for hidden_dim in config.layers_sizes:
             layers.append(nn.Linear(in_features, hidden_dim))
@@ -113,9 +132,68 @@ class MlpModel(nn.Module):
             layers.append(nn.ReLU())
             in_features = hidden_dim
 
-        layers.append(nn.Linear(in_features, 1))
+        # For n_outputs=1 this layer has the same shape as before multi-output models were supported, so this model
+        # still loads weights trained back then (including pretrained models from PREDICTOR_MODELS).
+        layers.append(nn.Linear(in_features, self.n_outputs))
         self.layers = nn.Sequential(*layers)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        x = nn.functional.one_hot(x.long(), num_classes=self.num_classes_for_one_hot).float().flatten(start_dim=-2)
-        return self.layers(x).squeeze(-1)
+        ans = self.layers(_one_hot_encode(x, self.num_classes_for_one_hot))
+        # For single-output models the trailing dimension of size 1 is removed, so there is one score per state.
+        return ans.squeeze(-1) if self.n_outputs == 1 else ans
+
+
+class _ResBlock(nn.Module):
+    """Residual block: Linear+LayerNorm+ReLU, adding its input to its output when their shapes match."""
+
+    def __init__(self, in_features: int, out_features: int):
+        super().__init__()
+        self.linear = nn.Linear(in_features, out_features)
+        self.norm = nn.LayerNorm(out_features)
+        self.activation = nn.ReLU()
+        # Skip connection is possible only when input and output of this block have the same number of features.
+        self.has_skip = in_features == out_features
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        ans = self.activation(self.norm(self.linear(x)))
+        return x + ans if self.has_skip else ans
+
+
+class ResMlpModel(nn.Module):
+    """Multi-layer perceptron with residual (skip) connections.
+
+    Deep perceptrons with skip connections are easier to train than plain ones, so this model is usually a better
+    backbone than :class:`MlpModel` when many hidden layers are needed.
+
+    Consumes one-hot encoded states, applies residual blocks described by `layers_sizes` (i.e. there are
+    ``len(layers_sizes)`` blocks and i-th block has ``layers_sizes[i]`` neurons), then a linear output layer with
+    `n_outputs` neurons. Each block is Linear+LayerNorm+ReLU and adds its input to its output. Blocks that change the
+    number of features (e.g. the first block, which consumes the one-hot encoded state) have no skip connection, so
+    ``layers_sizes=[512, 512, 512]`` means one projection followed by two residual blocks.
+
+    Output has shape ``[n_states]`` when ``n_outputs == 1``, and shape ``[n_states, n_outputs]`` otherwise. Setting
+    `n_outputs` to the number of generators of a graph gives a Q-model, which estimates distances for all children of
+    a state in a single forward pass (see :meth:`cayleypy.Predictor.score_children`).
+    """
+
+    def __init__(self, config: ModelConfig):
+        super().__init__()
+        assert config.model_type == "RESMLP"
+        if len(config.layers_sizes) == 0:
+            raise ValueError("ResMlpModel needs at least one block, but layers_sizes is empty.")
+        self.n_outputs = _validate_n_outputs(config)
+        self.num_classes_for_one_hot = config.num_classes_for_one_hot
+        self.input_layer_size = config.input_size * self.num_classes_for_one_hot
+
+        blocks: list[nn.Module] = []
+        in_features = self.input_layer_size
+        for hidden_dim in config.layers_sizes:
+            blocks.append(_ResBlock(in_features, hidden_dim))
+            in_features = hidden_dim
+        self.blocks = nn.Sequential(*blocks)
+        self.head = nn.Linear(in_features, self.n_outputs)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        ans = self.head(self.blocks(_one_hot_encode(x, self.num_classes_for_one_hot)))
+        # For single-output models the trailing dimension of size 1 is removed, so there is one score per state.
+        return ans.squeeze(-1) if self.n_outputs == 1 else ans
