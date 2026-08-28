@@ -46,7 +46,7 @@ class BfsDistributed:
         return "RANK" in os.environ and "WORLD_SIZE" in os.environ and "LOCAL_RANK" in os.environ
 
     @classmethod
-    def _use_torchrun_backend(cls) -> bool:
+    def use_torchrun_backend(cls) -> bool:
         return cls._is_torchrun_env() and int(os.environ["WORLD_SIZE"]) > 1
 
     # -------------------------------------------------------------------------
@@ -712,7 +712,7 @@ class BfsDistributed:
           * plain python -> existing single-process implementation;
           * torchrun with WORLD_SIZE > 1 -> torch.distributed implementation.
         """
-        if cls._use_torchrun_backend():
+        if cls.use_torchrun_backend():
             return cls._bfs_torchrun(
                 graph,
                 start_states=start_states,

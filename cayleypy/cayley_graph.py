@@ -214,7 +214,7 @@ class CayleyGraph:
         return_all_edges = kwargs.get("return_all_edges", False)
         disable_batching = kwargs.get("disable_batching", False)
 
-        use_torchrun = BfsDistributed._use_torchrun_backend()
+        use_torchrun = BfsDistributed.use_torchrun_backend()
         use_legacy_multi_gpu = self.num_gpus > 1 and not (return_all_edges or disable_batching)
 
         if use_torchrun or use_legacy_multi_gpu:
