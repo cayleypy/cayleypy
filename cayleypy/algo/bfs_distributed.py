@@ -43,11 +43,7 @@ class BfsDistributed:
 
     @staticmethod
     def _is_torchrun_env() -> bool:
-        return (
-            "RANK" in os.environ
-            and "WORLD_SIZE" in os.environ
-            and "LOCAL_RANK" in os.environ
-        )
+        return "RANK" in os.environ and "WORLD_SIZE" in os.environ and "LOCAL_RANK" in os.environ
 
     @classmethod
     def _use_torchrun_backend(cls) -> bool:
@@ -265,7 +261,9 @@ class BfsDistributed:
         return mask
 
     @staticmethod
-    def _encode_states_to_device(graph: "CayleyGraph", states: Union[torch.Tensor, np.ndarray, list], device: torch.device) -> torch.Tensor:
+    def _encode_states_to_device(
+        graph: "CayleyGraph", states: Union[torch.Tensor, np.ndarray, list], device: torch.device
+    ) -> torch.Tensor:
         """Encode states directly onto the target device.
 
         This avoids depending on graph.device, which may not match LOCAL_RANK
@@ -526,11 +524,7 @@ class BfsDistributed:
 
             layer_sizes.append(next_layer_size)
 
-            need_gather = (
-                next_layer_size <= max_layer_size_to_store
-                or return_all_hashes
-                or stop_condition is not None
-            )
+            need_gather = next_layer_size <= max_layer_size_to_store or return_all_hashes or stop_condition is not None
 
             gathered_states = None
             gathered_hashes = None
