@@ -1,4 +1,5 @@
 import math
+import os
 import random
 from typing import Callable, Optional, TYPE_CHECKING
 
@@ -10,6 +11,26 @@ if TYPE_CHECKING:
     from cayleypy import CayleyGraph
 
 MAX_INT = 2**62
+DEFAULT_TORCHRUN_HASH_SEED = 0
+
+
+def _is_multi_process_torchrun() -> bool:
+    if not all(name in os.environ for name in ("RANK", "LOCAL_RANK", "WORLD_SIZE")):
+        return False
+    try:
+        return int(os.environ["WORLD_SIZE"]) > 1
+    except ValueError:
+        return False
+
+
+def _resolve_seed(random_seed: Optional[int]) -> int:
+    if random_seed is not None:
+        return random_seed
+    if _is_multi_process_torchrun():
+        # Graphs are constructed independently before torch.distributed is initialized.
+        # Every rank must nevertheless build exactly the same hash function.
+        return DEFAULT_TORCHRUN_HASH_SEED
+    return random.randint(-MAX_INT, MAX_INT)
 
 
 def _splitmix64(x: torch.Tensor) -> torch.Tensor:
@@ -35,7 +56,7 @@ class StateHasher:
             return
 
         self.is_identity = False
-        self.seed = random_seed or random.randint(-MAX_INT, MAX_INT)
+        self.seed = _resolve_seed(random_seed)
 
         # Dot product is not safe for bit-encoded states, it has high probability of collisions.
         if graph.string_encoder is not None:
