@@ -5,9 +5,7 @@ from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
 
 
 def _matrix_graph(*, random_seed=None) -> CayleyGraph:
-    graph_def = CayleyGraphDef.for_matrix_group(
-        generators=[MatrixGenerator.create([[1, 1], [0, 1]], modulo=5)]
-    )
+    graph_def = CayleyGraphDef.for_matrix_group(generators=[MatrixGenerator.create([[1, 1], [0, 1]], modulo=5)])
     return CayleyGraph(graph_def, device="cpu", random_seed=random_seed)
 
 
