@@ -41,6 +41,12 @@ Beam search and ML
     cayleypy.Predictor
     cayleypy.algo.BeamSearchAlgorithm
     cayleypy.algo.BeamSearchResult
+    cayleypy.BeamSearchBackend
+    cayleypy.register_beam_search_backend
+    cayleypy.unregister_beam_search_backend
+    cayleypy.get_beam_search_backend
+    cayleypy.get_default_beam_search_backend
+    cayleypy.set_default_beam_search_backend
     cayleypy.algo.RandomWalksGenerator
     cayleypy.models.ModelConfig
     cayleypy.models.GroupTokenizer
