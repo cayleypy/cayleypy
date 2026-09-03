@@ -12,12 +12,43 @@ def _bezout(a, b):
     return g, s, t
 
 
-def inverse_integer(A):
-    A = [[int(x) for x in row] for row in A]
-    n = len(A)
+def _inverse_integer_2x2(A):
+    (a, b), (c, d) = A
+    determinant = a * d - b * c
 
-    if n == 0 or any(len(row) != n for row in A):
-        raise ValueError("A must be a nonempty square matrix")
+    if abs(determinant) != 1:
+        raise ValueError("matrix is not invertible over Z")
+
+    return [
+        [determinant * d, -determinant * b],
+        [-determinant * c, determinant * a],
+    ]
+
+
+def _inverse_integer_3x3(A):
+    (a, b, c), (d, e, f), (g, h, i) = A
+
+    x = e * i - f * h
+    y = f * g - d * i
+    z = d * h - e * g
+    determinant = a * x + b * y + c * z
+
+    if abs(determinant) != 1:
+        raise ValueError("matrix is not invertible over Z")
+
+    adjugate = [
+        [x, c * h - b * i, b * f - c * e],
+        [y, a * i - c * g, c * d - a * f],
+        [z, b * g - a * h, a * e - b * d],
+    ]
+    return [
+        [determinant * value for value in row]
+        for row in adjugate
+    ]
+
+
+def _inverse_integer_generic(A):
+    n = len(A)
 
     aug = [
         row + [int(i == j) for j in range(n)]
@@ -79,6 +110,21 @@ def inverse_integer(A):
                 ]
 
     return [row[n:] for row in aug]
+
+
+def inverse_integer(A):
+    A = [[int(x) for x in row] for row in A]
+    n = len(A)
+
+    if n == 0 or any(len(row) != n for row in A):
+        raise ValueError("A must be a nonempty square matrix")
+
+    if n == 2:
+        return _inverse_integer_2x2(A)
+    if n == 3:
+        return _inverse_integer_3x3(A)
+
+    return _inverse_integer_generic(A)
 
 
 def _clean(A, m, size=None):
