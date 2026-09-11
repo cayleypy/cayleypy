@@ -11,3 +11,4 @@ This site contains auto-generated documentation (API reference) for the library.
    :maxdepth: 1
 
    api
+   beam_search_backends
