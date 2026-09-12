@@ -4,7 +4,7 @@ import pytest
 import torch
 
 from .checkpoint import load_checkpoint, save_checkpoint
-from .models import MlpModel, ModelConfig, ResMlpModel
+from .models import MlpModel, ModelConfig, ResMlpModel, _ResBlock
 
 # Config in the format that existed before n_outputs, tokenizer_groups and graph_hash were added.
 LEGACY_CONFIG_DICT = {
@@ -134,15 +134,20 @@ def test_build_resmlp_model_with_multiple_outputs():
 def test_resmlp_has_skip_connections():
     config = ModelConfig(model_type="RESMLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8, 8])
     model = config.build_model()
+    assert isinstance(model, ResMlpModel)
 
     # The first block projects the one-hot encoded state (25 features) to 8 features, so it cannot have a skip
     # connection. All subsequent blocks preserve the number of features, so they have it.
-    assert not model.blocks[0].has_skip
-    assert model.blocks[1].has_skip
+    first_block = model.blocks[0]
+    block = model.blocks[1]
+    assert isinstance(first_block, _ResBlock)
+    assert isinstance(block, _ResBlock)
+    assert not first_block.has_skip
+    assert block.has_skip
 
     # With zeroed weights, a block with a skip connection is the identity function.
-    block = model.blocks[1]
     torch.nn.init.zeros_(block.linear.weight)
+    assert block.linear.bias is not None
     torch.nn.init.zeros_(block.linear.bias)
     x = torch.rand((4, 8))
     with torch.no_grad():
