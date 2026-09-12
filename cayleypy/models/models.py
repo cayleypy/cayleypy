@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import kagglehub
 import torch
@@ -70,7 +70,7 @@ class ModelConfig:
         else:
             raise ValueError("Unknown model type: " + self.model_type)
 
-    def load(self, device="cpu") -> nn.Module:
+    def load(self, device: Union[str, torch.device] = "cpu") -> nn.Module:
         """Creates model described by this config and loads weights.
 
         Weights are loaded from `weights_path`. A config with neither `weights_path` nor `weights_kaggle_id` describes

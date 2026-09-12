@@ -24,8 +24,8 @@ def test_generators_format():
     graph1 = CayleyGraphDef.create(generators)
     graph2 = CayleyGraphDef.create(np.array(generators))
     graph3 = CayleyGraphDef.create(torch.tensor(generators))
-    assert np.array_equal(graph1.generators, graph2.generators)
-    assert np.array_equal(graph1.generators, graph3.generators)
+    assert np.array_equal(graph1.generators_permutations, graph2.generators_permutations)
+    assert np.array_equal(graph1.generators_permutations, graph3.generators_permutations)
 
 
 def test_central_state_format():
@@ -111,7 +111,7 @@ def test_lrx_coset_growth():
     for central_state, expected_layer_sizes in expected.items():
         if len(central_state) > 15:
             continue
-        generators = PermutationGroups.lrx(len(central_state)).generators
+        generators = PermutationGroups.lrx(len(central_state)).generators_permutations
         graph = CayleyGraph(CayleyGraphDef.create(generators, central_state=central_state))
         result = graph.bfs()
         assert result.layer_sizes == expected_layer_sizes
@@ -270,8 +270,10 @@ def test_path_to_from():
     for _ in range(5):
         start_state = torch.tensor(np.random.permutation(n))
         path1 = graph.find_path_from(start_state, br)
+        assert path1 is not None
         assert torch.equal(graph.apply_path(start_state, path1)[0], graph.central_state)
         path2 = graph.find_path_to(start_state, br)
+        assert path2 is not None
         assert torch.equal(start_state, graph.apply_path(graph.central_state, path2)[0].cpu())
 
 
@@ -327,6 +329,8 @@ def test_with_inverted_generators_path_reversal():
     path_to = graph.find_path_to(start_state, bfs_result)
     path_from = graph.find_path_from(start_state, bfs_result)
 
+    assert path_to is not None
+    assert path_from is not None
     assert path_from == graph.definition.revert_path(path_to)
 
 
