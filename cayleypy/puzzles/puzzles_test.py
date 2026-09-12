@@ -11,13 +11,13 @@ def test_mini_pyramorphix():
     assert graph.n_generators == len(MINI_PYRAMORPHIX_ALLOWED_MOVES)
     assert graph.generator_names == list(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
     expected_generators = np.array([MINI_PYRAMORPHIX_ALLOWED_MOVES[k] for k in graph.generator_names])
-    assert np.array_equal(graph.generators, expected_generators)
-    for gen in graph.generators:
+    assert np.array_equal(graph.generators_permutations, expected_generators)
+    for gen in graph.generators_permutations:
         assert len(gen) == 24
         assert is_permutation(gen)
     identity = list(range(24))
     assert any(gen != identity for gen in graph.generators)
-    for gen in graph.generators:
+    for gen in graph.generators_permutations:
         inverse = inverse_permutation(gen)
         restored = [gen[i] for i in inverse]
         assert restored == list(range(24))
@@ -29,13 +29,13 @@ def test_picture_cube333():
     assert graph.n_generators == len(PICTURE_CUBE_333_ALLOWED_MOVES)
     assert graph.generator_names == list(PICTURE_CUBE_333_ALLOWED_MOVES.keys())
     expected_generators = np.array([PICTURE_CUBE_333_ALLOWED_MOVES[k] for k in graph.generator_names])
-    assert np.array_equal(graph.generators, expected_generators)
-    for gen in graph.generators:
+    assert np.array_equal(graph.generators_permutations, expected_generators)
+    for gen in graph.generators_permutations:
         assert len(gen) == 72
         assert is_permutation(gen)
     identity = list(range(72))
     assert any(gen != identity for gen in graph.generators)
-    for gen in graph.generators:
+    for gen in graph.generators_permutations:
         inverse = inverse_permutation(gen)
         restored = [gen[i] for i in inverse]
         assert restored == list(range(72))

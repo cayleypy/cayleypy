@@ -592,7 +592,7 @@ def test_conjugacy_class():
     assert graph.name == "conjugacy_class-4-2,2-3,1"
 
     n = 5
-    classes = {(2, 2): 5, (3,): 7}
+    classes: dict[tuple[int, ...], int | None] = {(2, 2): 5, (3,): 7}
     graph = PermutationGroups.conjugacy_classes(n, classes=classes)
     assert graph.generator_names == [
         "(2,2,1)_1",
@@ -623,7 +623,7 @@ def test_down_cycles():
     n = 6
     g = PermutationGroups.down_cycles(n)
     assert np.array_equal(
-        g.generators,
+        g.generators_permutations,
         [
             [1, 0, 2, 3, 4, 5],
             [1, 2, 0, 3, 4, 5],

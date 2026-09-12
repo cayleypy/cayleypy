@@ -34,8 +34,7 @@ dependencies = [
 [project.optional-dependencies]
 lint = [
     "black==25.1.0",
-    "mypy==1.15.0",
-    "pylint"
+    "pyright==1.1.411",
 ]
 test = [
     "pytest",
@@ -61,57 +60,6 @@ include-package-data = true
 
 [tool.setuptools.package-data]
 "cayleypy" = ["data/*.csv", "puzzles/gap_files/**"]
-
-[[tool.mypy.overrides]]
-module = ["networkx.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["tensorflow.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["numba.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["scipy.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["h5py.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["kagglehub.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["sympy.*"]
-ignore_missing_imports = true
-
-[tool.pylint."FORMAT"]
-max-line-length = 120
-max-module-lines = 2000
-[tool.pylint."MESSAGES CONTROL"]
-disable = [
-    "consider-using-enumerate",
-    "consider-using-f-string",
-    "fixme",
-    "missing-function-docstring",
-    "missing-module-docstring",
-    "no-else-return",
-    "too-few-public-methods",
-    "too-many-arguments",
-    "too-many-branches",
-    "too-many-instance-attributes",
-    "too-many-locals",
-    "too-many-positional-arguments",
-    "too-many-public-methods",
-    "too-many-return-statements",
-    "too-many-statements",
-]
-
-[tool.pylint.SIMILARITIES]
-ignore-comments = true
-ignore-docstrings = true
-ignore-imports = true
-ignore-signatures = true
-min-similarity-lines = 10
 
 [tool.black]
 line-length = 120
