@@ -1,6 +1,6 @@
 """Random walks generation for Cayley graphs."""
 
-from typing import TYPE_CHECKING, Optional, Union
+from typing import TYPE_CHECKING, Union
 
 import numpy as np
 import torch
@@ -34,7 +34,7 @@ class RandomWalksGenerator:
         length=10,
         mode="classic",
         start_state: Union[None, torch.Tensor, np.ndarray, list] = None,
-        nbt_history_depth: Optional[int] = None,
+        nbt_history_depth: int = -1,
     ) -> tuple[torch.Tensor, torch.Tensor]:
         """Generates random walks on the graph.
 
@@ -68,7 +68,7 @@ class RandomWalksGenerator:
         :param start_state: State from which to start random walk. Defaults to the central state.
         :param mode: Type of random walk (see above). Defaults to "classic".
         :param nbt_history_depth: For "nbt" mode, how many previous levels to remember and ban from revisiting.
-          Defaults to None, which uses ``length`` to retain the full history.
+          Defaults to -1, which uses ``length`` to retain the full history.
         :return: Pair of tensors ``x, y``. ``x`` contains states. ``y[i]`` is the estimated distance from start state
           to state ``x[i]``.
         """
@@ -78,7 +78,7 @@ class RandomWalksGenerator:
         elif mode == "bfs":
             return self.random_walks_bfs(width, length, start_state)
         elif mode == "nbt":
-            if nbt_history_depth is None:
+            if nbt_history_depth == -1:
                 nbt_history_depth = length
             if nbt_history_depth <= 0:
                 raise ValueError("nbt_history_depth must be positive.")
