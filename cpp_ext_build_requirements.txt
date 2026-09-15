@@ -1,0 +1,4 @@
+wheel>=0.45.1
+setuptools>=80.9.0
+pybind11>=3.0.1
+torch>=2.6.0
