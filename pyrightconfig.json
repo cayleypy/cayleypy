@@ -1,0 +1,6 @@
+{
+  "pythonVersion": "3.14",
+  "include": ["cayleypy"],
+  "typeCheckingMode": "basic",
+  "reportMissingParameterType": "none"
+}

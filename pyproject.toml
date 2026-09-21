@@ -34,8 +34,8 @@ dependencies = [
 [project.optional-dependencies]
 lint = [
     "black==25.1.0",
-    "mypy==1.15.0",
-    "pylint"
+    "pylint",
+    "pyright==1.1.414",
 ]
 test = [
     "pytest",
@@ -62,31 +62,10 @@ include-package-data = true
 [tool.setuptools.package-data]
 "cayleypy" = ["data/*.csv", "puzzles/gap_files/**"]
 
-[[tool.mypy.overrides]]
-module = ["networkx.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["tensorflow.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["numba.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["scipy.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["h5py.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["kagglehub.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["sympy.*"]
-ignore_missing_imports = true
-
 [tool.pylint."FORMAT"]
 max-line-length = 120
 max-module-lines = 2000
+
 [tool.pylint."MESSAGES CONTROL"]
 disable = [
     "consider-using-enumerate",

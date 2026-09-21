@@ -795,7 +795,7 @@ class PermutationGroups:
         )
 
     @staticmethod
-    def conjugacy_classes(n: int, classes: dict[tuple[int], Union[int, None]]) -> CayleyGraphDef:
+    def conjugacy_classes(n: int, classes: dict[tuple[int, ...], Union[int, None]]) -> CayleyGraphDef:
         """
         A conjugacy class of S_n is a subset of permutations with same set of cycle lengths.
 

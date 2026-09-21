@@ -132,7 +132,6 @@ your code using Black. There are few convenient ways to do that:
     contributors should read it.
 * When writing comments, [use punctuation](https://google.github.io/styleguide/pyguide.html#386-punctuation-spelling-and-grammar).
     In particular, always put a period (".") in the end of sentences.
-* We have pylint checks to enforce some style rules. You should fix pylint warnings instead of disabling the check. 
 
 ## How to add a new Cayley graph
 

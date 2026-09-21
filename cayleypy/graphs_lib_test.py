@@ -10,27 +10,27 @@ from cayleypy.permutation_utils import permutation_from_cycles
 
 def test_lrx():
     graph = PermutationGroups.lrx(4)
-    assert np.array_equal(graph.generators, [[1, 2, 3, 0], [3, 0, 1, 2], [1, 0, 2, 3]])
+    assert np.array_equal(graph.generators_permutations, [[1, 2, 3, 0], [3, 0, 1, 2], [1, 0, 2, 3]])
     assert graph.generator_names == ["L", "R", "X"]
     assert graph.name == "lrx-4"
 
     graph = PermutationGroups.lrx(5, k=3)
-    assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 1, 2, 0, 4]])
+    assert np.array_equal(graph.generators_permutations, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 1, 2, 0, 4]])
     assert graph.generator_names == ["L", "R", "X"]
     assert graph.name == "lrx-5(k=3)"
 
 
 def test_top_spin():
     graph = PermutationGroups.top_spin(5)
-    assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 2, 1, 0, 4]])
+    assert np.array_equal(graph.generators_permutations, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [3, 2, 1, 0, 4]])
 
     graph = PermutationGroups.top_spin(5, k=3)
-    assert np.array_equal(graph.generators, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [2, 1, 0, 3, 4]])
+    assert np.array_equal(graph.generators_permutations, [[1, 2, 3, 4, 0], [4, 0, 1, 2, 3], [2, 1, 0, 3, 4]])
 
 
 def test_all_transpositions():
     graph = PermutationGroups.all_transpositions(3)
-    assert np.array_equal(graph.generators, [[1, 0, 2], [2, 1, 0], [0, 2, 1]])
+    assert np.array_equal(graph.generators_permutations, [[1, 0, 2], [2, 1, 0], [0, 2, 1]])
     assert graph.generator_names == ["(0,1)", "(0,2)", "(1,2)"]
 
     graph = PermutationGroups.all_transpositions(20)
@@ -40,7 +40,7 @@ def test_all_transpositions():
 def test_transposons():
     graph = PermutationGroups.transposons(4)
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [1, 0, 2, 3],
             [1, 2, 0, 3],
@@ -71,7 +71,7 @@ def test_transposons():
 def test_block_interchange():
     graph = PermutationGroups.block_interchange(4)
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [1, 0, 2, 3],
             [1, 2, 0, 3],
@@ -114,7 +114,7 @@ def test_pancake():
     assert graph.n_generators == 5
     assert graph.generator_names == ["R1", "R2", "R3", "R4", "R5"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [[1, 0, 2, 3, 4, 5], [2, 1, 0, 3, 4, 5], [3, 2, 1, 0, 4, 5], [4, 3, 2, 1, 0, 5], [5, 4, 3, 2, 1, 0]],
     )
 
@@ -124,7 +124,7 @@ def test_cubic_pancake():
     assert graph.n_generators == 3
     assert graph.generator_names == ["R15", "R14", "R2"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
             [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 14],
@@ -136,7 +136,7 @@ def test_cubic_pancake():
     assert graph.n_generators == 3
     assert graph.generator_names == ["R15", "R14", "R3"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
             [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 14],
@@ -148,7 +148,7 @@ def test_cubic_pancake():
     assert graph.n_generators == 3
     assert graph.generator_names == ["R15", "R14", "R13"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
             [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 14],
@@ -160,7 +160,7 @@ def test_cubic_pancake():
     assert graph.n_generators == 3
     assert graph.generator_names == ["R15", "R14", "R12"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
             [13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 14],
@@ -172,7 +172,7 @@ def test_cubic_pancake():
     assert graph.n_generators == 3
     assert graph.generator_names == ["R15", "R13", "R2"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
             [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 13, 14],
@@ -184,7 +184,7 @@ def test_cubic_pancake():
     assert graph.n_generators == 3
     assert graph.generator_names == ["R15", "R13", "R3"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
             [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 13, 14],
@@ -196,7 +196,7 @@ def test_cubic_pancake():
     assert graph.n_generators == 3
     assert graph.generator_names == ["R15", "R13", "R12"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [14, 13, 12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0],
             [12, 11, 10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0, 13, 14],
@@ -210,7 +210,7 @@ def test_burnt_pancake():
     assert graph.n_generators == 6
     assert graph.generator_names == ["R1", "R2", "R3", "R4", "R5", "R6"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [6, 1, 2, 3, 4, 5, 0, 7, 8, 9, 10, 11],
             [7, 6, 2, 3, 4, 5, 1, 0, 8, 9, 10, 11],
@@ -227,7 +227,8 @@ def test_full_reversals():
     assert graph.n_generators == 6
     assert graph.generator_names == ["R[0..1]", "R[0..2]", "R[0..3]", "R[1..2]", "R[1..3]", "R[2..3]"]
     assert np.array_equal(
-        graph.generators, [[1, 0, 2, 3], [2, 1, 0, 3], [3, 2, 1, 0], [0, 2, 1, 3], [0, 3, 2, 1], [0, 1, 3, 2]]
+        graph.generators_permutations,
+        [[1, 0, 2, 3], [2, 1, 0, 3], [3, 2, 1, 0], [0, 2, 1, 3], [0, 3, 2, 1], [0, 1, 3, 2]],
     )
 
 
@@ -236,7 +237,7 @@ def test_signed_reversals():
     assert graph.n_generators == 6
     assert graph.generator_names == ["R[0..0]", "R[0..1]", "R[0..2]", "R[1..1]", "R[1..2]", "R[2..2]"]
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [3, 1, 2, 0, 4, 5],
             [4, 3, 2, 1, 0, 5],
@@ -252,25 +253,25 @@ def test_coxeter_b():
     graph = PermutationGroups.coxeter_b(3)
     assert graph.n_generators == 3
     assert graph.generator_names == ["(0,3)", "(0,1)(3,4)", "(1,2)(4,5)"]
-    assert np.array_equal(graph.generators, [[3, 1, 2, 0, 4, 5], [1, 0, 2, 4, 3, 5], [0, 2, 1, 3, 5, 4]])
+    assert np.array_equal(graph.generators_permutations, [[3, 1, 2, 0, 4, 5], [1, 0, 2, 4, 3, 5], [0, 2, 1, 3, 5, 4]])
 
 
 def test_coxeter_d():
     graph = PermutationGroups.coxeter_d(3)
     assert graph.n_generators == 3
     assert graph.generator_names == ["(0,4)(1,3)", "(0,1)(3,4)", "(1,2)(4,5)"]
-    assert np.array_equal(graph.generators, [[4, 3, 2, 1, 0, 5], [1, 0, 2, 4, 3, 5], [0, 2, 1, 3, 5, 4]])
+    assert np.array_equal(graph.generators_permutations, [[4, 3, 2, 1, 0, 5], [1, 0, 2, 4, 3, 5], [0, 2, 1, 3, 5, 4]])
 
 
 def test_cyclic_coxeter():
     graph = PermutationGroups.cyclic_coxeter(4)
     assert graph.n_generators == 4
     assert graph.generator_names == ["(0,1)", "(1,2)", "(2,3)", "(0,3)"]
-    assert np.array_equal(graph.generators, [[1, 0, 2, 3], [0, 2, 1, 3], [0, 1, 3, 2], [3, 1, 2, 0]])
+    assert np.array_equal(graph.generators_permutations, [[1, 0, 2, 3], [0, 2, 1, 3], [0, 1, 3, 2], [3, 1, 2, 0]])
 
     graph = PermutationGroups.cyclic_coxeter(3)
     assert graph.n_generators == 3
-    assert np.array_equal(graph.generators, [[1, 0, 2], [0, 2, 1], [2, 1, 0]])
+    assert np.array_equal(graph.generators_permutations, [[1, 0, 2], [0, 2, 1], [2, 1, 0]])
 
 
 def test_three_cycles():
@@ -286,14 +287,14 @@ def test_three_cycles():
         [0, 2, 3, 1],
         [0, 3, 1, 2],
     ]
-    assert np.array_equal(graph.generators, expected_generators)
+    assert np.array_equal(graph.generators_permutations, expected_generators)
 
 
 def test_three_cycles_0ij():
     graph = PermutationGroups.three_cycles_0ij(4)
     assert graph.n_generators == 6
     expected_generators = [[1, 2, 0, 3], [1, 3, 2, 0], [2, 0, 1, 3], [2, 1, 3, 0], [3, 0, 2, 1], [3, 1, 0, 2]]
-    assert np.array_equal(graph.generators, expected_generators)
+    assert np.array_equal(graph.generators_permutations, expected_generators)
 
 
 def test_three_cycles_01i():
@@ -301,14 +302,14 @@ def test_three_cycles_01i():
     assert graph.n_generators == 4
     assert graph.generators_inverse_closed
     expected_generators = [[1, 2, 0, 3], [2, 0, 1, 3], [1, 3, 2, 0], [3, 0, 2, 1]]
-    assert np.array_equal(graph.generators, expected_generators)
+    assert np.array_equal(graph.generators_permutations, expected_generators)
     assert graph.generator_names == ["(0 1 2)", "(1 0 2)", "(0 1 3)", "(1 0 3)"]
 
     graph = PermutationGroups.three_cycles_01i(4, add_inverses=False)
     assert graph.n_generators == 2
     assert not graph.generators_inverse_closed
     expected_generators = [[1, 2, 0, 3], [1, 3, 2, 0]]
-    assert np.array_equal(graph.generators, expected_generators)
+    assert np.array_equal(graph.generators_permutations, expected_generators)
     assert graph.generator_names == ["(0 1 2)", "(0 1 3)"]
 
 
@@ -481,7 +482,7 @@ def test_sl_root_weyl():
     graph = MatrixGroups.special_linear_root_weyl(2)
     assert graph.n_generators == 4
     assert graph.generators_inverse_closed
-    assert all(np.linalg.det(a.matrix) == 1 for a in graph.generators)
+    assert all(np.linalg.det(a.matrix) == 1 for a in graph.generators_matrices)
     assert graph.generators == [
         MatrixGenerator.create([[1, 1], [0, 1]]),
         MatrixGenerator.create([[1, -1], [0, 1]]),
@@ -492,7 +493,7 @@ def test_sl_root_weyl():
     graph = MatrixGroups.special_linear_root_weyl(3)
     assert graph.n_generators == 4
     assert graph.generators_inverse_closed
-    assert all(np.linalg.det(a.matrix) == 1 for a in graph.generators)
+    assert all(np.linalg.det(a.matrix) == 1 for a in graph.generators_matrices)
     assert graph.generators == [
         MatrixGenerator.create([[1, 1, 0], [0, 1, 0], [0, 0, 1]]),
         MatrixGenerator.create([[1, -1, 0], [0, 1, 0], [0, 0, 1]]),
@@ -503,7 +504,7 @@ def test_sl_root_weyl():
     graph = MatrixGroups.special_linear_root_weyl(4)
     assert graph.n_generators == 4
     assert graph.generators_inverse_closed
-    assert all(np.linalg.det(a.matrix) == 1 for a in graph.generators)
+    assert all(np.linalg.det(a.matrix) == 1 for a in graph.generators_matrices)
     assert graph.generators == [
         MatrixGenerator.create([[1, 1, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
         MatrixGenerator.create([[1, -1, 0, 0], [0, 1, 0, 0], [0, 0, 1, 0], [0, 0, 0, 1]]),
@@ -561,7 +562,7 @@ def test_conjugacy_class():
     classes = {(2, 2): None, (3,): None}
     graph = PermutationGroups.conjugacy_classes(n, classes=classes)
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [1, 0, 3, 2],
             [2, 3, 0, 1],
@@ -592,7 +593,7 @@ def test_conjugacy_class():
     assert graph.name == "conjugacy_class-4-2,2-3,1"
 
     n = 5
-    classes = {(2, 2): 5, (3,): 7}
+    classes: dict[tuple[int, ...], int | None] = {(2, 2): 5, (3,): 7}
     graph = PermutationGroups.conjugacy_classes(n, classes=classes)
     assert graph.generator_names == [
         "(2,2,1)_1",
@@ -623,7 +624,7 @@ def test_down_cycles():
     n = 6
     g = PermutationGroups.down_cycles(n)
     assert np.array_equal(
-        g.generators,
+        g.generators_permutations,
         [
             [1, 0, 2, 3, 4, 5],
             [1, 2, 0, 3, 4, 5],
@@ -671,7 +672,7 @@ def test_lsl_cycles():
         [4, 0, 1, 2, 3],  # L_inv
         [0, 4, 1, 2, 3],  # S_inv
     ]
-    assert all(any(np.array_equal(g, e) for g in graph.generators) for e in expected_generators)
+    assert all(any(np.array_equal(g, e) for g in graph.generators_permutations) for e in expected_generators)
 
     assert graph.n_generators == 4
     assert set(graph.generator_names) == {"L", "S", "L_inv", "S_inv"}
@@ -681,7 +682,7 @@ def test_prefix_cycles():
     n = 6
     g = PermutationGroups.prefix_cycles(n)
     assert np.array_equal(
-        g.generators,
+        g.generators_permutations,
         [
             [1, 0, 2, 3, 4, 5],
             [1, 2, 0, 3, 4, 5],

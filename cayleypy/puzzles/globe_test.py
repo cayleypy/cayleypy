@@ -33,7 +33,7 @@ def test_globe_3_4():
         [25, 24, 31, 3, 4, 5, 6, 26, 17, 16, 23, 11, 12, 13, 14, 18, 9, 8, 15, 19, 20, 21, 22, 10, 1, 0, 7, 27, 28, 29, 30, 2]
     ]
     # fmt: on
-    assert np.array_equal(graph.generators, expected_generators)
+    assert np.array_equal(graph.generators_permutations, expected_generators)
 
 
 def test_globe_2_6():
@@ -66,4 +66,4 @@ def test_globe_2_6():
         [27, 26, 25, 24, 35, 5, 6, 7, 8, 9, 10, 28, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 3, 2, 1, 0, 11, 29, 30, 31, 32, 33, 34, 4],
     ]
     # fmt: on
-    assert np.array_equal(graph.generators, expected_generators)
+    assert np.array_equal(graph.generators_permutations, expected_generators)

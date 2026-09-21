@@ -230,7 +230,7 @@ class BeamSearchAlgorithm:
             assert bfs_result_for_mitm is not None
             mask = isin_via_searchsorted(layer2_hashes, bfs_layers_hashes[found_layer_id])
             assert torch.any(mask), "No intersection in Meet-in-the-middle."
-            middle_state = graph.decode_states(layer2[mask.nonzero()[0].item()].reshape((1, -1)))
+            middle_state = graph.decode_states(layer2[int(mask.nonzero()[0].item())].reshape((1, -1)))
             path1 = graph.restore_path(all_layers_hashes, middle_state)
             path2 = graph.find_path_from(middle_state, bfs_result_for_mitm)
             assert path2 is not None

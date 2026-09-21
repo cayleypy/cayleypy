@@ -8,7 +8,7 @@ import torch
 
 from .permutation_utils import inverse_permutation
 
-AnyStateType = Union[torch.Tensor, np.ndarray, list]
+AnyStateType = Union[torch.Tensor, np.ndarray, list, str]
 
 
 class GeneratorType(Enum):
@@ -123,7 +123,7 @@ class CayleyGraphDef:
         if isinstance(generators, list):
             generators_list = generators
         elif isinstance(generators, torch.Tensor):
-            generators_list = [[q.item() for q in generators[i, :]] for i in range(generators.shape[0])]
+            generators_list = generators.tolist()
         elif isinstance(generators, np.ndarray):
             generators_list = [list(generators[i, :]) for i in range(generators.shape[0])]
         else:
@@ -253,7 +253,7 @@ class CayleyGraphDef:
     ) -> list[int]:
         if isinstance(central_state, list):
             central_state = np.array(central_state)
-        if hasattr(central_state, "reshape"):
+        if isinstance(central_state, (torch.Tensor, np.ndarray)):
             central_state = central_state.reshape((-1,))  # Flatten.
         return [int(x) for x in central_state]
 

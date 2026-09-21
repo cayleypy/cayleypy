@@ -1,5 +1,6 @@
 from dataclasses import dataclass, replace
 from functools import cached_property
+from os import PathLike
 from typing import Optional, Union, Any
 
 import h5py
@@ -72,7 +73,7 @@ class BfsResult:
             return False
         return True
 
-    def save(self, path: str):
+    def save(self, path: Union[str, PathLike[str]]):
         path = str(path)
         assert path.endswith(".h5"), "Please use '.h5' extention for BfsResult saving"
 
@@ -95,7 +96,7 @@ class BfsResult:
             f["graph__name"] = self.graph.name
 
     @staticmethod
-    def load(path: str):
+    def load(path: Union[str, PathLike[str]]):
         path = str(path)
         # pylint: disable=no-member
         with h5py.File(path, "r") as f:
@@ -164,7 +165,9 @@ class BfsResult:
             self,
             layers={k: v.to(device) for k, v in self.layers.items()},
             layers_hashes=[h.to(device) for h in self.layers_hashes],
-            edges_list_hashes=self.edges_list_hashes.to(device) if self.has_edges_list_hashes() else None,  # type: ignore # pylint: disable=line-too-long
+            edges_list_hashes=(
+                self.edges_list_hashes.to(device) if self.edges_list_hashes is not None else None
+            ),  # pylint: disable=line-too-long
         )
 
     @cached_property
