@@ -6,6 +6,7 @@ from typing import Optional, Union, Any
 import numpy as np
 import torch
 
+from .matrix_utils import inverse_integer, inverse_mod
 from .permutation_utils import inverse_permutation
 
 AnyStateType = Union[torch.Tensor, np.ndarray, list]
@@ -81,10 +82,11 @@ class MatrixGenerator:
 
     @cached_property
     def inv(self):
-        """Inverse of this matrix. Throws error if matrix is not invertible."""
-        # TODO: implement modular inverse, if needed.
-        matrix_inv = np.array(np.linalg.inv(self.matrix), dtype=np.int64)
-        assert np.array_equal(self.apply(matrix_inv), np.eye(self.n)), "Matrix is not invertible."
+        """Inverse over Z/mZ, or over Z when modulo == 0."""
+        if self.modulo:
+            matrix_inv = inverse_mod(self.matrix, self.modulo)
+        else:
+            matrix_inv = inverse_integer(self.matrix)
         return MatrixGenerator.create(matrix_inv, self.modulo)
 
     def __eq__(self, other: Any) -> bool:
