@@ -477,6 +477,30 @@ def test_sl_fund_roots():
     ]
 
 
+def test_unitriangular_fund_roots():
+    graph = MatrixGroups.unitriangular_fundamental_roots(2)
+    assert graph.name == "unitriangular_fund_roots-2"
+    assert graph.n_generators == 2
+    assert graph.generators_inverse_closed
+    assert graph.generator_names == ["e1", "e1'"]
+    assert graph.generators == [
+        MatrixGenerator.create([[1, 1], [0, 1]]),
+        MatrixGenerator.create([[1, -1], [0, 1]]),
+    ]
+
+    graph = MatrixGroups.unitriangular_fundamental_roots(3, modulo=5)
+    assert graph.name == "unitriangular_fund_roots-3%5"
+    assert graph.n_generators == 4
+    assert graph.generators_inverse_closed
+    assert graph.generator_names == ["e1", "e1'", "e2", "e2'"]
+    assert graph.generators == [
+        MatrixGenerator.create([[1, 1, 0], [0, 1, 0], [0, 0, 1]], modulo=5),
+        MatrixGenerator.create([[1, -1, 0], [0, 1, 0], [0, 0, 1]], modulo=5),
+        MatrixGenerator.create([[1, 0, 0], [0, 1, 1], [0, 0, 1]], modulo=5),
+        MatrixGenerator.create([[1, 0, 0], [0, 1, -1], [0, 0, 1]], modulo=5),
+    ]
+
+
 def test_sl_root_weyl():
     graph = MatrixGroups.special_linear_root_weyl(2)
     assert graph.n_generators == 4
