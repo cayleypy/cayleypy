@@ -10,7 +10,6 @@ from .cayley_graph_def import MatrixGenerator, CayleyGraphDef
 from .datasets import load_dataset
 from .graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 
-
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
 
@@ -226,6 +225,33 @@ def test_random_walks_matrix_group():
     assert x.shape == (200, 3, 3)
     assert y.shape == (200,)
     assert np.array_equal(y.cpu().numpy(), [i for i in range(10) for _ in range(20)])
+
+
+def test_random_walks_nbt_matrix_group():
+    generators = [
+        [[49, 1008], [1, 0]],
+        [[0, 1], [1008, 49]],
+        [[0, 583], [964, 49]],
+        [[49, 426], [45, 0]],
+    ]
+    graph = CayleyGraph(
+        CayleyGraphDef.for_matrix_group(
+            generators=[MatrixGenerator.create(matrix, modulo=1009) for matrix in generators],
+            generator_names=["a", "a'", "b", "b'"],
+            central_state=[[1, 0], [0, 1]],
+        ),
+        device="cpu",
+        random_seed=0,
+    )
+    width, length = 1000, 10
+    x, y = graph.random_walks(width=width, length=length, mode="nbt")
+
+    assert x.shape == (width * length, 2, 2)
+    assert y.shape == (width * length,)
+    # Verify that each walk is made of unique states.
+    for i in range(width):
+        walk = x[i::width].reshape(length, -1)
+        assert torch.unique(walk, dim=0).shape[0] == length, f"Walk {i} revisits a state"
 
 
 def test_random_walks_start_state():
