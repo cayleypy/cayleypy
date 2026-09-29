@@ -39,6 +39,7 @@ Beam search and ML
     :toctree: generated/
 
     cayleypy.Predictor
+    cayleypy.EnsemblePredictor
     cayleypy.algo.BeamSearchAlgorithm
     cayleypy.algo.BeamSearchResult
     cayleypy.algo.RandomWalksGenerator
