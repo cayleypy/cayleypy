@@ -8,14 +8,16 @@ import kagglehub
 import torch
 from torch import nn
 
+from .transformer import TransformerModel
+
 
 @dataclass(frozen=True)
 class ModelConfig:
     """Configuration used to describe ML model.
 
-    Fields `n_outputs`, `tokenizer_groups` and `graph_hash` describe capabilities added after the first version of this
-    class. Their defaults describe a single-output model without tokenization, which is not tied to a particular graph,
-    so configs written before these fields existed keep working.
+    Fields `n_outputs`, `tokenizer_groups`, `graph_hash`, `n_heads` and `dim_feedforward` describe capabilities added
+    after the first version of this class. Their defaults describe a single-output model without tokenization, which is
+    not tied to a particular graph, so configs written before these fields existed keep working.
 
     :param model_type: Type of the model, one of "MLP" (see :class:`MlpModel`) or "RESMLP"
         (see :class:`ResMlpModel`).
@@ -30,6 +32,9 @@ class ModelConfig:
         ``[group_size, num_groups]`` pairs. For example, ``[[3, 20], [2, 30]]`` means 20 tokens of 3 elements followed
         by 30 tokens of 2 elements. None means the state is not tokenized.
     :param graph_hash: Hash of the graph this model was trained for, see :func:`cayleypy.models.graph_hash`.
+    :param n_heads: Number of attention heads, for models with attention. None means one head per 64 features.
+    :param dim_feedforward: Width of the feed-forward layer inside a transformer block. None means 4 times the width
+        of the model.
     """
 
     model_type: str
@@ -41,6 +46,8 @@ class ModelConfig:
     n_outputs: int = 1
     tokenizer_groups: Optional[list[list[int]]] = None
     graph_hash: Optional[str] = None
+    n_heads: Optional[int] = None
+    dim_feedforward: Optional[int] = None
 
     @staticmethod
     def from_dict(cfg: dict[str, Any]):
@@ -55,6 +62,8 @@ class ModelConfig:
             n_outputs=cfg.get("n_outputs", 1),
             tokenizer_groups=cfg.get("tokenizer_groups", None),
             graph_hash=cfg.get("graph_hash", None),
+            n_heads=cfg.get("n_heads", None),
+            dim_feedforward=cfg.get("dim_feedforward", None),
         )
 
     def to_dict(self) -> dict[str, Any]:
@@ -67,6 +76,8 @@ class ModelConfig:
             return MlpModel(self)
         elif self.model_type == "RESMLP":
             return ResMlpModel(self)
+        elif self.model_type == "TRANSFORMER":
+            return TransformerModel(self)
         else:
             raise ValueError("Unknown model type: " + self.model_type)
 
