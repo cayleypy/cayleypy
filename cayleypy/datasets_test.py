@@ -333,7 +333,7 @@ def test_increasing_k_cycles_cayley_growth():
     for key, layer_sizes in data.items():
         n, k = map(int, key.split(","))
 
-        if n == k and k > 2:
+        if n == k > 2:
             continue
 
         if k % 2 == 0:
@@ -351,7 +351,7 @@ def test_consecutive_k_cycles_cayley_growth():
     data = load_dataset("consecutive_k_cycles_cayley_growth")
     for key, layer_sizes in data.items():
         n, k = map(int, key.split(","))
-        if k == n and n > 2:
+        if k == n > 2:
             assert sum(layer_sizes) == n
         elif k % 2 == 0:
             assert sum(layer_sizes) == math.factorial(n)
