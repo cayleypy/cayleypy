@@ -8,7 +8,6 @@ echo "Running pylint..."
 pylint ./cayleypy
 result+=$?
 
-
 echo "Running pyright..."
 pyright ./cayleypy
 result+=$?
