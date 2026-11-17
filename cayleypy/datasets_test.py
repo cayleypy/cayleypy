@@ -223,7 +223,7 @@ def test_hungarian_rings_growth():
     for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
         parameters = list(map(int, key.split(",")))
         assert len(parameters) == 4
-        (left_size, left_index, right_size, right_index) = parameters
+        left_size, left_index, right_size, right_index = parameters
         n = left_size + right_size - (2 if left_index > 0 and right_index > 0 else 1)
         if n < 6 or n > 12:
             continue
