@@ -207,7 +207,7 @@ def test_incomplete_bfs_symmetric_adjacency_matrix() -> None:
     assert np.array_equal(mx, mx.T)
 
 
-def _state_to_str(state: torch.Tensor):
+def _state_to_str(state: torch.Tensor) -> str:
     return "".join(str(int(x)) for x in state)
 
 

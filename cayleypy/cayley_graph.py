@@ -1,7 +1,7 @@
 import gc
 import math
 from functools import cached_property
-from typing import Optional, Sequence, Union
+from typing import Optional, Sequence, Union, TYPE_CHECKING
 
 import torch
 
@@ -16,6 +16,9 @@ from .device_config import DeviceConfig
 from .hasher import StateHasher
 from .string_encoder import StringEncoder
 from .torch_utils import CachedTensor, isin_via_searchsorted
+
+if TYPE_CHECKING:
+    import networkx
 
 
 class CayleyGraph:
@@ -293,7 +296,7 @@ class CayleyGraph:
             return None
         return self.definition.revert_path(path_to)
 
-    def to_networkx_graph(self):
+    def to_networkx_graph(self) -> "networkx.Graph":
         return self.bfs(
             max_layer_size_to_store=10**18, return_all_edges=True, return_all_hashes=True
         ).to_networkx_graph()

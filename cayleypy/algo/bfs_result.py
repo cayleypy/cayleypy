@@ -1,7 +1,7 @@
 from dataclasses import dataclass, replace
 from functools import cached_property
 from os import PathLike
-from typing import Optional, Union, Any
+from typing import Optional, Union, Any, TYPE_CHECKING
 
 import h5py
 import numpy as np
@@ -10,6 +10,9 @@ from scipy.sparse import coo_array
 
 from cayleypy.permutation_utils import apply_permutation
 from cayleypy.cayley_graph_def import CayleyGraphDef
+
+if TYPE_CHECKING:
+    import networkx
 
 
 @dataclass(frozen=True)
@@ -276,7 +279,7 @@ class BfsResult:
                     return self.graph.generator_names[i]
         assert False, f"Edge ({i1},{i2}) not found."
 
-    def to_networkx_graph(self, directed: bool = False, with_labels: bool = True):
+    def to_networkx_graph(self, directed: bool = False, with_labels: bool = True) -> "networkx.Graph":
         """Returns explicit graph as networkx.Graph or networkx.DiGraph."""
         # Import networkx here so we don't need to depend on this library in requirements.
         import networkx  # pylint: disable=import-outside-toplevel
