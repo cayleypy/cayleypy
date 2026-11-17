@@ -1,21 +1,21 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = ["setuptools"]
+requires = ["setuptools>=77.0.3"]
 
 [project]
 # https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
 name = "cayleypy"
-version = "0.1.0"
+version = "0.2.0"
 description = "Library for studying Cayley graphs and Schreier coset graphs"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "CayleyPy Foundation" }]
 
 # https://pypi.org/classifiers/
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "License :: OSI Approved :: MIT License",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
 
@@ -30,12 +30,12 @@ dependencies = [
 ]
 
 # Development dependencies
-# pip install .[torch,lint,test,dev,docs]
+# pip install ".[lint,test,dev,docs]"
 [project.optional-dependencies]
 lint = [
-    "black==25.1.0",
+    "black==26.10.1",
     "mypy==1.15.0",
-    "pylint"
+    "pylint==4.0.10"
 ]
 test = [
     "pytest",

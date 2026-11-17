@@ -223,7 +223,7 @@ def test_hungarian_rings_growth():
     for key, layer_sizes in load_dataset("hungarian_rings_growth").items():
         parameters = list(map(int, key.split(",")))
         assert len(parameters) == 4
-        (left_size, left_index, right_size, right_index) = parameters
+        left_size, left_index, right_size, right_index = parameters
         n = left_size + right_size - (2 if left_index > 0 and right_index > 0 else 1)
         if n < 6 or n > 12:
             continue
@@ -245,6 +245,14 @@ def test_sl_fund_roots_growth():
             if m in [2, 3, 5, 7, 11, 13, 17, 19, 23, 29]:
                 assert sum(layer_sizes) == math.prod(m**n - m**i for i in range(n)) / (m - 1)
             _verify_layers_fast(MatrixGroups.special_linear_fundamental_roots(n, modulo=m), layer_sizes)
+
+
+def test_unitriangular_fund_roots_growth():
+    for n in [2, 3]:
+        for key, layer_sizes in load_dataset(f"unitriangular_{n}_fund_roots_growth").items():
+            m = int(key)
+            assert sum(layer_sizes) == m ** (n * (n - 1) // 2)
+            _verify_layers_fast(MatrixGroups.unitriangular_fundamental_roots(n, modulo=m), layer_sizes)
 
 
 def test_sl_root_weyl_growth():

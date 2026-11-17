@@ -158,6 +158,10 @@ def _compute_sl_fund_roots_growth(n: str, m: str) -> list[int]:
     return CayleyGraph(MatrixGroups.special_linear_fundamental_roots(int(n), modulo=int(m))).bfs().layer_sizes
 
 
+def _compute_unitriangular_fund_roots_growth(n: str, m: str) -> list[int]:
+    return CayleyGraph(MatrixGroups.unitriangular_fundamental_roots(int(n), modulo=int(m))).bfs().layer_sizes
+
+
 def _compute_sl_root_weyl_growth(n: str, m: str) -> list[int]:
     return CayleyGraph(MatrixGroups.special_linear_root_weyl(int(n), modulo=int(m))).bfs().layer_sizes
 
@@ -256,6 +260,10 @@ def generate_datasets():
     _update_dataset("sl_2_fund_roots_growth", keys, lambda m: _compute_sl_fund_roots_growth(2, m))
     keys = [str(n) for n in range(2, 6)]
     _update_dataset("sl_3_fund_roots_growth", keys, lambda m: _compute_sl_fund_roots_growth(3, m))
+    keys = [str(n) for n in range(2, 11)]
+    _update_dataset("unitriangular_2_fund_roots_growth", keys, lambda m: _compute_unitriangular_fund_roots_growth(2, m))
+    keys = [str(n) for n in range(2, 6)]
+    _update_dataset("unitriangular_3_fund_roots_growth", keys, lambda m: _compute_unitriangular_fund_roots_growth(3, m))
     keys = [str(n) for n in range(2, 11)]
     _update_dataset("sl_2_root_weyl_growth", keys, lambda m: _compute_sl_root_weyl_growth(2, m))
     keys = [str(n) for n in range(2, 6)]

@@ -1,0 +1,23 @@
+name: Upload package to PyPi
+
+on: [workflow_dispatch]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v7
+    - uses: actions/setup-python@v7
+      with:
+        python-version: '3.x'
+    - name: Install dependencies
+      run: pip install build twine
+    - name: Build distributions
+      run: python -m build
+    - name: Check distributions
+      run: python -m twine check dist/*
+    - name: Publish distributions
+      env:
+        TWINE_USERNAME: __token__
+        TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      run: python -m twine upload dist/*
