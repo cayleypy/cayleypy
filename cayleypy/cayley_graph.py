@@ -5,7 +5,7 @@ from typing import Optional, Sequence, Union
 
 import torch
 
-from .algo.beam_search import BeamSearchAlgorithm
+from .beam_search_backends import get_beam_search_backend
 from .algo.bfs_algo import BfsAlgorithm
 from .algo.bfs_distributed import BfsDistributed
 from .algo.random_walks import RandomWalksGenerator
@@ -227,12 +227,20 @@ class CayleyGraph:
         """
         return RandomWalksGenerator(self).generate(**kwargs)
 
-    def beam_search(self, **kwargs):
+    def beam_search(self, *, backend=None, **kwargs):
         """Tries to find a path from `start_state` to central state using Beam Search algorithm.
 
         See :class:`cayleypy.algo.BeamSearchAlgorithm` for more details.
+
+        ``backend`` may be a registered name, a callable ``(graph, **kwargs)``,
+        or None to use the process default (initially ``"torch"``). The builtin
+        ``"torch"`` always runs the original algorithm. Optional backends own
+        their compatibility checks and fallback policy; errors are not hidden.
         """
-        return BeamSearchAlgorithm(self).search(**kwargs)
+        # Resolve under the registry lock, then call outside it. A backend owns
+        # its fallback policy; exceptions and results pass through unchanged.
+        search = backend if callable(backend) else get_beam_search_backend(backend)
+        return search(self, **kwargs)
 
     def restore_path(self, hashes: list[torch.Tensor], to_state: AnyStateType) -> list[int]:
         """Restores path from layers hashes.
