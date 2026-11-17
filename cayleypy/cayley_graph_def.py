@@ -8,7 +8,7 @@ import torch
 
 from .permutation_utils import inverse_permutation
 
-AnyStateType = Union[torch.Tensor, np.ndarray, list, str]
+AnyStateType = Union[torch.Tensor, np.ndarray, list]
 
 
 class GeneratorType(Enum):
@@ -108,7 +108,7 @@ class CayleyGraphDef:
     def create(
         generators: Union[list[list[int]], torch.Tensor, np.ndarray],
         generator_names: Optional[list[str]] = None,
-        central_state: Optional[AnyStateType] = None,
+        central_state: Optional[Union[AnyStateType, str]] = None,
         name: str = "",
     ):
         """Creates Cayley Graph definition (when generators are permutations).
