@@ -35,7 +35,7 @@ class Predictor:
             :meth:`cayleypy.models.ModelConfig.build_model` declare it automatically.
         """
         self.graph = graph
-        self.predict = lambda x: x  # type: Callable[[torch.Tensor], torch.Tensor]
+        self.predict: Callable[[torch.Tensor], torch.Tensor] = lambda x: x
         self.n_outputs = int(getattr(models_or_heuristics, "n_outputs", 1))
 
         if models_or_heuristics == "zero":
@@ -84,7 +84,7 @@ class Predictor:
         with torch.no_grad():
             num_batches = int(math.ceil(states.shape[0] / self.graph.batch_size))
             if num_batches > 1:
-                ans = []  # type: list[torch.Tensor]
+                ans: list[torch.Tensor] = []
                 for batch in states.tensor_split(num_batches, dim=0):
                     ans.append(self._predict_as_tensor(batch))
                 # Batches must be concatenated along dimension 0, otherwise outputs of multi-output models are mangled.

@@ -41,5 +41,9 @@ def test_permutation_1d(code_width: int, n: int):
     expected = torch.tensor([apply_permutation(perm, row) for row in s.numpy()], dtype=torch.int64)
     enc = StringEncoder(code_width=code_width, n=n)
     perm_func = enc.implement_permutation_1d(perm)
-    ans = enc.decode(perm_func(enc.encode(s)))  # type: ignore
+    encoded = enc.encode(s)
+    permuted = perm_func(encoded)
+    assert isinstance(permuted, torch.Tensor)
+    assert np.array_equal(perm_func(encoded.numpy()), permuted.numpy())
+    ans = enc.decode(permuted)
     assert torch.equal(ans, expected)

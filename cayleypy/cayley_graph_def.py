@@ -303,7 +303,7 @@ class CayleyGraphDef:
         new_name = self.name
         if new_name != "":
             new_name += "-ic"
-        new_generator_names = []  # type: list[str]
+        new_generator_names: list[str] = []
 
         if self.generators_type == GeneratorType.PERMUTATION:
             generators_set = {tuple(self.generators_permutations[i]) for i in range(self.n_generators)}

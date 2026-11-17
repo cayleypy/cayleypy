@@ -1,5 +1,5 @@
 import math
-from typing import Callable
+from typing import Callable, TypeVar
 
 import numpy as np
 import torch
@@ -7,6 +7,8 @@ import torch
 # We are using int64, but treating it as unsigned.
 # We cannot use uint64 because torch doesn't support bitwise shift for it.
 CODEWORD_LENGTH = 64
+
+_EncodedArray = TypeVar("_EncodedArray", np.ndarray, torch.Tensor)
 
 
 # Returns 64-bit number with bit in position `bit_id` equal to 1 and all other bits equal to 0.
@@ -107,7 +109,7 @@ class StringEncoder:
         exec(src, {}, l)  # pylint: disable=exec-used
         return l["f_"]
 
-    def implement_permutation_1d(self, p: list[int]) -> Callable[[np.ndarray], np.ndarray]:
+    def implement_permutation_1d(self, p: list[int]) -> Callable[[_EncodedArray], _EncodedArray]:
         """Converts permutation to a function on encoded tensor implementing this permutation.
 
         The function converts 1D tensor to 1D tensor of the same dimension.

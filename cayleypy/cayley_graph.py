@@ -244,7 +244,7 @@ class CayleyGraph:
         Length of returned path is equal to number of layers.
         """
         inv_graph = self.with_inverted_generators
-        path = []  # type: list[int]
+        path: list[int] = []
         cur_state = self.decode_states(self.encode_states(to_state))
 
         for i in range(len(hashes) - 1, -1, -1):

@@ -60,13 +60,13 @@ class BfsResult:
         for i in range(len(self.layers_hashes)):
             if not torch.all(self.layers_hashes[i] == other.layers_hashes[i]):
                 return False
-        if not self.has_edges_list_hashes():
-            if other.has_edges_list_hashes():
+        if self.edges_list_hashes is None or other.edges_list_hashes is None:
+            if self.edges_list_hashes is not other.edges_list_hashes:
                 return False
         else:
-            if self.edges_list_hashes.shape != other.edges_list_hashes.shape:  # type: ignore
+            if self.edges_list_hashes.shape != other.edges_list_hashes.shape:
                 return False
-            if not torch.all(self.edges_list_hashes == other.edges_list_hashes):  # type: ignore
+            if not torch.all(self.edges_list_hashes == other.edges_list_hashes):
                 return False
 
         if self.graph != other.graph:
@@ -85,8 +85,8 @@ class BfsResult:
 
             for i, hashes in enumerate(self.layers_hashes):
                 f[f"edges_list_hashes__{i}"] = hashes.detach().cpu()
-            if self.has_edges_list_hashes():
-                f["edges_list_hashes"] = self.edges_list_hashes.detach().cpu()  # type: ignore
+            if self.edges_list_hashes is not None:
+                f["edges_list_hashes"] = self.edges_list_hashes.detach().cpu()
             else:
                 f["edges_list_hashes"] = torch.empty([])
 
@@ -165,9 +165,6 @@ class BfsResult:
         """Returns last layer, formatted as set of strings."""
         return self.get_layer(self.diameter())
 
-    def has_edges_list_hashes(self):
-        return hasattr(self, "edges_list_hashes") and self.edges_list_hashes is not None
-
     def to_device(self, device: Union[str, torch.device]):
 
         if isinstance(device, str):
@@ -213,7 +210,7 @@ class BfsResult:
     def named_undirected_edges(self) -> set[tuple[str, str]]:
         """Names for vertices (representing coset elements in readable format)."""
         vn = self.vertex_names
-        return {tuple(sorted([vn[i1], vn[i2]])) for i1, i2 in self.edges_list}  # type: ignore
+        return {tuple(sorted([vn[i1], vn[i2]])) for i1, i2 in self.edges_list}
 
     def adjacency_matrix(self) -> np.ndarray:
         """Returns adjacency matrix as a dense NumPy array."""

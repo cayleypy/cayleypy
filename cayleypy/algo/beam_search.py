@@ -203,7 +203,7 @@ class BeamSearchAlgorithm:
         start_states = graph.encode_states(start_state)
         layer1, layer1_hashes = graph.get_unique_states(start_states)
         all_layers_hashes = [layer1_hashes]
-        debug_scores = {}  # type: dict[int, float]
+        debug_scores: dict[int, float] = {}
 
         if graph.central_state_hash[0] == layer1_hashes[0]:
             # Start state is the central state.
