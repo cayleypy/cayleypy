@@ -61,7 +61,8 @@ class RandomWalksGenerator:
             distance on the graph. The procedure is similar to beam search, except there is no goal function. All
             trajectories know about each other and avoid visiting states visited by any trajectory. Additionally,
             1-neighbors of current states are also banned to improve mixing. The `nbt_history_depth` parameter
-            controls how many previous levels to remember and ban.
+            controls how many previous levels to remember and ban. Stops early if no unbanned candidates remain,
+            returning only completed levels.
 
         :param width: Number of random walks to generate.
         :param length: Length of each random walk.
@@ -164,6 +165,7 @@ class RandomWalksGenerator:
         the number of random walk steps will be better related to actual distance on the graph.
         The procedure is similar to beam search, except there is no goal function.
         All trajectories know about each other and avoid visiting states visited by any trajectory.
+        Stops early and returns only completed levels if no unbanned candidates remain.
 
         :param width: Number of random walks to generate in parallel.
         :param length: Length of each random walk.
@@ -221,8 +223,7 @@ class RandomWalksGenerator:
                     array_new_states = array_new_states[mask_new, :].repeat(repeat_factor, 1)[:width, :]
                     i_step_corrected += 1
                 else:
-                    # No new states found, stay in place.
-                    array_new_states = array_current_states
+                    return graph.decode_states(states[: i_step * width]), y[: i_step * width]
 
             # 3. Select desired number of states randomly.
             perm = torch.randperm(array_new_states.size(0), device=graph.device)
