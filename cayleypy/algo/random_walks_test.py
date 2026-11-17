@@ -1,4 +1,5 @@
 import numpy as np
+import pytest
 import torch
 
 from ..cayley_graph import CayleyGraph
@@ -55,7 +56,9 @@ def test_random_walks_nbt_matrix_group():
         assert torch.unique(walk, dim=0).shape[0] == length, f"Walk {i} revisits a state"
 
 
-def test_random_walks_nbt_exhaustion():
+@pytest.mark.parametrize("width", [1, 2, 5])
+@pytest.mark.parametrize("length", [1, 2, 3, 4, 10])
+def test_random_walks_nbt_exhaustion(width, length):
     """Verify that NBT walks do not repeat states when no unseen candidates remain."""
     graph = CayleyGraph(
         CayleyGraphDef.for_matrix_group(
@@ -66,9 +69,15 @@ def test_random_walks_nbt_exhaustion():
         device="cpu",
         random_seed=0,
     )
-    x, _ = graph.random_walks(width=1, length=4, mode="nbt")
+    x, y = graph.random_walks(width=width, length=length, mode="nbt")
 
-    assert torch.unique(x.reshape(len(x), -1), dim=0).shape[0] == len(x), x
+    expected_length = min(length, 3)
+    assert x.shape == (width * expected_length, 1, 1)
+    expected_y = torch.tensor([0, 1, 2][:expected_length], dtype=y.dtype, device=y.device).repeat_interleave(width)
+    assert torch.equal(y, expected_y), y
+    for i in range(width):
+        walk = x[i::width].reshape(expected_length, -1)
+        assert torch.unique(walk, dim=0).shape[0] == expected_length, f"Walk {i} revisits a state"
 
 
 def test_random_walks_start_state():
