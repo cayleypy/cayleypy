@@ -247,6 +247,14 @@ def test_sl_fund_roots_growth():
             _verify_layers_fast(MatrixGroups.special_linear_fundamental_roots(n, modulo=m), layer_sizes)
 
 
+def test_unitriangular_fund_roots_growth():
+    for n in [2, 3]:
+        for key, layer_sizes in load_dataset(f"unitriangular_{n}_fund_roots_growth").items():
+            m = int(key)
+            assert sum(layer_sizes) == m ** (n * (n - 1) // 2)
+            _verify_layers_fast(MatrixGroups.unitriangular_fundamental_roots(n, modulo=m), layer_sizes)
+
+
 def test_sl_root_weyl_growth():
     for n in [2, 3]:
         for key, layer_sizes in load_dataset(f"sl_{n}_root_weyl_growth").items():
