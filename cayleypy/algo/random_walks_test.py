@@ -58,7 +58,8 @@ def test_random_walks_nbt_matrix_group():
 
 @pytest.mark.parametrize("width", [1, 2, 5])
 @pytest.mark.parametrize("length", [1, 2, 3, 4, 10])
-def test_random_walks_nbt_exhaustion(width, length):
+@pytest.mark.parametrize("nbt_history_depth", [-1, 2])
+def test_random_walks_nbt_exhaustion(width, length, nbt_history_depth):
     """Verify that NBT walks do not repeat states when no unseen candidates remain."""
     graph = CayleyGraph(
         CayleyGraphDef.for_matrix_group(
@@ -69,7 +70,7 @@ def test_random_walks_nbt_exhaustion(width, length):
         device="cpu",
         random_seed=0,
     )
-    x, y = graph.random_walks(width=width, length=length, mode="nbt")
+    x, y = graph.random_walks(width=width, length=length, mode="nbt", nbt_history_depth=nbt_history_depth)
 
     expected_length = min(length, 3)
     assert x.shape == (width * expected_length, 1, 1)
@@ -78,6 +79,15 @@ def test_random_walks_nbt_exhaustion(width, length):
     for i in range(width):
         walk = x[i::width].reshape(expected_length, -1)
         assert torch.unique(walk, dim=0).shape[0] == expected_length, f"Walk {i} revisits a state"
+
+
+@pytest.mark.parametrize("nbt_history_depth", [0, -2])
+def test_random_walks_nbt_invalid_history_depth(nbt_history_depth):
+    """Reject history depths that disable non-backtracking checks."""
+    graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu", random_seed=0)
+
+    with pytest.raises(ValueError, match=r"^nbt_history_depth must be positive\.$"):
+        graph.random_walks(width=1, length=4, mode="nbt", nbt_history_depth=nbt_history_depth)
 
 
 def test_random_walks_start_state():
