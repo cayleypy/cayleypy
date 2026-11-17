@@ -1,6 +1,6 @@
 import math
 import typing
-from typing import Callable
+from typing import Any, Callable
 
 import torch
 
@@ -17,7 +17,7 @@ def _hamming_distance(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
 class Predictor:
     """Estimates distance from central state to given states."""
 
-    def __init__(self, graph: "CayleyGraph", models_or_heuristics) -> None:
+    def __init__(self, graph: "CayleyGraph", models_or_heuristics: Any) -> None:
         """Initializes Predictor.
 
         :param graph: Associated CayleyGraph object.
