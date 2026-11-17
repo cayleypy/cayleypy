@@ -96,24 +96,33 @@ class BfsResult:
             f["graph__name"] = self.graph.name
 
     @staticmethod
-    def load(path: Union[str, PathLike[str]]):
+    def load(path: Union[str, PathLike[str]]) -> "BfsResult":
+        """Load a saved result, restoring tensor fields on the CPU."""
         path = str(path)
-        # pylint: disable=no-member
         with h5py.File(path, "r") as f:
 
-            layer_sizes = f["layer_sizes"][()].tolist()
+            def read_dataset(key: str) -> h5py.Dataset:
+                dataset = f[key]
+                if not isinstance(dataset, h5py.Dataset):
+                    raise TypeError(f"Expected '{key}' to be an HDF5 dataset")
+                return dataset
+
+            def read_array(key: str) -> np.ndarray:
+                return np.asarray(read_dataset(key)[()])
+
+            layer_sizes = read_array("layer_sizes").tolist()
 
             layers_hashes = []
             for i in range(len(layer_sizes)):
                 key = f"edges_list_hashes__{i}"
                 if key not in f:
                     break
-                layers_hashes.append(f[key][()])
+                layers_hashes.append(torch.from_numpy(read_array(key)))
 
-            if f["edges_list_hashes"].shape == tuple():
+            if read_dataset("edges_list_hashes").shape == tuple():
                 edges_list_hashes = None
             else:
-                edges_list_hashes = f["edges_list_hashes"][()]
+                edges_list_hashes = torch.from_numpy(read_array("edges_list_hashes"))
 
             layers_keys = {}
             for k in f.keys():
@@ -121,20 +130,23 @@ class BfsResult:
                     layer_n = int(k.strip("layer__"))
                     layers_keys[layer_n] = k
 
+            graph_name = read_dataset("graph__name").asstr()[()]
+            if not isinstance(graph_name, str):
+                raise TypeError("Expected 'graph__name' to contain a scalar string")
+
             loaded_result = BfsResult(
-                bfs_completed=bool(f["bfs_completed"][()]),
+                bfs_completed=bool(read_array("bfs_completed").item()),
                 layer_sizes=layer_sizes,
-                layers={k: f[layer_key][()] for k, layer_key in layers_keys.items()},
+                layers={k: torch.from_numpy(read_array(layer_key)) for k, layer_key in layers_keys.items()},
                 edges_list_hashes=edges_list_hashes,
                 layers_hashes=layers_hashes,
                 graph=CayleyGraphDef.create(
-                    generators=f["graph__generators"][()].tolist(),
-                    generator_names=[x.decode("utf-8") for x in f["graph__generator_names"][()]],
-                    central_state=f["graph__central_state"][()].tolist(),
-                    name=f["graph__name"][()].decode("utf-8"),
+                    generators=read_array("graph__generators").tolist(),
+                    generator_names=np.asarray(read_dataset("graph__generator_names").asstr()[()]).tolist(),
+                    central_state=read_array("graph__central_state").tolist(),
+                    name=graph_name,
                 ),
             )
-        # pylint: enable=no-member
         return loaded_result
 
     def diameter(self):
