@@ -30,7 +30,7 @@ dependencies = [
 ]
 
 # Development dependencies
-# pip install .[torch,lint,test,dev,docs]
+# pip install ".[lint,test,dev,docs]"
 [project.optional-dependencies]
 lint = [
     "black==26.10.1",
