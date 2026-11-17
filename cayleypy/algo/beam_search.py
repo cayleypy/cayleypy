@@ -323,12 +323,13 @@ class BeamSearchAlgorithm:
         array_beam_states = start_states_encoded.view(1, -1).clone()
 
         # Initialize hash storage for non-backtracking.
+        vec_hashes_current: Optional[torch.Tensor] = None
+        i_cyclic_index_for_hash_storage = 0
         if history_depth > 0:
             initial_hashes = graph.hasher.make_hashes(start_states_encoded)
             vec_hashes_current = initial_hashes.expand(
                 beam_width * graph.definition.n_generators, history_depth
             ).clone()
-            i_cyclic_index_for_hash_storage = 0
 
         debug_scores: dict[int, float] = {}
         t0 = time.time()
@@ -362,6 +363,7 @@ class BeamSearchAlgorithm:
 
             # Non-backtracking: forbid visiting states visited before.
             if history_depth > 0:
+                assert vec_hashes_current is not None
                 t1 = time.time()
                 vec_hashes_new = graph.hasher.make_hashes(array_new_states)
                 t_hash += time.time() - t1
