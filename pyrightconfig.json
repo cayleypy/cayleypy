@@ -2,5 +2,5 @@
   "pythonVersion": "3.14",
   "include": ["cayleypy"],
   "typeCheckingMode": "standard",
-  "reportMissingParameterType": "none"
+  "reportMissingParameterType": "warning"
 }
