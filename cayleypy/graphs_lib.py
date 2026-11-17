@@ -1,7 +1,7 @@
 """Library of pre-defined graphs."""
 
 from itertools import permutations, combinations
-from typing import Union
+from typing import Any, Union
 from math import factorial
 import numpy as np
 
@@ -947,7 +947,7 @@ class PermutationGroups:
         )
 
 
-def prepare_graph(name: str, n: int = 0, **kwargs) -> CayleyGraphDef:
+def prepare_graph(name: str, n: int = 0, **kwargs: Any) -> CayleyGraphDef:
     """Returns pre-defined CayleyGraphDef by codename and additional kwargs.
 
     See the source of this function for list of supported graphs.

@@ -1,7 +1,7 @@
 import gc
 import math
 from functools import cached_property
-from typing import Optional, Sequence, Union, TYPE_CHECKING
+from typing import Any, Optional, Sequence, Union, TYPE_CHECKING
 
 import torch
 
@@ -210,7 +210,7 @@ class CayleyGraph:
         """Calculates neighbors in decoded (external) representation."""
         return self.decode_states(self.get_neighbors(self.encode_states(states)))
 
-    def bfs(self, **kwargs) -> BfsResult:
+    def bfs(self, **kwargs: Any) -> BfsResult:
         """Runs breadth-first search (BFS) algorithm from given `start_states`.
 
         See :class:`cayleypy.algo.BfsAlgorithm` for more details, including arguments description.
@@ -224,14 +224,14 @@ class CayleyGraph:
             return BfsDistributed.bfs(self, **kwargs)
         return BfsAlgorithm.bfs(self, **kwargs)
 
-    def random_walks(self, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
+    def random_walks(self, **kwargs: Any) -> tuple[torch.Tensor, torch.Tensor]:
         """Generates random walks on this graph.
 
         See :class:`cayleypy.algo.RandomWalksGenerator` for more details.
         """
         return RandomWalksGenerator(self).generate(**kwargs)
 
-    def beam_search(self, **kwargs) -> BeamSearchResult:
+    def beam_search(self, **kwargs: Any) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using Beam Search algorithm.
 
         See :class:`cayleypy.algo.BeamSearchAlgorithm` for more details.

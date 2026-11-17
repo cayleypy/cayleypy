@@ -1,10 +1,10 @@
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import torch
 
 from .cayley_graph import CayleyGraph
-from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
+from .cayley_graph_def import AnyStateType, CayleyGraphDef, MatrixGenerator
 from .graphs_lib import prepare_graph
 
 
@@ -20,9 +20,9 @@ def create_graph(
     generators_matrices: Optional[list[Union[MatrixGenerator, list, np.ndarray]]] = None,
     generator_names: Optional[list[str]] = None,
     name: str = "",
-    central_state=None,
+    central_state: Optional[Union[AnyStateType, str]] = None,
     make_inverse_closed: bool = False,
-    **kwargs,
+    **kwargs: Any,
 ) -> CayleyGraph:
     """Creates CayleyGraph.
 
