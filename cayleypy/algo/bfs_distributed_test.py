@@ -6,7 +6,6 @@ from ..cayley_graph_def import CayleyGraphDef
 from ..datasets import load_dataset
 from ..graphs_lib import PermutationGroups
 
-
 HAS_CUDA = torch.cuda.is_available()
 HAS_MULTI_GPU = HAS_CUDA and torch.cuda.device_count() >= 2
 
