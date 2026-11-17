@@ -190,8 +190,12 @@ class RandomWalksGenerator:
         # Initialize hash storage for non-backtracking.
         # Use graph's hasher for consistency.
         initial_hashes = graph.hasher.make_hashes(start_state)
-        vec_hashes_current = initial_hashes.expand(width * graph.definition.n_generators, history_depth).clone()
-        i_cyclic_index_for_hash_storage = 0
+        full_history = TorchHashSet() if history_depth == length else None
+        if full_history is not None:
+            full_history.add_sorted_hashes(initial_hashes)
+        else:
+            vec_hashes_current = initial_hashes.expand(width * graph.definition.n_generators, history_depth).clone()
+            i_cyclic_index_for_hash_storage = 0
 
         i_step_corrected = 0
         for i_step in range(1, length):
@@ -208,7 +212,10 @@ class RandomWalksGenerator:
             vec_hashes_new = graph.hasher.make_hashes(array_new_states)
 
             # Select only states not seen before.
-            mask_new = ~torch.isin(vec_hashes_new, vec_hashes_current.view(-1), assume_unique=False)
+            if full_history is not None:
+                mask_new = full_history.get_mask_to_remove_seen_hashes(vec_hashes_new)
+            else:
+                mask_new = ~torch.isin(vec_hashes_new, vec_hashes_current.view(-1), assume_unique=False)
             mask_new_sum = mask_new.sum().item()
 
             if mask_new_sum >= width:
@@ -234,7 +241,10 @@ class RandomWalksGenerator:
             states[i_step * width : (i_step + 1) * width, :] = array_current_states
 
             # 5. Update hash storage.
-            i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
-            vec_hashes_current[:, i_cyclic_index_for_hash_storage] = vec_hashes_new
+            if full_history is not None:
+                full_history.add_sorted_hashes(vec_hashes_new[mask_new].unique(sorted=True))
+            else:
+                i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
+                vec_hashes_current[:, i_cyclic_index_for_hash_storage] = vec_hashes_new
 
         return graph.decode_states(states), y
