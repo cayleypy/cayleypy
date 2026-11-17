@@ -131,7 +131,7 @@ class Puzzles:
         return GapPuzzles.puzzle("starminx_2")
 
     @staticmethod
-    def megaminx():
+    def megaminx() -> CayleyGraphDef:
         """Cayley graph for the Megaminx puzzle.
 
         See https://en.wikipedia.org/wiki/Megaminx.

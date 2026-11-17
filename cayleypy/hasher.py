@@ -24,7 +24,7 @@ def _splitmix64(x: torch.Tensor) -> torch.Tensor:
 class StateHasher:
     """Helper class to hash states."""
 
-    def __init__(self, graph: "CayleyGraph", random_seed: Optional[int], chunk_size=2**18):
+    def __init__(self, graph: "CayleyGraph", random_seed: Optional[int], chunk_size: int = 2**18) -> None:
         self.state_size = graph.encoded_state_size
         self.chunk_size = chunk_size
 

@@ -1,3 +1,5 @@
+from typing import Optional, Union
+
 import numpy as np
 import pytest
 
@@ -12,7 +14,7 @@ def _layer_to_set(layer: np.ndarray) -> set[str]:
     return set("".join(str(x) for x in state) for state in layer)
 
 
-def test_bfs_growth_swap():
+def test_bfs_growth_swap() -> None:
     graph = CayleyGraph(CayleyGraphDef.create([[1, 0]], central_state="01"))
     result = BfsAlgorithm.bfs(graph)
     assert result.layer_sizes == [1, 1]
@@ -21,7 +23,7 @@ def test_bfs_growth_swap():
     assert _layer_to_set(result.get_layer(1)) == {"10"}
 
 
-def test_bfs_lrx_coset_5():
+def test_bfs_lrx_coset_5() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(5).with_central_state("01210"))
     ans = graph.bfs()
     assert ans.bfs_completed
@@ -33,7 +35,7 @@ def test_bfs_lrx_coset_5():
     assert _layer_to_set(ans.get_layer(6)) == {"10201"}
 
 
-def test_bfs_lrx_coset_10():
+def test_bfs_lrx_coset_10() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(10).with_central_state("0110110110"))
     ans = graph.bfs()
     assert ans.diameter() == 17
@@ -45,21 +47,21 @@ def test_bfs_lrx_coset_10():
     assert _layer_to_set(ans.get_layer(17)) == {"1111100001"}
 
 
-def test_bfs_max_radius():
+def test_bfs_max_radius() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(10).with_central_state("0110110110"))
     ans = graph.bfs(max_diameter=5)
     assert not ans.bfs_completed
     assert ans.layer_sizes == [1, 3, 4, 6, 11, 16]
 
 
-def test_bfs_max_layer_size_to_explore():
+def test_bfs_max_layer_size_to_explore() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(10).with_central_state("0110110110"))
     ans = graph.bfs(max_layer_size_to_explore=10)
     assert not ans.bfs_completed
     assert ans.layer_sizes == [1, 3, 4, 6, 11]
 
 
-def test_bfs_max_layer_size_to_store():
+def test_bfs_max_layer_size_to_store() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(10).with_central_state("0110110110"))
     ans = graph.bfs(max_layer_size_to_store=10)
     assert ans.bfs_completed
@@ -72,14 +74,14 @@ def test_bfs_max_layer_size_to_store():
     assert ans.layers.keys() == set(range(18))
 
 
-def test_bfs_start_state():
+def test_bfs_start_state() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(5))
     ans = graph.bfs(start_states=[0, 1, 2, 1, 0])
     assert ans.bfs_completed
     assert ans.layer_sizes == [1, 3, 5, 8, 7, 5, 1]
 
 
-def test_bfs_multiple_start_states():
+def test_bfs_multiple_start_states() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(5))
     ans = graph.bfs(start_states=[[0, 1, 2, 1, 0], [1, 0, 2, 0, 1], [0, 1, 1, 2, 0]])
     assert ans.bfs_completed
@@ -87,32 +89,32 @@ def test_bfs_multiple_start_states():
 
 
 @pytest.mark.parametrize("bit_encoding_width", [None, 6])
-def test_bfs_lrx_n40_layers5(bit_encoding_width):
+def test_bfs_lrx_n40_layers5(bit_encoding_width: Optional[int]) -> None:
     # We need 6*40=240 bits for encoding, so each states is encoded by four int64's.
     graph_def = PermutationGroups.lrx(40)
     graph = CayleyGraph(graph_def, bit_encoding_width=bit_encoding_width)
     assert graph.bfs(max_diameter=5).layer_sizes == [1, 3, 6, 12, 24, 48]
 
 
-def test_bfs_last_layer_lrx_n8():
+def test_bfs_last_layer_lrx_n8() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(8))
     assert _layer_to_set(graph.bfs().last_layer()) == {"10765432"}
 
 
-def test_bfs_last_layer_lrx_coset_n8():
+def test_bfs_last_layer_lrx_coset_n8() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(8).with_central_state("01230123"))
     assert _layer_to_set(graph.bfs().last_layer()) == {"11003322", "22110033", "33221100", "00332211"}
 
 
 @pytest.mark.parametrize("bit_encoding_width", [None, 3, 10, "auto"])
-def test_bfs_bit_encoding(bit_encoding_width):
+def test_bfs_bit_encoding(bit_encoding_width: Union[None, int, str]) -> None:
     graph_def = PermutationGroups.lrx(8)
     result = CayleyGraph(graph_def, bit_encoding_width=bit_encoding_width).bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
 @pytest.mark.parametrize("batch_size", [100, 1000, 10**9])
-def test_bfs_batching_lrx(batch_size: int):
+def test_bfs_batching_lrx(batch_size: int) -> None:
     graph_def = PermutationGroups.lrx(8)
     graph = CayleyGraph(graph_def, batch_size=batch_size)
     result = graph.bfs()
@@ -120,7 +122,7 @@ def test_bfs_batching_lrx(batch_size: int):
 
 
 # Test that batching works when state doesn't fit in int64.
-def test_bfs_batching_coxeter20():
+def test_bfs_batching_coxeter20() -> None:
     graph_def = PermutationGroups.coxeter(20)
     graph = CayleyGraph(graph_def, batch_size=10000)
     assert not graph.hasher.is_identity
@@ -130,7 +132,7 @@ def test_bfs_batching_coxeter20():
     assert result.layer_sizes == load_dataset("coxeter_cayley_growth")["20"][:8]
 
 
-def test_bfs_batching_all_transpositions():
+def test_bfs_batching_all_transpositions() -> None:
     graph_def = PermutationGroups.all_transpositions(8)
     graph = CayleyGraph(graph_def, batch_size=2**10)
     result = graph.bfs()
@@ -138,13 +140,13 @@ def test_bfs_batching_all_transpositions():
 
 
 @pytest.mark.parametrize("hash_chunk_size", [100, 1000, 10**9])
-def test_bfs_hash_chunking(hash_chunk_size: int):
+def test_bfs_hash_chunking(hash_chunk_size: int) -> None:
     graph_def = PermutationGroups.lrx(8)
     result = CayleyGraph(graph_def, hash_chunk_size=hash_chunk_size).bfs()
     assert result.layer_sizes == load_dataset("lrx_cayley_growth")["8"]
 
 
-def test_bfs_small_hash_chunk_size():
+def test_bfs_small_hash_chunk_size() -> None:
     graph_def = PermutationGroups.lrx(20)
     graph = CayleyGraph(graph_def, hash_chunk_size=100)
     assert graph.bfs(max_diameter=8).layer_sizes == [1, 3, 6, 12, 24, 48, 91, 172, 325]

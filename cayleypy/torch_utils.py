@@ -1,7 +1,7 @@
 import torch
 
 
-def isin_via_searchsorted(elements: torch.Tensor, test_elements_sorted: torch.Tensor):
+def isin_via_searchsorted(elements: torch.Tensor, test_elements_sorted: torch.Tensor) -> torch.Tensor:
     """Equivalent to torch.isin but faster."""
     if len(test_elements_sorted) == 0:
         return torch.zeros_like(elements, dtype=torch.bool)
@@ -13,7 +13,7 @@ def isin_via_searchsorted(elements: torch.Tensor, test_elements_sorted: torch.Te
 class CachedTensor:
     """Stores a tensor and lazily caches copies of it on requested devices."""
 
-    def __init__(self, tensor: torch.Tensor):
+    def __init__(self, tensor: torch.Tensor) -> None:
         self.tensor = tensor
         self.cache = {tensor.device: tensor}
 
@@ -27,10 +27,10 @@ class CachedTensor:
 class TorchHashSet:
     """A set of int64 numbers, backed by one or more sorted tensors."""
 
-    def __init__(self):
-        self.data = []
+    def __init__(self) -> None:
+        self.data: list[torch.Tensor] = []
 
-    def add_sorted_hashes(self, sorted_numbers: torch.Tensor):
+    def add_sorted_hashes(self, sorted_numbers: torch.Tensor) -> None:
         """IMPORTANT: Assumes that new numbers are sorted and do not appear in the set before."""
         self.data.append(sorted_numbers)
         if len(self.data) >= 10:

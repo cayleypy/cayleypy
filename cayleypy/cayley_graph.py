@@ -6,11 +6,12 @@ from typing import Optional, Sequence, Union
 import torch
 
 from .algo.beam_search import BeamSearchAlgorithm
+from .algo.beam_search_result import BeamSearchResult
 from .algo.bfs_algo import BfsAlgorithm
 from .algo.bfs_distributed import BfsDistributed
 from .algo.random_walks import RandomWalksGenerator
 from .algo.bfs_result import BfsResult
-from .cayley_graph_def import AnyStateType, CayleyGraphDef, GeneratorType
+from .cayley_graph_def import AnyStateType, CayleyGraphDef, GeneratorType, MatrixGenerator
 from .device_config import DeviceConfig
 from .hasher import StateHasher
 from .string_encoder import StringEncoder
@@ -62,8 +63,8 @@ class CayleyGraph:
         specific_devices: Optional[Sequence[Union[int, str, torch.device]]] = None,
         device_config: Optional[DeviceConfig] = None,
         _hasher: Optional[StateHasher] = None,
-        **unused_kwargs,
-    ):
+        **unused_kwargs: object,
+    ) -> None:
         """Initializes CayleyGraph.
 
         :param definition: definition of the graph (as CayleyPyDef).
@@ -152,7 +153,7 @@ class CayleyGraph:
             return self.string_encoder.decode(states)
         return states
 
-    def apply_generator_batched(self, i: int, src: torch.Tensor, dst: torch.Tensor):
+    def apply_generator_batched(self, i: int, src: torch.Tensor, dst: torch.Tensor) -> None:
         """Applies i-th generator to encoded states in `src`, writes output to `dst`."""
         states_num = src.shape[0]
         if self.definition.is_permutation_group():
@@ -184,7 +185,7 @@ class CayleyGraph:
             states = new_states
         return self.decode_states(states)
 
-    def validate_path(self, start_state: AnyStateType, path: list[int]):
+    def validate_path(self, start_state: AnyStateType, path: list[int]) -> None:
         """Checks that `path` indeed is path from `start_state` to central state."""
         path_result = self.apply_path(start_state, path).reshape(-1)
         assert torch.equal(path_result, self.central_state)
@@ -220,14 +221,14 @@ class CayleyGraph:
             return BfsDistributed.bfs(self, **kwargs)
         return BfsAlgorithm.bfs(self, **kwargs)
 
-    def random_walks(self, **kwargs):
+    def random_walks(self, **kwargs) -> tuple[torch.Tensor, torch.Tensor]:
         """Generates random walks on this graph.
 
         See :class:`cayleypy.algo.RandomWalksGenerator` for more details.
         """
         return RandomWalksGenerator(self).generate(**kwargs)
 
-    def beam_search(self, **kwargs):
+    def beam_search(self, **kwargs) -> BeamSearchResult:
         """Tries to find a path from `start_state` to central state using Beam Search algorithm.
 
         See :class:`cayleypy.algo.BeamSearchAlgorithm` for more details.
@@ -297,7 +298,7 @@ class CayleyGraph:
             max_layer_size_to_store=10**18, return_all_edges=True, return_all_hashes=True
         ).to_networkx_graph()
 
-    def free_memory(self):
+    def free_memory(self) -> None:
         if self.verbose >= 1:
             print("Freeing memory...")
         gc.collect()
@@ -319,12 +320,12 @@ class CayleyGraph:
         return self.device_config.num_gpus
 
     @property
-    def generators(self):
+    def generators(self) -> Union[list[list[int]], list[MatrixGenerator]]:
         """Generators of this Cayley graph."""
         return self.definition.generators
 
     @cached_property
-    def with_inverted_generators(self):
+    def with_inverted_generators(self) -> "CayleyGraph":
         """Returns copy of this graph with inverted generators."""
         return self.modified_copy(self.definition.with_inverted_generators())
 

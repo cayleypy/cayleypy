@@ -36,13 +36,13 @@ class MatrixGenerator:
     modulo: int
 
     @staticmethod
-    def create(matrix: Union[list, np.ndarray], modulo: int = 0):
+    def create(matrix: Union[list, np.ndarray], modulo: int = 0) -> "MatrixGenerator":
         matrix = np.array(matrix, dtype=np.int64)
         if modulo > 0:
             matrix %= modulo
         return MatrixGenerator(matrix, modulo)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Validation.
         assert self.matrix.shape == (self.n, self.n), "Must be square matrix"
         assert self.matrix.dtype == np.int64
@@ -58,7 +58,7 @@ class MatrixGenerator:
         return np.array_equal(self.apply(other.matrix), eye) and np.array_equal(other.apply(self.matrix), eye)
 
     @cached_property
-    def n(self):
+    def n(self) -> int:
         return self.matrix.shape[0]
 
     def apply(self, state: np.ndarray) -> np.ndarray:
@@ -80,7 +80,7 @@ class MatrixGenerator:
         return ans
 
     @cached_property
-    def inv(self):
+    def inv(self) -> "MatrixGenerator":
         """Inverse of this matrix. Throws error if matrix is not invertible."""
         # TODO: implement modular inverse, if needed.
         matrix_inv = np.array(np.linalg.inv(self.matrix), dtype=np.int64)
@@ -110,7 +110,7 @@ class CayleyGraphDef:
         generator_names: Optional[list[str]] = None,
         central_state: Optional[Union[AnyStateType, str]] = None,
         name: str = "",
-    ):
+    ) -> "CayleyGraphDef":
         """Creates Cayley Graph definition (when generators are permutations).
 
         :param generators: List of generating permutations of size n.
@@ -154,7 +154,7 @@ class CayleyGraphDef:
         generator_names: Optional[list[str]] = None,
         central_state: Optional[AnyStateType] = None,
         name: str = "",
-    ):
+    ) -> "CayleyGraphDef":
         """Creates Cayley Graph definition (when generators are matrices).
 
         :param generators: List of generating n*n matrices.
@@ -172,7 +172,7 @@ class CayleyGraphDef:
         assert len(central_state) % n == 0, "Wrong size of central state."
         return CayleyGraphDef(GeneratorType.MATRIX, [], generators, generator_names, central_state_list, name)
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         # Validation.
         assert len(self.generator_names) == len(self.generators), "Wrong number of generator names."
         if self.generators_type == GeneratorType.PERMUTATION:
@@ -257,17 +257,19 @@ class CayleyGraphDef:
             central_state = central_state.reshape((-1,))  # Flatten.
         return [int(x) for x in central_state]
 
-    def with_central_state(self, central_state) -> "CayleyGraphDef":
+    def with_central_state(
+        self, central_state: Union[list[int], list[list[int]], torch.Tensor, np.ndarray, str]
+    ) -> "CayleyGraphDef":
         return replace(self, central_state=CayleyGraphDef.normalize_central_state(central_state))
 
     def with_name(self, name: str) -> "CayleyGraphDef":
         return replace(self, name=name)
 
-    def is_permutation_group(self):
+    def is_permutation_group(self) -> bool:
         """Whether generators in this graph are permutations."""
         return self.generators_type == GeneratorType.PERMUTATION
 
-    def is_matrix_group(self):
+    def is_matrix_group(self) -> bool:
         """Whether generators in this graph are matrices."""
         return self.generators_type == GeneratorType.MATRIX
 
@@ -337,7 +339,7 @@ class CayleyGraphDef:
                 name=new_name,
             )
 
-    def path_to_string(self, path: list[int], delimiter=".") -> str:
+    def path_to_string(self, path: list[int], delimiter: str = ".") -> str:
         return delimiter.join(self.generator_names[i] for i in path)
 
     def revert_path(self, path: list[int]) -> list[int]:

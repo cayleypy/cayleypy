@@ -73,7 +73,7 @@ class BfsResult:
             return False
         return True
 
-    def save(self, path: Union[str, PathLike[str]]):
+    def save(self, path: Union[str, PathLike[str]]) -> None:
         path = str(path)
         assert path.endswith(".h5"), "Please use '.h5' extention for BfsResult saving"
 
@@ -149,7 +149,7 @@ class BfsResult:
             )
         return loaded_result
 
-    def diameter(self):
+    def diameter(self) -> int:
         """Maximal distance from any start vertex to any other vertex."""
         return len(self.layer_sizes) - 1
 
@@ -165,7 +165,7 @@ class BfsResult:
         """Returns last layer, formatted as set of strings."""
         return self.get_layer(self.diameter())
 
-    def to_device(self, device: Union[str, torch.device]):
+    def to_device(self, device: Union[str, torch.device]) -> "BfsResult":
 
         if isinstance(device, str):
             device = torch.device(device)
@@ -276,7 +276,7 @@ class BfsResult:
                     return self.graph.generator_names[i]
         assert False, f"Edge ({i1},{i2}) not found."
 
-    def to_networkx_graph(self, directed=False, with_labels=True):
+    def to_networkx_graph(self, directed: bool = False, with_labels: bool = True):
         """Returns explicit graph as networkx.Graph or networkx.DiGraph."""
         # Import networkx here so we don't need to depend on this library in requirements.
         import networkx  # pylint: disable=import-outside-toplevel
@@ -293,8 +293,8 @@ class BfsResult:
             ans.add_edge(vertex_names[i1], vertex_names[i2], label=label)
         return ans
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"BfsResult(diameter={self.diameter()}, layer_sizes={self.layer_sizes})"
 
-    def check_has_layer_hashes(self):
+    def check_has_layer_hashes(self) -> None:
         assert len(self.layers_hashes) == len(self.layer_sizes), "Run bfs with return_all_hashes=True."

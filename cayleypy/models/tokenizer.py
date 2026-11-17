@@ -37,7 +37,7 @@ class GroupTokenizer:
       (50, 60)
     """
 
-    def __init__(self, groups: Sequence[Sequence[int]]):
+    def __init__(self, groups: Sequence[Sequence[int]]) -> None:
         """Creates tokenizer for states grouped as described by `groups`.
 
         :param groups: Specification of groups, as a list of ``[group_size, num_groups]`` pairs. Groups are laid out in

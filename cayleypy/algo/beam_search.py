@@ -92,7 +92,7 @@ class BeamSearchAlgorithm:
     guide the search and supports meet-in-the-middle optimization.
     """
 
-    def __init__(self, graph: "CayleyGraph"):
+    def __init__(self, graph: "CayleyGraph") -> None:
         """Initialize the beam search algorithm.
 
         :param graph: The Cayley graph to search on.
@@ -171,9 +171,9 @@ class BeamSearchAlgorithm:
         *,
         start_state: AnyStateType,
         predictor: Optional[Predictor] = None,
-        beam_width=1000,
-        max_steps=1000,
-        return_path=False,
+        beam_width: int = 1000,
+        max_steps: int = 1000,
+        return_path: bool = False,
         bfs_result_for_mitm: Optional[BfsResult] = None,
         use_child_scores: bool = False,
     ) -> BeamSearchResult:
@@ -216,7 +216,7 @@ class BeamSearchAlgorithm:
 
         # Checks if any of `hashes` are in neighborhood of the central state.
         # Returns the number of the first layer where intersection was found, or -1 if not found.
-        def _check_path_found(hashes):
+        def _check_path_found(hashes: torch.Tensor) -> int:
             for j, layer in enumerate(bfs_layers_hashes):
                 if torch.any(isin_via_searchsorted(layer, hashes)):
                     return j

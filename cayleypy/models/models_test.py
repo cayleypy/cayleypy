@@ -1,4 +1,5 @@
 import json
+from pathlib import Path
 
 import pytest
 import torch
@@ -20,7 +21,7 @@ LEGACY_CONFIG_DICT = {
 STATES = torch.tensor([[0, 1, 2, 3, 4], [4, 3, 2, 1, 0]])
 
 
-def test_from_dict_legacy():
+def test_from_dict_legacy() -> None:
     config = ModelConfig.from_dict(LEGACY_CONFIG_DICT)
     assert config.model_type == "MLP"
     assert config.input_size == 16
@@ -35,7 +36,7 @@ def test_from_dict_legacy():
     assert config.graph_hash is None
 
 
-def test_from_dict_new_fields():
+def test_from_dict_new_fields() -> None:
     config = ModelConfig.from_dict(
         {
             "model_type": "MLP",
@@ -52,7 +53,7 @@ def test_from_dict_new_fields():
     assert config.graph_hash == "abc123"
 
 
-def test_to_dict_round_trip():
+def test_to_dict_round_trip() -> None:
     config = ModelConfig(
         model_type="MLP",
         input_size=120,
@@ -70,31 +71,31 @@ def test_to_dict_round_trip():
     assert ModelConfig.from_dict(as_dict) == config
 
 
-def test_to_dict_is_json_serializable():
+def test_to_dict_is_json_serializable() -> None:
     config = ModelConfig.from_dict(LEGACY_CONFIG_DICT)
     assert json.loads(json.dumps(config.to_dict())) == config.to_dict()
 
 
-def test_build_mlp_model():
+def test_build_mlp_model() -> None:
     config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8, 8])
     model = config.build_model()
     assert isinstance(model, MlpModel)
     assert model(STATES).shape == (2,)
 
 
-def test_build_model_unknown_type():
+def test_build_model_unknown_type() -> None:
     config = ModelConfig(model_type="NoSuchModel", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8])
     with pytest.raises(ValueError, match="Unknown model type"):
         config.build_model()
 
 
-def test_build_mlp_model_with_multiple_outputs():
+def test_build_mlp_model_with_multiple_outputs() -> None:
     config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8], n_outputs=3)
     model = config.build_model()
     assert model(STATES).shape == (2, 3)
 
 
-def test_mlp_state_dict_is_backward_compatible():
+def test_mlp_state_dict_is_backward_compatible() -> None:
     # Weights of pretrained single-output models were saved before multi-output models were supported. Keys and shapes
     # of the state dict must not change, otherwise those weights stop loading.
     config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8, 8])
@@ -115,7 +116,7 @@ def test_mlp_state_dict_is_backward_compatible():
     assert state_dict["layers.6.weight"].shape == (1, 8)
 
 
-def test_build_resmlp_model():
+def test_build_resmlp_model() -> None:
     config = ModelConfig(model_type="RESMLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8, 8, 8])
     model = config.build_model()
     assert isinstance(model, ResMlpModel)
@@ -125,13 +126,13 @@ def test_build_resmlp_model():
     assert len(model.blocks) == 3
 
 
-def test_build_resmlp_model_with_multiple_outputs():
+def test_build_resmlp_model_with_multiple_outputs() -> None:
     config = ModelConfig(model_type="RESMLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8], n_outputs=3)
     model = config.build_model()
     assert model(STATES).shape == (2, 3)
 
 
-def test_resmlp_has_skip_connections():
+def test_resmlp_has_skip_connections() -> None:
     config = ModelConfig(model_type="RESMLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8, 8])
     model = config.build_model()
     assert isinstance(model, ResMlpModel)
@@ -154,7 +155,7 @@ def test_resmlp_has_skip_connections():
         assert torch.equal(block(x), x)
 
 
-def test_models_are_invariant_to_batch_size():
+def test_models_are_invariant_to_batch_size() -> None:
     for model_type in ["MLP", "RESMLP"]:
         config = ModelConfig(
             model_type=model_type, input_size=5, num_classes_for_one_hot=5, layers_sizes=[8, 8], n_outputs=3
@@ -169,7 +170,7 @@ def test_models_are_invariant_to_batch_size():
                 assert torch.allclose(model(states[i : i + 1]), expected[i : i + 1], atol=1e-6)
 
 
-def test_checkpoint_round_trip(tmp_path):
+def test_checkpoint_round_trip(tmp_path: Path) -> None:
     for model_type in ["MLP", "RESMLP"]:
         config = ModelConfig(
             model_type=model_type, input_size=5, num_classes_for_one_hot=5, layers_sizes=[8, 8], n_outputs=3
@@ -184,7 +185,7 @@ def test_checkpoint_round_trip(tmp_path):
             assert torch.equal(loaded_model(STATES), model(STATES))
 
 
-def test_build_model_with_non_positive_n_outputs():
+def test_build_model_with_non_positive_n_outputs() -> None:
     for model_type in ["MLP", "RESMLP"]:
         config = ModelConfig(
             model_type=model_type, input_size=5, num_classes_for_one_hot=5, layers_sizes=[8], n_outputs=0
@@ -193,13 +194,13 @@ def test_build_model_with_non_positive_n_outputs():
             config.build_model()
 
 
-def test_build_resmlp_model_without_blocks():
+def test_build_resmlp_model_without_blocks() -> None:
     config = ModelConfig(model_type="RESMLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[])
     with pytest.raises(ValueError, match="at least one block"):
         config.build_model()
 
 
-def test_load_rejects_kaggle_id_without_weights_path():
+def test_load_rejects_kaggle_id_without_weights_path() -> None:
     """Test that a config naming a Kaggle model but no file in it fails instead of loading nothing."""
     config = ModelConfig(
         model_type="MLP",
@@ -212,7 +213,7 @@ def test_load_rejects_kaggle_id_without_weights_path():
         config.load()
 
 
-def test_load_without_weights_returns_untrained_model():
+def test_load_without_weights_returns_untrained_model() -> None:
     """Test that a config with no weights at all is still loadable (it describes an untrained model)."""
     config = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot=5, layers_sizes=[8])
     model = config.load()

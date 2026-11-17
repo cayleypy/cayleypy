@@ -16,7 +16,7 @@ DATA_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data")
 
 
 @functools.cache
-def load_dataset(dataset_name: str, error_if_not_found=True) -> dict[str, Any]:
+def load_dataset(dataset_name: str, error_if_not_found: bool = True) -> dict[str, Any]:
     """Loads named dataset."""
     file_name = os.path.join(DATA_DIR, dataset_name + ".csv")
     data: dict[str, str] = {}
@@ -30,7 +30,7 @@ def load_dataset(dataset_name: str, error_if_not_found=True) -> dict[str, Any]:
     return data
 
 
-def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str], Any]):
+def _update_dataset(dataset_name: str, keys: list[str], eval_func: Callable[[str], Any]) -> None:
     file_name = os.path.join(DATA_DIR, dataset_name + ".csv")
     data = load_dataset(dataset_name, error_if_not_found=False)
     for key in keys:
@@ -76,7 +76,7 @@ def _compute_top_spin_cayley_growth(n: str) -> list[int]:
 
 
 @functools.cache
-def _stirling(n, k):
+def _stirling(n: int, k: int) -> int:
     """Computes unsigned Stirling number of the first kind."""
     if n == k == 0:
         return 1
@@ -209,7 +209,7 @@ def _compute_prefix_cycles_cayley_growth(n: str) -> list[int]:
     return CayleyGraph(PermutationGroups.prefix_cycles(int(n))).bfs().layer_sizes
 
 
-def generate_datasets():
+def generate_datasets() -> None:
     """Generates datasets for small n, keeping existing values."""
     keys = []
     for n in range(3, 30):

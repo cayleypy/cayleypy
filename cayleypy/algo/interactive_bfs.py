@@ -10,7 +10,7 @@ from ..torch_utils import isin_via_searchsorted
 class InteractiveBfs:
     """Interactive breadth-first search that computes layers one by one."""
 
-    def __init__(self, graph: CayleyGraph, start_states: AnyStateType):
+    def __init__(self, graph: CayleyGraph, start_states: AnyStateType) -> None:
         self.graph = graph
         self.cur_layer = graph.encode_states(start_states)
         self.hashes = [graph.hasher.make_hashes(self.cur_layer)]
@@ -25,7 +25,7 @@ class InteractiveBfs:
                 ans &= ~isin_via_searchsorted(hashes, h)
         return ans
 
-    def step(self):
+    def step(self) -> None:
         """Computes next layer of BFS."""
         next_layer, next_layer_hashes = self.graph.get_unique_states(self.graph.get_neighbors(self.cur_layer))
         mask = self._remove_seen_states(next_layer_hashes)

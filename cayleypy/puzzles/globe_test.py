@@ -4,7 +4,7 @@ import numpy as np
 from .puzzles import Puzzles
 
 
-def test_globe_3_4():
+def test_globe_3_4() -> None:
     graph = Puzzles.globe_puzzle(3, 4)
 
     assert graph.n_generators == 16
@@ -36,7 +36,7 @@ def test_globe_3_4():
     assert np.array_equal(graph.generators_permutations, expected_generators)
 
 
-def test_globe_2_6():
+def test_globe_2_6() -> None:
     graph = Puzzles.globe_puzzle(2, 6)
 
     assert graph.n_generators == 18

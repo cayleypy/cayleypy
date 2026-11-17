@@ -61,11 +61,11 @@ def generate_cube_permutations_oneline(n: int) -> Dict[str, str]:
     n_squared = n * n
     total_stickers = 6 * n_squared
 
-    def get_sticker_index(face_name, row, col):
+    def get_sticker_index(face_name: str, row: int, col: int) -> int:
         face_idx = face_map[face_name]
         return face_idx * n_squared + row * n + col
 
-    def rotate_face_cw(face_name):
+    def rotate_face_cw(face_name: str) -> list[tuple[int, ...]]:
         cycles = []
         permuted = [False] * n_squared
         for r_start in range(n):

@@ -6,7 +6,7 @@ from ..cayley_graph import CayleyGraph
 from ..permutation_utils import is_permutation, inverse_permutation
 
 
-def test_mini_pyramorphix():
+def test_mini_pyramorphix() -> None:
     graph = Puzzles.mini_pyramorphix()
     assert graph.n_generators == len(MINI_PYRAMORPHIX_ALLOWED_MOVES)
     assert graph.generator_names == list(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
@@ -24,7 +24,7 @@ def test_mini_pyramorphix():
     assert set(graph.generator_names) == set(MINI_PYRAMORPHIX_ALLOWED_MOVES.keys())
 
 
-def test_picture_cube333():
+def test_picture_cube333() -> None:
     graph = Puzzles.picture_cube333()
     assert graph.n_generators == len(PICTURE_CUBE_333_ALLOWED_MOVES)
     assert graph.generator_names == list(PICTURE_CUBE_333_ALLOWED_MOVES.keys())
@@ -42,7 +42,7 @@ def test_picture_cube333():
     assert set(graph.generator_names) == set(PICTURE_CUBE_333_ALLOWED_MOVES.keys())
 
 
-def test_pyraminx():
+def test_pyraminx() -> None:
     perm_set_length = 36
     graph = Puzzles.pyraminx()
     assert graph.n_generators == len(PYRAMINX_MOVES) * 2  # inverse generators are not listed in PYRAMINX_MOVES
@@ -57,7 +57,7 @@ def test_pyraminx():
         assert len(gen) == perm_set_length
 
 
-def test_megaminx():
+def test_megaminx() -> None:
     perm_set_length = 120
     graph = Puzzles.megaminx()
     assert graph.n_generators == len(MEGAMINX_MOVES) * 2  # inverse generators are not listed in MEGAMINX_MOVES
