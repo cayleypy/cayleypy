@@ -148,7 +148,7 @@ class PinballLoss(Loss):
     0.5
     """
 
-    def __init__(self, tau: float = 0.5):
+    def __init__(self, tau: float = 0.5) -> None:
         """Initializes PinballLoss.
 
         :param tau: Quantile of the target distribution to predict. Must be strictly between 0 and 1.

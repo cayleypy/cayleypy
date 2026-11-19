@@ -85,7 +85,9 @@ class BfsAlgorithm:
 
         # Applies the same mask to states and hashes.
         # If states and hashes are the same thing, it will not create a copy.
-        def _apply_mask(states, hashes, mask):
+        def _apply_mask(
+            states: torch.Tensor, hashes: torch.Tensor, mask: torch.Tensor
+        ) -> tuple[torch.Tensor, torch.Tensor]:
             new_states = states[mask]
             new_hashes = graph.hasher.make_hashes(new_states) if graph.hasher.is_identity else hashes[mask]
             return new_states, new_hashes
@@ -94,8 +96,8 @@ class BfsAlgorithm:
         for i in range(1, max_diameter + 1):
             if do_batching and len(layer1) > graph.batch_size:
                 num_batches = int(math.ceil(layer1_hashes.shape[0] / graph.batch_size))
-                layer2_batches = []  # type: list[torch.Tensor]
-                layer2_hashes_batches = []  # type: list[torch.Tensor]
+                layer2_batches: list[torch.Tensor] = []
+                layer2_hashes_batches: list[torch.Tensor] = []
                 for layer1_batch in layer1.tensor_split(num_batches, dim=0):
                     layer2_batch = graph.get_neighbors(layer1_batch)
                     layer2_batch, layer2_hashes_batch = graph.get_unique_states(layer2_batch)

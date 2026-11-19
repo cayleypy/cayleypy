@@ -24,7 +24,7 @@ def _central_state_from_ip(n: int, ip: list[list[int]]) -> list[int]:
     Values in this array are integers from 0 to k-1 where k is number of colors.
     It is allowed to not specify singleton groups of equivalent pieces.
     """
-    pos_to_eq_list = {}  # type: dict[int, list[int]]
+    pos_to_eq_list: dict[int, list[int]] = {}
     for eq_list in ip:
         for pos in eq_list:
             pos_to_eq_list[pos - 1] = eq_list
@@ -44,9 +44,9 @@ def _central_state_from_ip(n: int, ip: list[list[int]]) -> list[int]:
 
 
 def _parse_gap_file(text: str) -> CayleyGraphDef:
-    generators_dict = {}  # type: dict[str, list[list[int]]]
-    generator_names = []  # type: list[str]
-    ip = None  # type: Optional[list[list[int]]]
+    generators_dict: dict[str, list[list[int]]] = {}
+    generator_names: list[str] = []
+    ip: Optional[list[list[int]]] = None
     for line in text.split("\n"):
         if ":=" not in line:
             continue

@@ -2,9 +2,11 @@
 
 import itertools
 import math
+from typing import Sequence
 
 import numba
 import numpy as np
+from numpy.typing import NDArray
 
 from ..cayley_graph import CayleyGraph
 from ..permutation_utils import is_permutation
@@ -15,7 +17,7 @@ PREFIX_MAP_1 = np.zeros((CHUNK_SIZE,), dtype=np.int32)  # Maps prefix id to enco
 PREFIX_MAP_2 = np.zeros((2 ** (3 * R)), dtype=np.int32)  # Maps encoded permutation to prefix id.
 
 
-def _prepare_prefix_maps():
+def _prepare_prefix_maps() -> None:
     """Prepare tables to convert between permutation and its rank."""
     model_prefixes = list(itertools.permutations(range(R)))
     assert len(model_prefixes) == CHUNK_SIZE
@@ -30,7 +32,7 @@ _prepare_prefix_maps()
 
 # Credit: https://nimrod.blog/posts/algorithms-behind-popcount/
 @numba.njit("i8(u8[:])")
-def _bit_count(x):
+def _bit_count(x: NDArray[np.uint64]) -> int:
     ans = 0
     for i in range(len(x)):
         n = x[i]
@@ -42,7 +44,7 @@ def _bit_count(x):
 
 
 @numba.njit("i8(i8,i8[:])", inline="always")
-def permutation_to_rank(p, chunk_map2):
+def permutation_to_rank(p: int, chunk_map2: NDArray[np.int64]):
     # Ignores suffix.
     encoded_prefix = 0
     for i in range(R):
@@ -51,7 +53,7 @@ def permutation_to_rank(p, chunk_map2):
 
 
 @numba.njit("i8(i8,i8[:])", inline="always")
-def rank_to_permutation(rank, chunk_map1):
+def rank_to_permutation(rank: int, chunk_map1: NDArray[np.int64]):
     encoded_prefix = PREFIX_MAP_1[rank]
     ans = 0
     for i in range(R):
@@ -60,7 +62,7 @@ def rank_to_permutation(rank, chunk_map1):
 
 
 @numba.njit("(i8[:],u8[:],i8[:])")
-def _materialize_permutations(ans, black, map1):
+def _materialize_permutations(ans: NDArray[np.int64], black: NDArray[np.uint64], map1: NDArray[np.int64]) -> None:
     ctr = 0
     for i1 in range(CHUNK_SIZE // 64):
         if black[i1] == 0:
@@ -75,13 +77,13 @@ def _materialize_permutations(ans, black, map1):
 
 
 @numba.njit("(i8[:],u8[:],i8[:])")
-def _paint_gray(perms, gray, map2):
+def _paint_gray(perms: NDArray[np.int64], gray: NDArray[np.uint64], map2: NDArray[np.int64]) -> None:
     for i in range(len(perms)):
         rank = permutation_to_rank(perms[i], map2)
         gray[rank // 64] |= 1 << (rank % 64)
 
 
-def _encode_perm(p):
+def _encode_perm(p: Sequence[int]) -> int:
     return sum(p[i] << (4 * i) for i in range(len(p)))
 
 
@@ -91,7 +93,7 @@ class VertexChunk:
     We do not store them explicitly, but materialize each time.
     """
 
-    def __init__(self, n, suffix):
+    def __init__(self, n: int, suffix: tuple[int, ...]) -> None:
         self.black = np.zeros((CHUNK_SIZE // 64,), dtype=np.uint64)
         self.last_layer = np.zeros((CHUNK_SIZE // 64,), dtype=np.uint64)
         self.gray = np.zeros((CHUNK_SIZE // 64,), dtype=np.uint64)
@@ -108,7 +110,7 @@ class VertexChunk:
             self.map2[self.map1[i]] = i
 
     # Returns array of length black_count - explict permutations for black vertices this chunk.
-    def materialize_last_layer_permutations(self):
+    def materialize_last_layer_permutations(self) -> NDArray[np.int64]:
         assert self.changed_on_last_step
         assert self.last_layer_count > 0
         ans = np.full((self.last_layer_count,), self.encoded_suffix, dtype=np.int64)
@@ -117,11 +119,11 @@ class VertexChunk:
 
     # Paints vertices of given ranks gray.
     # Vertices outside of this chunk are ignored.
-    def paint_gray(self, perms):
+    def paint_gray(self, perms: NDArray[np.int64]) -> None:
         _paint_gray(perms, self.gray, self.map2)
 
     # black |= gray. Clears gray.
-    def flush_gray_to_black(self):
+    def flush_gray_to_black(self) -> None:
         self.gray &= ~self.black  # Now gray contains NEW vertices added on this step.
         self.last_layer_count = _bit_count(self.gray)
         if self.last_layer_count == 0:
@@ -137,7 +139,7 @@ class VertexChunk:
 class CayleyGraphChunkedBfs:
     """Class to run the special BFS algorithm."""
 
-    def __init__(self, graph: CayleyGraph):
+    def __init__(self, graph: CayleyGraph) -> None:
         n = graph.definition.state_size
         self.graph = graph
         self.chunks = [VertexChunk(n, prefix) for prefix in itertools.permutations(range(n), r=n - R)]
@@ -158,7 +160,7 @@ class CayleyGraphChunkedBfs:
         perm_funcs = [enc.implement_permutation_1d(p) for p in perms]
         self.perm_funcs = [numba.njit("i8[:](i8[:])")(f) for f in perm_funcs]
 
-    def paint_gray(self, perms):
+    def paint_gray(self, perms: NDArray[np.int64]) -> None:
         if len(perms) == 1:
             self.chunk_map[perms[0] & self.suffix_mask].paint_gray(perms)
             return
@@ -171,14 +173,14 @@ class CayleyGraphChunkedBfs:
         i1 = group_starts[-1]
         self.chunk_map[keys[i1]].paint_gray(perms[i1:])
 
-    def flush_gray_to_black(self):
+    def flush_gray_to_black(self) -> None:
         for c in self.chunks:
             c.flush_gray_to_black()
 
-    def count_last_layer(self):
+    def count_last_layer(self) -> int:
         return sum(c.last_layer_count for c in self.chunks)
 
-    def bfs(self, max_diameter=10**6):
+    def bfs(self, max_diameter: int = 10**6) -> list[int]:
         initial_states = np.array([_encode_perm(self.graph.definition.central_state)], dtype=np.int64)
         self.paint_gray(initial_states)
         self.flush_gray_to_black()

@@ -1,6 +1,6 @@
 """Helper functions."""
 
-from typing import Any, Sequence
+from typing import Any, Iterator, Sequence
 from collections import Counter
 import random
 from itertools import combinations, permutations
@@ -85,7 +85,7 @@ def permutations_with_cycle_lenghts(n: int, cycle_lengths: list[int]) -> list[li
     all_elems = set(range(n))
     result = []
 
-    def backtrack(last_min, available, lengths_counter):
+    def backtrack(last_min: int, available: set[int], lengths_counter: Counter[int]) -> Iterator[list[tuple[int, ...]]]:
         # if no lengths left, we should have used all elements
         if not lengths_counter:
             if not available:

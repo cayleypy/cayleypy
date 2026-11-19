@@ -1,15 +1,16 @@
 import os
+from typing import Optional, Union
 
 import numpy as np
 import pytest
 import torch
+from pytest_benchmark.fixture import BenchmarkFixture
 
 from cayleypy.algo import bfs_numpy
 from .cayley_graph import CayleyGraph
 from .cayley_graph_def import MatrixGenerator, CayleyGraphDef
 from .datasets import load_dataset
 from .graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
-
 
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 BENCHMARK_RUN = os.getenv("BENCHMARK") == "1"
@@ -19,16 +20,16 @@ def _layer_to_set(layer: np.ndarray) -> set[str]:
     return set("".join(str(x) for x in state) for state in layer)
 
 
-def test_generators_format():
+def test_generators_format() -> None:
     generators = [[1, 2, 0], [2, 0, 1], [1, 0, 2]]
     graph1 = CayleyGraphDef.create(generators)
     graph2 = CayleyGraphDef.create(np.array(generators))
     graph3 = CayleyGraphDef.create(torch.tensor(generators))
-    assert np.array_equal(graph1.generators, graph2.generators)
-    assert np.array_equal(graph1.generators, graph3.generators)
+    assert np.array_equal(graph1.generators_permutations, graph2.generators_permutations)
+    assert np.array_equal(graph1.generators_permutations, graph3.generators_permutations)
 
 
-def test_central_state_format():
+def test_central_state_format() -> None:
     graph_def = PermutationGroups.lrx(10)
     dest_list = [0, 1, 2, 3, 0, 1, 2, 3, 0, 1]
     graph1 = CayleyGraph(graph_def.with_central_state("0123012301"))
@@ -41,7 +42,7 @@ def test_central_state_format():
 
 
 @pytest.mark.parametrize("bit_encoding_width", [None, 5])
-def test_get_neighbors(bit_encoding_width):
+def test_get_neighbors(bit_encoding_width: Optional[int]) -> None:
     # Directly check _get_neighbors_batched.
     # In what order it generates neighbours is an implementation detail. However, we rely on this convention when
     # generating the edges list.
@@ -55,20 +56,20 @@ def test_get_neighbors(bit_encoding_width):
     )
 
 
-def test_edges_list_n2():
+def test_edges_list_n2() -> None:
     graph = CayleyGraph(CayleyGraphDef.create([[1, 0]], central_state="01"))
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
     assert result.named_undirected_edges() == {("01", "10")}
 
 
-def test_edges_list_n3():
+def test_edges_list_n3() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(3).with_central_state("001"))
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
     assert result.named_undirected_edges() == {("001", "001"), ("001", "010"), ("001", "100"), ("010", "100")}
 
 
 @pytest.mark.parametrize("bit_encoding_width", [None, 5])
-def test_edges_list_n4(bit_encoding_width):
+def test_edges_list_n4(bit_encoding_width: Optional[int]) -> None:
     graph_def = PermutationGroups.top_spin(4).with_central_state("0011")
     graph = CayleyGraph(graph_def, bit_encoding_width=bit_encoding_width)
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
@@ -83,14 +84,14 @@ def test_edges_list_n4(bit_encoding_width):
     }
 
 
-def test_generators_not_inverse_closed():
+def test_generators_not_inverse_closed() -> None:
     graph = CayleyGraphDef.create([[1, 2, 3, 0]])
     assert not graph.generators_inverse_closed
     assert CayleyGraph(graph).bfs().layer_sizes == [1, 1, 1, 1]
 
 
 # Tests below compare growth function for small graphs with stored pre-computed results.
-def test_lrx_cayley_growth():
+def test_lrx_cayley_growth() -> None:
     expected = load_dataset("lrx_cayley_growth")
     for n in range(3, 10):
         graph = CayleyGraph(PermutationGroups.lrx(n))
@@ -98,7 +99,7 @@ def test_lrx_cayley_growth():
         assert result.layer_sizes == expected[str(n)]
 
 
-def test_top_spin_cayley_growth():
+def test_top_spin_cayley_growth() -> None:
     expected = load_dataset("top_spin_cayley_growth")
     for n in range(4, 10):
         graph = CayleyGraph(PermutationGroups.top_spin(n))
@@ -106,12 +107,12 @@ def test_top_spin_cayley_growth():
         assert result.layer_sizes == expected[str(n)]
 
 
-def test_lrx_coset_growth():
+def test_lrx_coset_growth() -> None:
     expected = load_dataset("lrx_coset_growth")
     for central_state, expected_layer_sizes in expected.items():
         if len(central_state) > 15:
             continue
-        generators = PermutationGroups.lrx(len(central_state)).generators
+        generators = PermutationGroups.lrx(len(central_state)).generators_permutations
         graph = CayleyGraph(CayleyGraphDef.create(generators, central_state=central_state))
         result = graph.bfs()
         assert result.layer_sizes == expected_layer_sizes
@@ -120,7 +121,7 @@ def test_lrx_coset_growth():
 # Skipped by default.
 # To run slow tests like this, do `RUN_SLOW_TESTS=1 pytest`
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
-def test_cube222_qtm():
+def test_cube222_qtm() -> None:
     graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
     result = graph.bfs()
     assert result.num_vertices == 3674160
@@ -129,7 +130,7 @@ def test_cube222_qtm():
 
 
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
-def test_cube222_htm():
+def test_cube222_htm() -> None:
     graph = CayleyGraph(prepare_graph("cube_2/2/2_9gensHTM"))
     result = graph.bfs()
     assert result.num_vertices == 3674160
@@ -137,13 +138,13 @@ def test_cube222_htm():
     assert result.layer_sizes == load_dataset("puzzles_growth")["cube_222_fixed_htm"]
 
 
-def test_all_transpositions_8():
+def test_all_transpositions_8() -> None:
     graph = CayleyGraph(PermutationGroups.all_transpositions(8))
     result = graph.bfs()
     assert result.layer_sizes == load_dataset("all_transpositions_cayley_growth")["8"]
 
 
-def test_generator_names():
+def test_generator_names() -> None:
     graph = CayleyGraphDef.create([[1, 2, 3, 0], [0, 2, 1, 3]])
     assert graph.generator_names == ["1,2,3,0", "0,2,1,3"]
 
@@ -151,28 +152,28 @@ def test_generator_names():
     assert graph.generator_names == ["L", "R", "X"]
 
 
-def test_hashes_list_len():
+def test_hashes_list_len() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(10).with_central_state("0110110110"))
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
     assert result.bfs_completed
     assert result.num_vertices == len(result.vertex_names)
 
 
-def test_hashes_list_len_max_radius():
+def test_hashes_list_len_max_radius() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(10).with_central_state("0110110110"))
     result = graph.bfs(return_all_edges=True, return_all_hashes=True, max_diameter=2)
     assert not result.bfs_completed
     assert result.num_vertices == len(result.vertex_names)
 
 
-def test_hashes_list_len_max_layer_size_to_explore():
+def test_hashes_list_len_max_layer_size_to_explore() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(10).with_central_state("0110110110"))
     result = graph.bfs(return_all_edges=True, return_all_hashes=True, max_layer_size_to_explore=2)
     assert not result.bfs_completed
     assert result.num_vertices == len(result.vertex_names)
 
 
-def test_matrix_group():
+def test_matrix_group() -> None:
     p = 10
     x = MatrixGenerator.create([[1, 1], [0, 1]], modulo=p)
     x_inv = MatrixGenerator.create([[1, -1], [0, 1]], modulo=p)
@@ -192,25 +193,25 @@ def test_matrix_group():
     assert len(bfs_result.all_states) == 10
 
 
-def test_bfs_heisenberg_group():
+def test_bfs_heisenberg_group() -> None:
     graph = CayleyGraph(MatrixGroups.heisenberg())
     bfs_result = graph.bfs(max_diameter=15)
     # See https://oeis.org/A063810
     assert bfs_result.layer_sizes == [1, 4, 12, 36, 82, 164, 294, 476, 724, 1052, 1464, 1972, 2590, 3324, 4186, 5188]
 
 
-def test_incomplete_bfs_symmetric_adjacency_matrix():
+def test_incomplete_bfs_symmetric_adjacency_matrix() -> None:
     graph = CayleyGraph(prepare_graph("pyraminx"), device="cpu")
     bfs_result = graph.bfs(return_all_edges=True, return_all_hashes=True, max_diameter=2)
     mx = bfs_result.adjacency_matrix()
     assert np.array_equal(mx, mx.T)
 
 
-def _state_to_str(state: torch.Tensor):
+def _state_to_str(state: torch.Tensor) -> str:
     return "".join(str(int(x)) for x in state)
 
 
-def test_random_walks_single_walk():
+def test_random_walks_single_walk() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(5))
     x, y = graph.random_walks(width=1, length=5)
     assert x.shape == (5, 5)
@@ -220,7 +221,7 @@ def test_random_walks_single_walk():
     assert np.array_equal(y.cpu().numpy(), [0, 1, 2, 3, 4])
 
 
-def test_random_walks_matrix_group():
+def test_random_walks_matrix_group() -> None:
     graph = CayleyGraph(MatrixGroups.heisenberg())
     x, y = graph.random_walks(width=20, length=10)
     assert x.shape == (200, 3, 3)
@@ -228,7 +229,7 @@ def test_random_walks_matrix_group():
     assert np.array_equal(y.cpu().numpy(), [i for i in range(10) for _ in range(20)])
 
 
-def test_random_walks_start_state():
+def test_random_walks_start_state() -> None:
     graph = CayleyGraph(PermutationGroups.lx(5))
     x, y = graph.random_walks(width=10, length=5, start_state=[1, 0, 0, 0, 0])
     assert x.shape == (50, 5)
@@ -239,7 +240,7 @@ def test_random_walks_start_state():
         assert _state_to_str(x[i]) in ["01000", "00001"]
 
 
-def test_random_walks_bfs_small():
+def test_random_walks_bfs_small() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(4))
     x, y = graph.random_walks(width=50, length=100, mode="bfs")
     assert x.shape == (24, 4)
@@ -247,7 +248,7 @@ def test_random_walks_bfs_small():
     assert np.array_equal(y.cpu().numpy(), [0, 1, 1, 1, 2, 2, 2, 2, 2, 3, 3, 3, 3, 3, 3, 4, 4, 4, 4, 4, 5, 5, 5, 6])
 
 
-def test_random_walks_bfs():
+def test_random_walks_bfs() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(20))
     x, y = graph.random_walks(width=100, length=50, mode="bfs")
     assert x.shape == (4485, 20)
@@ -256,22 +257,24 @@ def test_random_walks_bfs():
     assert y[-1] == 49
 
 
-def test_random_walks_bfs_matrix_groups():
+def test_random_walks_bfs_matrix_groups() -> None:
     graph = CayleyGraph(MatrixGroups.heisenberg())
     x, y = graph.random_walks(width=100, length=50, mode="bfs")
     assert x.shape == (4635, 3, 3)
     assert y.shape == (4635,)
 
 
-def test_path_to_from():
+def test_path_to_from() -> None:
     n = 8
     graph = CayleyGraph(PermutationGroups.lrx(n))
     br = graph.bfs(return_all_hashes=True)
     for _ in range(5):
         start_state = torch.tensor(np.random.permutation(n))
         path1 = graph.find_path_from(start_state, br)
+        assert path1 is not None
         assert torch.equal(graph.apply_path(start_state, path1)[0], graph.central_state)
         path2 = graph.find_path_to(start_state, br)
+        assert path2 is not None
         assert torch.equal(start_state, graph.apply_path(graph.central_state, path2)[0].cpu())
 
 
@@ -279,7 +282,7 @@ def test_path_to_from():
 @pytest.mark.skipif(not BENCHMARK_RUN, reason="benchmark")
 @pytest.mark.parametrize("benchmark_mode", ["baseline", "bit_encoded", "bfs_numpy"])
 @pytest.mark.parametrize("n", [26])
-def test_benchmark_top_spin(benchmark, benchmark_mode, n):
+def test_benchmark_top_spin(benchmark: BenchmarkFixture, benchmark_mode: str, n: int) -> None:
     central_state = [0] * (n // 2) + [1] * (n // 2)
     graph_def = PermutationGroups.lrx(n).with_central_state(central_state)
     if benchmark_mode == "bfs_numpy":
@@ -292,7 +295,7 @@ def test_benchmark_top_spin(benchmark, benchmark_mode, n):
 
 
 @pytest.mark.parametrize("bit_encoding_width", [3, 4, 8, "auto"])
-def test_bit_encoding_width_values(bit_encoding_width):
+def test_bit_encoding_width_values(bit_encoding_width: Union[int, str]) -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, bit_encoding_width=bit_encoding_width)
     bfs_result = graph.bfs(max_diameter=3)
@@ -300,7 +303,7 @@ def test_bit_encoding_width_values(bit_encoding_width):
     assert bfs_result.layer_sizes == load_dataset("lrx_cayley_growth")["5"][:4]
 
 
-def test_modified_copy_preserves_hasher_and_encoder():
+def test_modified_copy_preserves_hasher_and_encoder() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, bit_encoding_width=3)
 
@@ -314,7 +317,7 @@ def test_modified_copy_preserves_hasher_and_encoder():
     assert not torch.equal(new_graph.central_state, graph.central_state)
 
 
-def test_with_inverted_generators_path_reversal():
+def test_with_inverted_generators_path_reversal() -> None:
     graph_def = PermutationGroups.lrx(4)
     graph = CayleyGraph(graph_def)
 
@@ -327,10 +330,12 @@ def test_with_inverted_generators_path_reversal():
     path_to = graph.find_path_to(start_state, bfs_result)
     path_from = graph.find_path_from(start_state, bfs_result)
 
+    assert path_to is not None
+    assert path_from is not None
     assert path_from == graph.definition.revert_path(path_to)
 
 
-def test_bfs_on_modified_copy_preserves_structure_safe():
+def test_bfs_on_modified_copy_preserves_structure_safe() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, bit_encoding_width=3)
 

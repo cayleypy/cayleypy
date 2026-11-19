@@ -4,7 +4,7 @@ from .models_lib import PREDICTOR_MODELS
 from .. import prepare_graph, Predictor, CayleyGraph
 
 
-def test_loads_predictor_models():
+def test_loads_predictor_models() -> None:
     # Checks that all models can be loaded and successfully return prediction for central state of the graph.
     # This test does not check model quality.
     for graph_name in PREDICTOR_MODELS:

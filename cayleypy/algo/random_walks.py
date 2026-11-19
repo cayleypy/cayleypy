@@ -1,6 +1,6 @@
 """Random walks generation for Cayley graphs."""
 
-from typing import TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 import numpy as np
 import torch
@@ -20,7 +20,7 @@ class RandomWalksGenerator:
       * "bfs": Breadth-first search based random walks with uniqueness constraints.
     """
 
-    def __init__(self, graph: "CayleyGraph"):
+    def __init__(self, graph: "CayleyGraph") -> None:
         """Initialize the random walks generator.
 
         :param graph: The Cayley graph to generate walks on.
@@ -30,9 +30,9 @@ class RandomWalksGenerator:
     def generate(
         self,
         *,
-        width=5,
-        length=10,
-        mode="classic",
+        width: int = 5,
+        length: int = 10,
+        mode: str = "classic",
         start_state: Union[None, torch.Tensor, np.ndarray, list] = None,
         nbt_history_depth: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor]:
@@ -179,11 +179,12 @@ class RandomWalksGenerator:
         y[:width] = 0
 
         # Initialize hash storage for non-backtracking.
+        vec_hashes_current: Optional[torch.Tensor] = None
+        i_cyclic_index_for_hash_storage = 0
         if history_depth > 0:
             # Use graph's hasher for consistency.
             initial_hashes = graph.hasher.make_hashes(start_state)
             vec_hashes_current = initial_hashes.expand(width * graph.definition.n_generators, history_depth).clone()
-            i_cyclic_index_for_hash_storage = 0
 
         i_step_corrected = 0
         for i_step in range(1, length):
@@ -196,7 +197,9 @@ class RandomWalksGenerator:
                 array_new_states = array_new_states.flatten(end_dim=1)
 
             # 2. Non-backtracking: select states not seen before.
+            vec_hashes_new: Optional[torch.Tensor] = None
             if history_depth > 0:
+                assert vec_hashes_current is not None
                 # Compute hashes of new states.
                 vec_hashes_new = graph.hasher.make_hashes(array_new_states)
 
@@ -229,6 +232,8 @@ class RandomWalksGenerator:
 
             # 5. Update hash storage.
             if history_depth > 0:
+                assert vec_hashes_current is not None
+                assert vec_hashes_new is not None
                 i_cyclic_index_for_hash_storage = (i_cyclic_index_for_hash_storage + 1) % history_depth
                 vec_hashes_current[:, i_cyclic_index_for_hash_storage] = vec_hashes_new
 

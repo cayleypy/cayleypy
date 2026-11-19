@@ -33,9 +33,9 @@ Mathematical applications:
 * Approximation of the word metrics and diffusion distance
 * Estimation of the mixing time for random walks of different types 
 * BFS from given state (growth function, adjacency matrix, last layers).
-* Library of graphs and generators (LRX, TopSpin, Rubik Cubes, wreath, globe etc.,
+* Library of graphs and generators (LRX, TopSpin, unitriangular and special linear matrix groups, Rubik Cubes, wreath, globe etc.,
   see [here](https://www.kaggle.com/code/ivankolt/generation-of-incidence-mtx-pancake)).
-* Library of datasets with solutions to some problems (e.g. growth functions like
+* Library of datasets with solutions to some problems (e.g. growth functions for permutation groups and small matrix groups like UT(n) and SL(n), like
   [here](https://www.kaggle.com/code/fedimser/bfs-for-binary-string-permutations)).
 
 ## Examples
@@ -132,7 +132,7 @@ your code using Black. There are few convenient ways to do that:
     contributors should read it.
 * When writing comments, [use punctuation](https://google.github.io/styleguide/pyguide.html#386-punctuation-spelling-and-grammar).
     In particular, always put a period (".") in the end of sentences.
-* We have pylint checks to enforce some style rules. You should fix pylint warnings instead of disabling the check. 
+* We have pylint checks to enforce some style rules. You should fix pylint warnings instead of disabling the check.
 
 ## How to add a new Cayley graph
 

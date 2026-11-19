@@ -1,21 +1,21 @@
 [build-system]
 build-backend = "setuptools.build_meta"
-requires = ["setuptools"]
+requires = ["setuptools>=77.0.3"]
 
 [project]
 # https://packaging.python.org/en/latest/specifications/declaring-project-metadata/
 name = "cayleypy"
-version = "0.1.0"
+version = "0.2.0"
 description = "Library for studying Cayley graphs and Schreier coset graphs"
 readme = "README.md"
 requires-python = ">=3.9"
-license = { file = "LICENSE" }
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [{ name = "CayleyPy Foundation" }]
 
 # https://pypi.org/classifiers/
 classifiers = [
     "Development Status :: 3 - Alpha",
-    "License :: OSI Approved :: MIT License",
     "Topic :: Scientific/Engineering :: Mathematics",
 ]
 
@@ -30,12 +30,12 @@ dependencies = [
 ]
 
 # Development dependencies
-# pip install .[torch,lint,test,dev,docs]
+# pip install ".[lint,test,dev,docs]"
 [project.optional-dependencies]
 lint = [
-    "black==25.1.0",
-    "mypy==1.15.0",
-    "pylint"
+    "black==26.10.1",
+    "pylint==4.0.10",
+    "pyright==1.1.414",
 ]
 test = [
     "pytest",
@@ -48,9 +48,8 @@ dev = [
 ]
 docs = [
     # Libraries needed to build documentation.
-    "sphinx",
+    "sphinx>=9.1.0",
     "sphinx_rtd_theme",
-    "sphinx_markdown_parser",
 ]
 
 [project.urls]
@@ -63,31 +62,10 @@ include-package-data = true
 [tool.setuptools.package-data]
 "cayleypy" = ["data/*.csv", "puzzles/gap_files/**"]
 
-[[tool.mypy.overrides]]
-module = ["networkx.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["tensorflow.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["numba.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["scipy.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["h5py.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["kagglehub.*"]
-ignore_missing_imports = true
-[[tool.mypy.overrides]]
-module = ["sympy.*"]
-ignore_missing_imports = true
-
 [tool.pylint."FORMAT"]
 max-line-length = 120
 max-module-lines = 2000
+
 [tool.pylint."MESSAGES CONTROL"]
 disable = [
     "consider-using-enumerate",

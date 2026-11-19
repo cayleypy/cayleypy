@@ -2,7 +2,7 @@
 
 import os
 from dataclasses import asdict, dataclass
-from typing import Any, Optional
+from typing import Any, Optional, Union
 
 import kagglehub
 import torch
@@ -43,7 +43,7 @@ class ModelConfig:
     graph_hash: Optional[str] = None
 
     @staticmethod
-    def from_dict(cfg: dict[str, Any]):
+    def from_dict(cfg: dict[str, Any]) -> "ModelConfig":
         """Creates config from Python dict."""
         return ModelConfig(
             model_type=cfg["model_type"],
@@ -70,7 +70,7 @@ class ModelConfig:
         else:
             raise ValueError("Unknown model type: " + self.model_type)
 
-    def load(self, device="cpu") -> nn.Module:
+    def load(self, device: Union[str, torch.device] = "cpu") -> nn.Module:
         """Creates model described by this config and loads weights.
 
         Weights are loaded from `weights_path`. A config with neither `weights_path` nor `weights_kaggle_id` describes
@@ -117,7 +117,7 @@ class MlpModel(nn.Module):
     Output has shape ``[n_states]`` when ``n_outputs == 1``, and shape ``[n_states, n_outputs]`` otherwise.
     """
 
-    def __init__(self, config: ModelConfig):
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         assert config.model_type == "MLP"
         self.n_outputs = _validate_n_outputs(config)
@@ -146,7 +146,7 @@ class MlpModel(nn.Module):
 class _ResBlock(nn.Module):
     """Residual block: Linear+LayerNorm+ReLU, adding its input to its output when their shapes match."""
 
-    def __init__(self, in_features: int, out_features: int):
+    def __init__(self, in_features: int, out_features: int) -> None:
         super().__init__()
         self.linear = nn.Linear(in_features, out_features)
         self.norm = nn.LayerNorm(out_features)
@@ -176,7 +176,7 @@ class ResMlpModel(nn.Module):
     a state in a single forward pass (see :meth:`cayleypy.Predictor.score_children`).
     """
 
-    def __init__(self, config: ModelConfig):
+    def __init__(self, config: ModelConfig) -> None:
         super().__init__()
         assert config.model_type == "RESMLP"
         if len(config.layers_sizes) == 0:

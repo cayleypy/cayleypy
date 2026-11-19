@@ -1,5 +1,6 @@
 import itertools
 import os
+from typing import Optional
 
 import pytest
 
@@ -33,7 +34,7 @@ circular_shift_test_data = [
 
 
 @pytest.mark.parametrize("size, step, expected_result", circular_shift_test_data)
-def test_circular_shift(size, step, expected_result):
+def test_circular_shift(size: int, step: int, expected_result: list[int]) -> None:
     assert _circular_shift(items=list(range(0, size)), step=step) == expected_result
 
 
@@ -46,7 +47,9 @@ def test_circular_shift(size, step, expected_result):
         (1, 0, 1, 0, 1, [0]),
     ],
 )
-def test_create_right_ring(left_size, left_index, right_size, right_index, full_size, exp_result):
+def test_create_right_ring(
+    left_size: int, left_index: int, right_size: int, right_index: int, full_size: int, exp_result: list[int]
+) -> None:
     right_ring = _create_right_ring(left_size, left_index, right_size, right_index, full_size)
     assert right_ring == exp_result
 
@@ -62,7 +65,7 @@ def test_create_right_ring(left_size, left_index, right_size, right_index, full_
         pytest.param(2, -1, None, marks=pytest.mark.xfail(raises=ValueError)),
     ],
 )
-def test_get_intersections(left_index, right_index, exp_intersections):
+def test_get_intersections(left_index: int, right_index: int, exp_intersections: Optional[int]) -> None:
     intersections = _get_intersections(left_index=left_index, right_index=right_index)
     assert intersections == exp_intersections
 
@@ -104,7 +107,15 @@ wreath_moves = [
     "left_size, left_index, right_size, right_index, step, expected_result_l, expected_result_r",
     hr_symmetric_test_data + hr_test_data + wreath_moves,
 )
-def test_hr_permutations(left_size, left_index, right_size, right_index, step, expected_result_l, expected_result_r):
+def test_hr_permutations(
+    left_size: int,
+    left_index: int,
+    right_size: int,
+    right_index: int,
+    step: int,
+    expected_result_l: list[int],
+    expected_result_r: list[int],
+) -> None:
     l_permutations, r_permutations = hungarian_rings_permutations(left_size, left_index, right_size, right_index, step)
     intersections = _get_intersections(left_index=left_index, right_index=right_index)
 
@@ -125,7 +136,9 @@ hr_value_error_data = [
 
 
 @pytest.mark.parametrize("left_size,left_index,right_size,right_index,step", hr_value_error_data)
-def test_hr_permutations_value_errors(left_size: int, left_index: int, right_size: int, right_index: int, step: int):
+def test_hr_permutations_value_errors(
+    left_size: int, left_index: int, right_size: int, right_index: int, step: int
+) -> None:
     with pytest.raises(ValueError):
         hungarian_rings_permutations(left_size, left_index, right_size, right_index, step=step)
 
@@ -133,7 +146,9 @@ def test_hr_permutations_value_errors(left_size: int, left_index: int, right_siz
 @pytest.mark.parametrize(
     "left_size, left_index, right_size, right_index, step", [(6, 3, 6, 2, 2), (6, 1, 5, 2, -7), (13, 9, 5, 2, 6)]
 )
-def test_hr_permutations_compensation(left_size: int, left_index: int, right_size: int, right_index: int, step: int):
+def test_hr_permutations_compensation(
+    left_size: int, left_index: int, right_size: int, right_index: int, step: int
+) -> None:
     left_index = min(left_index, left_size - 1)
     right_index = min(right_index, right_size - 1)
     l_permutations, r_permutations = hungarian_rings_permutations(
@@ -152,7 +167,7 @@ def test_hr_permutations_compensation(left_size: int, left_index: int, right_siz
 
 
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
-def test_hr_permutations_compensation_bf():
+def test_hr_permutations_compensation_bf() -> None:
     two_inter_params = [range(2, 6), range(1, 5), range(2, 6), range(1, 5), range(-7, 8)]
     one_inter_params = [range(2, 6), [0], range(2, 6), [0], range(-7, 8)]
     parameters = list(itertools.product(*one_inter_params)) + list(itertools.product(*two_inter_params))
@@ -181,7 +196,7 @@ def test_hr_permutations_compensation_bf():
         (12, (7, 2, 7, 3)),
     ],
 )
-def test_get_santa_parameters_from_n(n: int, parameters):
+def test_get_santa_parameters_from_n(n: int, parameters: tuple[int, int, int, int]) -> None:
     assert get_santa_parameters_from_n(n) == parameters
 
 
@@ -222,12 +237,12 @@ groups_data = [
 
 
 @pytest.mark.parametrize("pair, variants", pairs_data.items())
-def test_get_pair_variants(pair: tuple[int, int], variants: list):
+def test_get_pair_variants(pair: tuple[int, int], variants: list) -> None:
     assert get_pair_variants(*pair) == variants
 
 
 @pytest.mark.parametrize("n, group", groups_data)
-def test_get_group(n: int, group: list):
+def test_get_group(n: int, group: list) -> None:
     assert get_group(n) == group
 
 
@@ -245,7 +260,7 @@ layer_sizes_data = [
 
 
 @pytest.mark.parametrize("parameters, layer_sizes", layer_sizes_data)
-def test_layer_sizes(parameters: tuple[int, int, int, int], layer_sizes: list[int]):
+def test_layer_sizes(parameters: tuple[int, int, int, int], layer_sizes: list[int]) -> None:
     generators, generator_names = hungarian_rings_generators(*parameters)
     n = len(generators[0])
     graph_def = CayleyGraphDef.create(generators, central_state=list(range(n)), generator_names=generator_names)

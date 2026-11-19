@@ -5,8 +5,6 @@ import inspect
 import os
 import sys
 
-from sphinx_markdown_parser.parser import MarkdownParser
-
 # -- Path setup --------------------------------------------------------------
 # If extensions (or modules to document with autodoc) are in another directory,
 # add these directories to sys.path here. If the directory is relative to the
@@ -17,8 +15,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 
 def setup(app):
-    app.add_source_parser(MarkdownParser)
-    app.add_config_value("pandoc_use_parser", "markdown", True)
     app.connect("autodoc-process-signature", autodoc_process_signature)
     app.add_css_file("custom.css")
 
@@ -66,13 +62,6 @@ html_theme = "sphinx_rtd_theme"
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = []
-
-# Allow markdown includes.
-# http://www.sphinx-doc.org/en/master/markdown.html
-source_suffix = {
-    ".rst": "restructuredtext",
-    ".md": "markdown",
-}
 
 # Home page for documentation.
 master_doc = "index"
