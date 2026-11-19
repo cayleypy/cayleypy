@@ -204,28 +204,13 @@ def _inverse_generic(matrix: list[list[int]], m: int) -> list[list[int]]:
 def inverse_mod(
     matrix: Iterable[Iterable[SupportsInt]],
     m: int,
-    method: str = "auto",
 ) -> list[list[int]]:
-    """Invert a matrix modulo m; orientation is retained for compatibility only."""
+    """Invert a matrix modulo m, choosing the implementation by matrix size."""
     matrix = _clean(matrix, m)
     n = len(matrix)
 
-    if method == "auto":
-        if n == 2:
-            return _inverse_2x2(matrix, m)
-        if n == 3:
-            return _inverse_3x3(matrix, m)
-        return _inverse_generic(matrix, m)
-
-    if method == "2x2":
-        if n != 2:
-            raise ValueError("method='2x2' requires a 2x2 matrix")
+    if n == 2:
         return _inverse_2x2(matrix, m)
-    if method == "3x3":
-        if n != 3:
-            raise ValueError("method='3x3' requires a 3x3 matrix")
+    if n == 3:
         return _inverse_3x3(matrix, m)
-    if method == "generic":
-        return _inverse_generic(matrix, m)
-
-    raise ValueError("method must be 'auto', '2x2', '3x3', or 'generic'")
+    return _inverse_generic(matrix, m)
