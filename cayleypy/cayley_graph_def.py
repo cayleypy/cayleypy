@@ -6,6 +6,7 @@ from typing import Optional, Union, Any
 import numpy as np
 import torch
 
+from .matrix_utils import inverse_integer, inverse_mod
 from .permutation_utils import inverse_permutation
 
 AnyStateType = Union[torch.Tensor, np.ndarray, list]
@@ -28,7 +29,7 @@ class MatrixGenerator:
     """Cayley graph generator that is square (n*n) integer matrix.
 
     This matrix applied (by multiplication) to n*m matrices.
-    If `modulo != 0`, multiplication is modulo this number (`2<=modulo<=2^31`).
+    If `modulo != 0`, multiplication is exact modulo this number (`2<=modulo<=2^31`).
     If `modulo == 0`, multiplication is signed int64 multiplication with overflow.
     """
 
@@ -63,6 +64,14 @@ class MatrixGenerator:
 
     def apply(self, state: np.ndarray) -> np.ndarray:
         """Multiplies (from left) this matrix by a n*m matrix."""
+        if self.modulo > 0:
+            state = state % self.modulo
+            if self.n * (int(self.modulo) - 1) ** 2 > 2**63 - 1:
+                # Each product plus a reduced accumulator fits in signed int64.
+                ans = np.zeros_like(state, dtype=np.int64)
+                for k in range(self.n):
+                    ans = (ans + self.matrix[:, k : k + 1] * state[k]) % self.modulo
+                return ans
         ans = self.matrix @ state
         if self.modulo > 0:
             ans %= self.modulo
@@ -73,6 +82,13 @@ class MatrixGenerator:
         assert len(states.shape) == 3
         assert states.shape[1] == self.n
         mx = torch.tensor(self.matrix, dtype=torch.int64, device=states.device)
+        if self.modulo > 0:
+            states = states % self.modulo
+            if self.n * (int(self.modulo) - 1) ** 2 > 2**63 - 1:
+                ans = torch.zeros(states.shape, dtype=torch.int64, device=states.device)
+                for k in range(self.n):
+                    ans = (ans + mx[None, :, k, None] * states[:, k : k + 1, :]) % self.modulo
+                return ans
         mx = mx.unsqueeze(0).unsqueeze(-1)
         ans = (mx * states.unsqueeze(1)).sum(dim=2)
         if self.modulo > 0:
@@ -81,10 +97,12 @@ class MatrixGenerator:
 
     @cached_property
     def inv(self) -> "MatrixGenerator":
-        """Inverse of this matrix. Throws error if matrix is not invertible."""
-        # TODO: implement modular inverse, if needed.
-        matrix_inv = np.array(np.linalg.inv(self.matrix), dtype=np.int64)
-        assert np.array_equal(self.apply(matrix_inv), np.eye(self.n)), "Matrix is not invertible."
+        """Inverse for modular or signed-int64-overflow multiplication."""
+        if self.modulo:
+            matrix_inv = inverse_mod(self.matrix, self.modulo)
+        else:
+            matrix_inv = inverse_integer(self.matrix)
+            matrix_inv = [[(value + 2**63) % 2**64 - 2**63 for value in row] for row in matrix_inv]
         return MatrixGenerator.create(matrix_inv, self.modulo)
 
     def __eq__(self, other: Any) -> bool:

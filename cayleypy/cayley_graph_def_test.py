@@ -1,4 +1,6 @@
+import numpy as np
 import pytest
+import torch
 
 from cayleypy import CayleyGraphDef, MatrixGenerator, PermutationGroups
 
@@ -28,3 +30,23 @@ def test_make_inverse_closed() -> None:
     graph = PermutationGroups.lx(4).make_inverse_closed()
     assert graph.generators_permutations == [[1, 2, 3, 0], [1, 0, 2, 3], [3, 0, 1, 2]]
     assert graph.generator_names == ["L", "X", "L'"]
+
+
+@pytest.mark.parametrize("modulo", [5, 2**31 - 1, 2**31])
+def test_modular_matrix_multiplication_overflow(modulo: int) -> None:
+    """Compare NumPy and batched Torch multiplication with exact arithmetic."""
+    generator = MatrixGenerator.create([[-3, -2, -2], [-2, -3, -2], [-2, -2, -3]], modulo=modulo)
+    state = np.array([[2**63 - 1, -(2**63)], [-1, 1], [modulo - 1, 0]], dtype=np.int64)
+    states = np.stack([state, state[::-1]])
+    expected = np.asarray((generator.matrix.astype(object) @ states.astype(object)) % modulo, dtype=np.int64)
+
+    assert generator.is_inverse_to(generator.inv)
+    assert np.array_equal(generator.apply(state), expected[0])
+    assert torch.equal(generator.apply_batch_torch(torch.from_numpy(states)), torch.from_numpy(expected))
+
+
+def test_inverse_matrix_int64_wraparound() -> None:
+    """Keep generators invertible when exact inverse entries exceed int64."""
+    generator = MatrixGenerator.create([[1, -(2**63)], [0, 1]])
+    assert generator.inv == generator
+    assert generator.is_inverse_to(generator.inv)
