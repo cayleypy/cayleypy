@@ -1,7 +1,7 @@
 """Helper functions for matrices."""
 
 from math import gcd
-from typing import Iterable, Optional, SupportsInt
+from typing import Iterable, Optional, SupportsIndex, SupportsInt
 
 
 def _bezout(a: int, b: int) -> tuple[int, int, int]:
@@ -203,9 +203,10 @@ def _inverse_generic(matrix: list[list[int]], m: int) -> list[list[int]]:
 
 def inverse_mod(
     matrix: Iterable[Iterable[SupportsInt]],
-    m: int,
+    m: SupportsIndex,
 ) -> list[list[int]]:
     """Invert a matrix modulo m, choosing the implementation by matrix size."""
+    m = int(m)
     matrix = _clean(matrix, m)
     n = len(matrix)
 

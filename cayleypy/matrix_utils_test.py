@@ -222,10 +222,10 @@ def test_inverse_mod_generated_invertible_matrices() -> None:
 
 
 def test_inverse_mod_numpy_input_and_no_mutation() -> None:
-    """Ensure modular inversion accepts NumPy arrays without changing them."""
+    """Accept NumPy matrices and scalar moduli without mutating the input."""
     matrix = np.array([[1, 2], [3, 4]], dtype=np.int64)
     matrix_before = matrix.copy()
-    assert inverse_mod(matrix, 5) == [[3, 1], [4, 2]]
+    assert inverse_mod(matrix, np.int64(5)) == [[3, 1], [4, 2]]
     assert np.array_equal(matrix, matrix_before)
 
 
