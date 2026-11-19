@@ -205,7 +205,6 @@ def inverse_mod(
     matrix: Iterable[Iterable[SupportsInt]],
     m: int,
     method: str = "auto",
-    orientation: str = "auto",  # pylint: disable=unused-argument
 ) -> list[list[int]]:
     """Invert a matrix modulo m; orientation is retained for compatibility only."""
     matrix = _clean(matrix, m)
