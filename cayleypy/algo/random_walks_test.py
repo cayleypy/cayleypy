@@ -59,7 +59,7 @@ def test_random_walks_nbt_matrix_group():
 @pytest.mark.parametrize("width", [1, 2, 5])
 @pytest.mark.parametrize("length", [1, 2, 3, 4, 10])
 @pytest.mark.parametrize("nbt_history_depth", [-1, 2])
-def test_random_walks_nbt_exhaustion(width, length, nbt_history_depth):
+def test_random_walks_nbt_exhaustion(width: int, length: int, nbt_history_depth: int):
     """Verify that NBT walks do not repeat states when no unseen candidates remain."""
     graph = CayleyGraph(
         CayleyGraphDef.for_matrix_group(
@@ -82,7 +82,7 @@ def test_random_walks_nbt_exhaustion(width, length, nbt_history_depth):
 
 
 @pytest.mark.parametrize("nbt_history_depth", [0, -2])
-def test_random_walks_nbt_invalid_history_depth(nbt_history_depth):
+def test_random_walks_nbt_invalid_history_depth(nbt_history_depth: int):
     """Reject history depths that disable non-backtracking checks."""
     graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu", random_seed=0)
 
