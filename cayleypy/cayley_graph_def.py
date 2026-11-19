@@ -97,11 +97,12 @@ class MatrixGenerator:
 
     @cached_property
     def inv(self) -> "MatrixGenerator":
-        """Inverse over Z/mZ, or over Z when modulo == 0."""
+        """Inverse for modular or signed-int64-overflow multiplication."""
         if self.modulo:
             matrix_inv = inverse_mod(self.matrix, self.modulo)
         else:
             matrix_inv = inverse_integer(self.matrix)
+            matrix_inv = [[(value + 2**63) % 2**64 - 2**63 for value in row] for row in matrix_inv]
         return MatrixGenerator.create(matrix_inv, self.modulo)
 
     def __eq__(self, other: Any) -> bool:
