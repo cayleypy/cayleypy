@@ -1,9 +1,11 @@
 """Helper functions for matrices."""
 
 from math import gcd
+from typing import Iterable, Optional, SupportsInt
 
 
-def _bezout(a, b):
+def _bezout(a: int, b: int) -> tuple[int, int, int]:
+    """Return the gcd and coefficients of a Bezout identity."""
     g = gcd(a, b)
     if b == g:
         return g, 0, 1
@@ -12,8 +14,9 @@ def _bezout(a, b):
     return g, s, t
 
 
-def _inverse_integer_2x2(A):
-    (a, b), (c, d) = A
+def _inverse_integer_2x2(matrix: list[list[int]]) -> list[list[int]]:
+    """Invert a unimodular 2x2 matrix using its adjugate."""
+    (a, b), (c, d) = matrix
     determinant = a * d - b * c
 
     if abs(determinant) != 1:
@@ -25,8 +28,9 @@ def _inverse_integer_2x2(A):
     ]
 
 
-def _inverse_integer_3x3(A):
-    (a, b, c), (d, e, f), (g, h, i) = A
+def _inverse_integer_3x3(matrix: list[list[int]]) -> list[list[int]]:
+    """Invert a unimodular 3x3 matrix using its adjugate."""
+    (a, b, c), (d, e, f), (g, h, i) = matrix
 
     x = e * i - f * h
     y = f * g - d * i
@@ -41,19 +45,14 @@ def _inverse_integer_3x3(A):
         [y, a * i - c * g, c * d - a * f],
         [z, b * g - a * h, a * e - b * d],
     ]
-    return [
-        [determinant * value for value in row]
-        for row in adjugate
-    ]
+    return [[determinant * value for value in row] for row in adjugate]
 
 
-def _inverse_integer_generic(A):
-    n = len(A)
+def _inverse_integer_generic(matrix: list[list[int]]) -> list[list[int]]:
+    """Invert a unimodular matrix using integer row operations."""
+    n = len(matrix)
 
-    aug = [
-        row + [int(i == j) for j in range(n)]
-        for i, row in enumerate(A)
-    ]
+    aug = [row + [int(i == j) for j in range(n)] for i, row in enumerate(matrix)]
 
     for k in range(n):
         # Prefer an existing unit pivot.
@@ -80,14 +79,8 @@ def _inverse_integer_generic(A):
                 row_k = aug[k]
                 row_i = aug[i]
 
-                aug[k] = [
-                    s * x + t * y
-                    for x, y in zip(row_k, row_i)
-                ]
-                aug[i] = [
-                    -(b // g) * x + (a // g) * y
-                    for x, y in zip(row_k, row_i)
-                ]
+                aug[k] = [s * x + t * y for x, y in zip(row_k, row_i)]
+                aug[i] = [-(b // g) * x + (a // g) * y for x, y in zip(row_k, row_i)]
 
                 if abs(aug[k][k]) == 1:
                     break
@@ -104,44 +97,43 @@ def _inverse_integer_generic(A):
 
             q = aug[i][k]
             if q:
-                aug[i] = [
-                    x - q * y
-                    for x, y in zip(aug[i], aug[k])
-                ]
+                aug[i] = [x - q * y for x, y in zip(aug[i], aug[k])]
 
     return [row[n:] for row in aug]
 
 
-def inverse_integer(A):
-    A = [[int(x) for x in row] for row in A]
-    n = len(A)
+def inverse_integer(matrix: Iterable[Iterable[SupportsInt]]) -> list[list[int]]:
+    """Return the exact integer inverse of a unimodular square matrix."""
+    matrix = [[int(x) for x in row] for row in matrix]
+    n = len(matrix)
 
-    if n == 0 or any(len(row) != n for row in A):
+    if n == 0 or any(len(row) != n for row in matrix):
         raise ValueError("A must be a nonempty square matrix")
 
     if n == 2:
-        return _inverse_integer_2x2(A)
+        return _inverse_integer_2x2(matrix)
     if n == 3:
-        return _inverse_integer_3x3(A)
+        return _inverse_integer_3x3(matrix)
 
-    return _inverse_integer_generic(A)
+    return _inverse_integer_generic(matrix)
 
 
-def _clean(A, m, size=None):
+def _clean(matrix: Iterable[Iterable[SupportsInt]], m: int, size: Optional[int] = None) -> list[list[int]]:
     """Reduce entries modulo m and perform the useful shape checks."""
     if m < 2:
         raise ValueError("modulus m must be at least 2")
-    A = [[int(x) % m for x in row] for row in A]
-    n = len(A)
-    if n == 0 or any(len(row) != n for row in A):
+    matrix = [[int(x) % m for x in row] for row in matrix]
+    n = len(matrix)
+    if n == 0 or any(len(row) != n for row in matrix):
         raise ValueError("A must be a nonempty square matrix")
     if size is not None and n != size:
         raise ValueError(f"expected a {size}x{size} matrix, got {n}x{n}")
-    return A
+    return matrix
 
 
-def _inverse_2x2(A, m):
-    (a, b), (c, d) = A
+def _inverse_2x2(matrix: list[list[int]], m: int) -> list[list[int]]:
+    """Invert a 2x2 matrix modulo m using its adjugate."""
+    (a, b), (c, d) = matrix
     s = pow((a * d - b * c) % m, -1, m)
     return [
         [s * d % m, -s * b % m],
@@ -149,8 +141,9 @@ def _inverse_2x2(A, m):
     ]
 
 
-def _inverse_3x3(A, m):
-    (a, b, c), (d, e, f), (g, h, i) = A
+def _inverse_3x3(matrix: list[list[int]], m: int) -> list[list[int]]:
+    """Invert a 3x3 matrix modulo m using its adjugate."""
+    (a, b, c), (d, e, f), (g, h, i) = matrix
 
     x = e * i - f * h
     y = f * g - d * i
@@ -165,78 +158,75 @@ def _inverse_3x3(A, m):
     return [[s * x % m for x in row] for row in adjugate]
 
 
-def _inverse_generic(A, m):
+def _inverse_generic(matrix: list[list[int]], m: int) -> list[list[int]]:
     """Factorization-free Bezout--Gauss--Jordan elimination."""
-    n = len(A)
-    M = [
-        row[:] + [int(i == j) for j in range(n)]
-        for i, row in enumerate(A)
-    ]
+    n = len(matrix)
+    aug = [row[:] + [int(i == j) for j in range(n)] for i, row in enumerate(matrix)]
 
     for k in range(n):
         # Use an existing unit pivot when possible.
         pivot_row = next(
-            (i for i in range(k, n) if gcd(M[i][k], m) == 1),
+            (i for i in range(k, n) if gcd(aug[i][k], m) == 1),
             None,
         )
         if pivot_row is not None:
-            M[k], M[pivot_row] = M[pivot_row], M[k]
+            aug[k], aug[pivot_row] = aug[pivot_row], aug[k]
         else:
             # Over composite moduli, several nonunits may combine into a unit.
             for i in range(k + 1, n):
-                if gcd(M[k][k], m) == 1:
+                if gcd(aug[k][k], m) == 1:
                     break
-                b = M[i][k]
+                b = aug[i][k]
                 if b == 0:
                     continue
 
-                a = M[k][k]
+                a = aug[k][k]
                 g, s, t = _bezout(a, b)
-                R, S = M[k][:], M[i][:]
-                M[k] = [(s * x + t * y) % m for x, y in zip(R, S)]
-                M[i] = [
-                    (-(b // g) * x + (a // g) * y) % m
-                    for x, y in zip(R, S)
-                ]
+                row_k, row_i = aug[k][:], aug[i][:]
+                aug[k] = [(s * x + t * y) % m for x, y in zip(row_k, row_i)]
+                aug[i] = [(-(b // g) * x + (a // g) * y) % m for x, y in zip(row_k, row_i)]
 
-        pivot = M[k][k]
+        pivot = aug[k][k]
         if gcd(pivot, m) != 1:
             raise ValueError(f"matrix is not invertible modulo {m}")
 
         s = pow(pivot, -1, m)
-        M[k] = [s * x % m for x in M[k]]
+        aug[k] = [s * x % m for x in aug[k]]
 
         for i in range(n):
-            if i != k and M[i][k]:
-                s = M[i][k]
-                M[i] = [(x - s * y) % m for x, y in zip(M[i], M[k])]
+            if i != k and aug[i][k]:
+                s = aug[i][k]
+                aug[i] = [(x - s * y) % m for x, y in zip(aug[i], aug[k])]
 
-    return [row[n:] for row in M]
+    return [row[n:] for row in aug]
 
 
-def inverse_mod(A, m, method="auto", orientation="auto"):
-    """Invert A modulo m, selecting an appropriate implementation."""
-    A = _clean(A, m)
-    n = len(A)
+def inverse_mod(
+    matrix: Iterable[Iterable[SupportsInt]],
+    m: int,
+    method: str = "auto",
+    orientation: str = "auto",  # pylint: disable=unused-argument
+) -> list[list[int]]:
+    """Invert a matrix modulo m; orientation is retained for compatibility only."""
+    matrix = _clean(matrix, m)
+    n = len(matrix)
 
     if method == "auto":
         if n == 2:
-            return _inverse_2x2(A, m)
+            return _inverse_2x2(matrix, m)
         if n == 3:
-            return _inverse_3x3(A, m)
-        return _inverse_generic(A, m)
+            return _inverse_3x3(matrix, m)
+        return _inverse_generic(matrix, m)
 
     if method == "2x2":
         if n != 2:
             raise ValueError("method='2x2' requires a 2x2 matrix")
-        return _inverse_2x2(A, m)
+        return _inverse_2x2(matrix, m)
     if method == "3x3":
         if n != 3:
             raise ValueError("method='3x3' requires a 3x3 matrix")
-        return _inverse_3x3(A, m)
+        return _inverse_3x3(matrix, m)
     if method == "generic":
-        return _inverse_generic(A, m)
+        return _inverse_generic(matrix, m)
 
-    raise ValueError(
-        "method must be 'auto', '2x2', '3x3', or 'generic'"
-    )
+    raise ValueError("method must be 'auto', '2x2', '3x3', or 'generic'")
