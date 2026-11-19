@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import numpy as np
@@ -45,6 +46,14 @@ def test_bfs_result_eq():
             assert bfs_res_1 == bfs_res_2, "Bfs results must be equal for the the equal graphs"
             assert bfs_res_1 != bfs_res_3, "Bfs results must be different for different graphs"
             assert bfs_res_3 != bfs_res_3_md, "Bfs results must be different if bfs was not completed"
+
+
+def test_bfs_result_eq_without_edges():
+    # Results with and without edge hashes must compare unequal in both directions without raising.
+    result = CayleyGraph(PermutationGroups.lrx(3), device="cpu").bfs(return_all_edges=True, return_all_hashes=True)
+    without_edges = replace(result, edges_list_hashes=None)
+    assert result != without_edges
+    assert without_edges != result
 
 
 def test_bfs_result_save_load():

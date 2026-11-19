@@ -154,15 +154,15 @@ def _compute_heisenberg_growth(key: str) -> list[int]:
     return CayleyGraph(MatrixGroups.heisenberg(n=n, modulo=modulo)).bfs().layer_sizes
 
 
-def _compute_sl_fund_roots_growth(n: str, m: str) -> list[int]:
+def _compute_sl_fund_roots_growth(n: int, m: str) -> list[int]:
     return CayleyGraph(MatrixGroups.special_linear_fundamental_roots(int(n), modulo=int(m))).bfs().layer_sizes
 
 
-def _compute_unitriangular_fund_roots_growth(n: str, m: str) -> list[int]:
-    return CayleyGraph(MatrixGroups.unitriangular_fundamental_roots(int(n), modulo=int(m))).bfs().layer_sizes
+def _compute_unitriangular_fund_roots_growth(n: int, m: str) -> list[int]:
+    return CayleyGraph(MatrixGroups.unitriangular_fundamental_roots(n, modulo=int(m))).bfs().layer_sizes
 
 
-def _compute_sl_root_weyl_growth(n: str, m: str) -> list[int]:
+def _compute_sl_root_weyl_growth(n: int, m: str) -> list[int]:
     return CayleyGraph(MatrixGroups.special_linear_root_weyl(int(n), modulo=int(m))).bfs().layer_sizes
 
 

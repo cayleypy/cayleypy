@@ -203,7 +203,7 @@ class BeamSearchAlgorithm:
         start_states = graph.encode_states(start_state)
         layer1, layer1_hashes = graph.get_unique_states(start_states)
         all_layers_hashes = [layer1_hashes]
-        debug_scores = {}  # type: dict[int, float]
+        debug_scores: dict[int, float] = {}
 
         if graph.central_state_hash[0] == layer1_hashes[0]:
             # Start state is the central state.
@@ -230,7 +230,7 @@ class BeamSearchAlgorithm:
             assert bfs_result_for_mitm is not None
             mask = isin_via_searchsorted(layer2_hashes, bfs_layers_hashes[found_layer_id])
             assert torch.any(mask), "No intersection in Meet-in-the-middle."
-            middle_state = graph.decode_states(layer2[mask.nonzero()[0].item()].reshape((1, -1)))
+            middle_state = graph.decode_states(layer2[int(mask.nonzero()[0].item())].reshape((1, -1)))
             path1 = graph.restore_path(all_layers_hashes, middle_state)
             path2 = graph.find_path_from(middle_state, bfs_result_for_mitm)
             assert path2 is not None
@@ -323,12 +323,13 @@ class BeamSearchAlgorithm:
         array_beam_states = start_states_encoded.view(1, -1).clone()
 
         # Initialize hash storage for non-backtracking.
+        vec_hashes_current: Optional[torch.Tensor] = None
+        i_cyclic_index_for_hash_storage = 0
         if history_depth > 0:
             initial_hashes = graph.hasher.make_hashes(start_states_encoded)
             vec_hashes_current = initial_hashes.expand(
                 beam_width * graph.definition.n_generators, history_depth
             ).clone()
-            i_cyclic_index_for_hash_storage = 0
 
         debug_scores: dict[int, float] = {}
         t0 = time.time()
@@ -362,6 +363,7 @@ class BeamSearchAlgorithm:
 
             # Non-backtracking: forbid visiting states visited before.
             if history_depth > 0:
+                assert vec_hashes_current is not None
                 t1 = time.time()
                 vec_hashes_new = graph.hasher.make_hashes(array_new_states)
                 t_hash += time.time() - t1

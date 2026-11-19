@@ -9,7 +9,7 @@ def test_cube_222_qstm():
     exp_names = ["f0", "f0_inv", "f1", "f1_inv", "r0", "r0_inv", "r1", "r1_inv", "d0", "d0_inv", "d1", "d1_inv"]
     assert graph.generator_names == exp_names
     assert np.array_equal(
-        graph.generators,
+        graph.generators_permutations,
         [
             [0, 1, 19, 17, 6, 4, 7, 5, 2, 9, 3, 11, 12, 13, 14, 15, 16, 20, 18, 21, 10, 8, 22, 23],
             [0, 1, 8, 10, 5, 7, 4, 6, 21, 9, 20, 11, 12, 13, 14, 15, 16, 3, 18, 2, 17, 19, 22, 23],

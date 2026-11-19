@@ -176,7 +176,9 @@ def test_make_loss():
     pinball = make_loss("pinball", tau=0.9)
     assert isinstance(pinball, PinballLoss)
     assert pinball.tau == 0.9
-    assert make_loss("pinball").tau == 0.5  # type: ignore[attr-defined]
+    default_pinball = make_loss("pinball")
+    assert isinstance(default_pinball, PinballLoss)
+    assert default_pinball.tau == 0.5
     predictions, targets = torch.tensor([1.0]), torch.tensor([2.0])
     assert torch.equal(make_loss("mse")(predictions, targets), MseLoss()(predictions, targets))
 
@@ -214,7 +216,7 @@ def test_masked_training_updates_only_labeled_outputs():
 
 def test_loss_is_abstract():
     with pytest.raises(TypeError):
-        Loss()  # type: ignore[abstract]  # pylint: disable=abstract-class-instantiated
+        Loss()  # pyright: ignore[reportAbstractUsage]  # pylint: disable=abstract-class-instantiated
 
 
 def test_pinball_rejects_tau_outside_unit_interval():
