@@ -32,7 +32,7 @@ class StringEncoder:
     This class also provides functionality to efficiently apply permutation in encoded format using bit operations.
     """
 
-    def __init__(self, *, code_width: int = 1, n: int = 1):
+    def __init__(self, *, code_width: int = 1, n: int = 1) -> None:
         """Initializes StringEncoder.
 
         :param code_width: Number of bits to encode one element of coset.

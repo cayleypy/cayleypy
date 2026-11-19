@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import pytest
 import torch
 
@@ -9,7 +11,7 @@ MLP_CONFIG = ModelConfig(model_type="MLP", input_size=5, num_classes_for_one_hot
 STATES = torch.tensor([[0, 1, 2, 3, 4], [4, 3, 2, 1, 0], [1, 0, 2, 4, 3]])
 
 
-def test_save_and_load(tmp_path):
+def test_save_and_load(tmp_path: Path) -> None:
     path = tmp_path / "model.pt"
     model = MLP_CONFIG.build_model()
     save_checkpoint(path, model, MLP_CONFIG)
@@ -21,7 +23,7 @@ def test_save_and_load(tmp_path):
         assert torch.equal(loaded_model(STATES), model(STATES))
 
 
-def test_save_and_load_with_graph(tmp_path):
+def test_save_and_load_with_graph(tmp_path: Path) -> None:
     path = tmp_path / "model.pt"
     graph_def = PermutationGroups.lrx(5)
     model = MLP_CONFIG.build_model()
@@ -35,14 +37,14 @@ def test_save_and_load_with_graph(tmp_path):
         assert torch.equal(loaded_model(STATES), model(STATES))
 
 
-def test_load_checkpoint_for_another_graph(tmp_path):
+def test_load_checkpoint_for_another_graph(tmp_path: Path) -> None:
     path = tmp_path / "model.pt"
     save_checkpoint(path, MLP_CONFIG.build_model(), MLP_CONFIG, PermutationGroups.lrx(5))
     with pytest.raises(ValueError, match="was trained for another graph"):
         load_checkpoint(path, graph_def=PermutationGroups.lrx(6))
 
 
-def test_load_checkpoint_without_graph_hash(tmp_path):
+def test_load_checkpoint_without_graph_hash(tmp_path: Path) -> None:
     path = tmp_path / "model.pt"
     save_checkpoint(path, MLP_CONFIG.build_model(), MLP_CONFIG)
 
@@ -51,14 +53,14 @@ def test_load_checkpoint_without_graph_hash(tmp_path):
     assert loaded_config.graph_hash is None
 
 
-def test_load_bare_state_dict(tmp_path):
+def test_load_bare_state_dict(tmp_path: Path) -> None:
     path = tmp_path / "model.pt"
     torch.save(MLP_CONFIG.build_model().state_dict(), path)
     with pytest.raises(ValueError, match="not a CayleyPy checkpoint"):
         load_checkpoint(path)
 
 
-def test_load_checkpoint_of_unsupported_version(tmp_path):
+def test_load_checkpoint_of_unsupported_version(tmp_path: Path) -> None:
     path = tmp_path / "model.pt"
     model = MLP_CONFIG.build_model()
     checkpoint = {
@@ -71,12 +73,12 @@ def test_load_checkpoint_of_unsupported_version(tmp_path):
         load_checkpoint(path)
 
 
-def test_graph_hash_is_deterministic():
+def test_graph_hash_is_deterministic() -> None:
     assert graph_hash(PermutationGroups.lrx(5)) == graph_hash(PermutationGroups.lrx(5))
     assert len(graph_hash(PermutationGroups.lrx(5))) == 64
 
 
-def test_graph_hash_depends_on_math_only():
+def test_graph_hash_depends_on_math_only() -> None:
     graph_def = PermutationGroups.lrx(5)
 
     # Names of the graph and of its generators do not affect mathematical properties of the graph.
@@ -88,7 +90,7 @@ def test_graph_hash_depends_on_math_only():
     assert graph_hash(graph_def.with_central_state([0, 0, 1, 1, 2])) != graph_hash(graph_def)
 
 
-def test_graph_hash_for_matrix_group():
+def test_graph_hash_for_matrix_group() -> None:
     graph_def = MatrixGroups.heisenberg()
     assert graph_hash(graph_def) == graph_hash(MatrixGroups.heisenberg())
     assert len(graph_hash(graph_def)) == 64
@@ -96,7 +98,7 @@ def test_graph_hash_for_matrix_group():
     assert graph_hash(MatrixGroups.heisenberg(n=4)) != graph_hash(graph_def)
 
 
-def test_save_and_load_for_matrix_group(tmp_path):
+def test_save_and_load_for_matrix_group(tmp_path: Path) -> None:
     path = tmp_path / "model.pt"
     graph_def = MatrixGroups.heisenberg()
     config = ModelConfig(model_type="MLP", input_size=graph_def.state_size, num_classes_for_one_hot=2, layers_sizes=[8])

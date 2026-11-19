@@ -85,7 +85,9 @@ class BfsAlgorithm:
 
         # Applies the same mask to states and hashes.
         # If states and hashes are the same thing, it will not create a copy.
-        def _apply_mask(states, hashes, mask):
+        def _apply_mask(
+            states: torch.Tensor, hashes: torch.Tensor, mask: torch.Tensor
+        ) -> tuple[torch.Tensor, torch.Tensor]:
             new_states = states[mask]
             new_hashes = graph.hasher.make_hashes(new_states) if graph.hasher.is_identity else hashes[mask]
             return new_states, new_hashes

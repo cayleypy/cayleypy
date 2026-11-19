@@ -1,3 +1,5 @@
+from typing import Optional
+
 import pytest
 import torch
 
@@ -11,7 +13,7 @@ from ..puzzles import Puzzles
 MEGAMINX_GROUPS = [[3, 20], [2, 30]]
 
 
-def test_tokenizes_known_layout():
+def test_tokenizes_known_layout() -> None:
     # Two pieces with 2 stickers each (positions 0..3), then three pieces with 1 sticker each (positions 4..6).
     tokenizer = GroupTokenizer([[2, 2], [1, 3]])
     assert tokenizer.state_size == 7
@@ -28,7 +30,7 @@ def test_tokenizes_known_layout():
     assert torch.equal(tokenizer(torch.tensor([3, 2, 0, 1, 6, 4, 5])), torch.tensor([3, 0, 2, 0, 1]))
 
 
-def test_megaminx_sizes():
+def test_megaminx_sizes() -> None:
     tokenizer = GroupTokenizer(MEGAMINX_GROUPS)
     assert tokenizer.groups == MEGAMINX_GROUPS
     assert tokenizer.state_size == 120
@@ -42,7 +44,7 @@ def test_megaminx_sizes():
     assert torch.equal(tokens, torch.tensor([3 * i for i in range(20)] + [2 * i for i in range(30)]))
 
 
-def test_tokenizes_batch_of_states():
+def test_tokenizes_batch_of_states() -> None:
     graph_def = Puzzles.megaminx()
     tokenizer = GroupTokenizer(MEGAMINX_GROUPS)
     states = torch.tensor([_apply(graph_def, i) for i in range(graph_def.n_generators)])
@@ -53,7 +55,7 @@ def test_tokenizes_batch_of_states():
         assert torch.equal(tokens[i], tokenizer(states[i]))
 
 
-def test_tokens_identify_states():
+def test_tokens_identify_states() -> None:
     # Tokenization is lossless for Megaminx: distinct states have distinct tokens.
     graph_def = Puzzles.megaminx()
     tokenizer = GroupTokenizer(MEGAMINX_GROUPS)
@@ -62,13 +64,13 @@ def test_tokens_identify_states():
     assert len(torch.unique(tokens, dim=0)) == len(torch.unique(states, dim=0))
 
 
-def test_verify_accepts_puzzles_with_matching_grouping():
+def test_verify_accepts_puzzles_with_matching_grouping() -> None:
     GroupTokenizer(MEGAMINX_GROUPS).verify(Puzzles.megaminx())
     # Mini pyramorphix: 8 pieces with 3 stickers each.
     GroupTokenizer([[3, 8]]).verify(Puzzles.mini_pyramorphix())
 
 
-def test_from_config():
+def test_from_config() -> None:
     config = ModelConfig(
         model_type="MLP",
         input_size=120,
@@ -81,7 +83,7 @@ def test_from_config():
     assert tokenizer.n_tokens == 50
 
 
-def test_rejects_states_of_wrong_size():
+def test_rejects_states_of_wrong_size() -> None:
     tokenizer = GroupTokenizer(MEGAMINX_GROUPS)
     with pytest.raises(ValueError, match="120 elements, got states with 119 elements"):
         tokenizer(torch.zeros((2, 119), dtype=torch.int64))
@@ -89,7 +91,7 @@ def test_rejects_states_of_wrong_size():
         tokenizer(torch.tensor(0))
 
 
-def test_rejects_inconsistent_groups():
+def test_rejects_inconsistent_groups() -> None:
     with pytest.raises(ValueError, match="must not be empty"):
         GroupTokenizer([])
     with pytest.raises(ValueError, match=r"pair \[group_size, num_groups\]"):
@@ -100,13 +102,13 @@ def test_rejects_inconsistent_groups():
         GroupTokenizer([[-3, 20]])
 
 
-def test_from_config_rejects_config_without_tokenizer_groups():
+def test_from_config_rejects_config_without_tokenizer_groups() -> None:
     config = ModelConfig(model_type="MLP", input_size=120, num_classes_for_one_hot=120, layers_sizes=[64])
     with pytest.raises(ValueError, match="has no tokenizer_groups"):
         GroupTokenizer.from_config(config)
 
 
-def test_from_config_rejects_groups_inconsistent_with_input_size():
+def test_from_config_rejects_groups_inconsistent_with_input_size() -> None:
     config = ModelConfig(
         model_type="MLP",
         input_size=100,
@@ -118,7 +120,7 @@ def test_from_config_rejects_groups_inconsistent_with_input_size():
         GroupTokenizer.from_config(config)
 
 
-def test_verify_rejects_wrong_grouping():
+def test_verify_rejects_wrong_grouping() -> None:
     # In this encoding of the 2x2x2 cube, stickers of one corner are not in consecutive positions.
     with pytest.raises(ValueError, match="elements of one piece, in cyclic order"):
         GroupTokenizer([[3, 8]]).verify(Puzzles.rubik_cube(2, "QTM"))
@@ -137,14 +139,14 @@ def test_verify_rejects_wrong_grouping():
         GroupTokenizer([[2, 2]]).verify(PermutationGroups.lrx(4).with_central_state("0011"))
 
 
-def test_verify_rejects_incompatible_graphs():
+def test_verify_rejects_incompatible_graphs() -> None:
     with pytest.raises(ValueError, match="states of this graph have 120 elements"):
         GroupTokenizer([[3, 8]]).verify(Puzzles.megaminx())
     with pytest.raises(ValueError, match="permutation generators"):
         GroupTokenizer([[3, 3]]).verify(MatrixGroups.heisenberg())
 
 
-def _apply(graph_def: CayleyGraphDef, generator_id: int, state=None) -> list[int]:
+def _apply(graph_def: CayleyGraphDef, generator_id: int, state: Optional[list[int]] = None) -> list[int]:
     """Applies generator with the given id to the given state (central state by default)."""
     if state is None:
         state = list(graph_def.central_state)

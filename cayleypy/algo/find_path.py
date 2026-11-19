@@ -1,7 +1,7 @@
 """Automatic path finding."""
 
 import time
-from typing import Optional
+from typing import Any, Optional
 
 from .bfs_mitm import MeetInTheMiddle
 from .bfs_result import BfsResult
@@ -11,7 +11,7 @@ from ..models.models_lib import PREDICTOR_MODELS
 from ..predictor import Predictor
 
 
-def _precompute_bfs(graph: CayleyGraph, **kwargs) -> BfsResult:
+def _precompute_bfs(graph: CayleyGraph, **kwargs: Any) -> BfsResult:
     """Computes BfsResult of reasonable size to assist with path finding and caches it."""
     if not hasattr(graph, "_bfs_result_for_find_path"):
         if graph.verbose > 0:
@@ -30,7 +30,7 @@ def _precompute_bfs(graph: CayleyGraph, **kwargs) -> BfsResult:
     return getattr(graph, "_bfs_result_for_find_path")
 
 
-def find_path(graph: CayleyGraph, start_state: AnyStateType, **kwargs) -> Optional[list[int]]:
+def find_path(graph: CayleyGraph, start_state: AnyStateType, **kwargs: Any) -> Optional[list[int]]:
     """Finds path from ``start_state`` to central state.
 
     This function will try to automatically pick the best algorithm. It will return ``None`` if path was not found,

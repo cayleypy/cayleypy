@@ -1,6 +1,6 @@
 import math
 import typing
-from typing import Callable
+from typing import Any, Callable
 
 import torch
 
@@ -17,7 +17,7 @@ def _hamming_distance(x: torch.Tensor, y: torch.Tensor) -> torch.Tensor:
 class Predictor:
     """Estimates distance from central state to given states."""
 
-    def __init__(self, graph: "CayleyGraph", models_or_heuristics):
+    def __init__(self, graph: "CayleyGraph", models_or_heuristics: Any) -> None:
         """Initializes Predictor.
 
         :param graph: Associated CayleyGraph object.
@@ -54,7 +54,7 @@ class Predictor:
             raise ValueError(f"Unable to understand how to call {models_or_heuristics}")
 
     @staticmethod
-    def pretrained(graph: "CayleyGraph"):
+    def pretrained(graph: "CayleyGraph") -> "Predictor":
         """Loads pre-trained predictor for this graph."""
         if graph.definition.name not in PREDICTOR_MODELS:
             raise KeyError("No pretrained model for this graph.")

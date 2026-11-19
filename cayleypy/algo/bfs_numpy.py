@@ -1,6 +1,7 @@
 """Special BFS algorithms, optimized for low memory usage."""
 
 import numpy as np
+from numpy.typing import NDArray
 
 from ..cayley_graph import CayleyGraph
 from ..permutation_utils import inverse_permutation
@@ -25,7 +26,7 @@ def bfs_numpy(graph: CayleyGraph, max_diameter: int = 1000000) -> list[int]:
         assert len(inv) == 1
         inv_perm_idx.append(inv[0])
 
-    def _make_states_unique(layer):
+    def _make_states_unique(layer: list[NDArray[np.int64]]) -> None:
         for i1 in range(pn):
             for i2 in range(i1 + 1, pn):
                 layer[i1] = np.setdiff1d(layer[i1], layer[i2], assume_unique=True)

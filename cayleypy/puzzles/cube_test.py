@@ -3,7 +3,7 @@ import numpy as np
 from .puzzles import Puzzles
 
 
-def test_cube_222_qstm():
+def test_cube_222_qstm() -> None:
     graph = Puzzles.rubik_cube(2, metric="QSTM")
     assert graph.n_generators == 12
     exp_names = ["f0", "f0_inv", "f1", "f1_inv", "r0", "r0_inv", "r1", "r1_inv", "d0", "d0_inv", "d1", "d1_inv"]
@@ -27,31 +27,31 @@ def test_cube_222_qstm():
     )
 
 
-def test_cube_222_qtm():
+def test_cube_222_qtm() -> None:
     graph = Puzzles.rubik_cube(2, metric="QTM")
     assert graph.n_generators == 12
 
 
-def test_cube_222_htm():
+def test_cube_222_htm() -> None:
     graph = Puzzles.rubik_cube(2, metric="HTM")
     assert graph.n_generators == 18
 
 
-def test_cube_333_qtm():
+def test_cube_333_qtm() -> None:
     graph = Puzzles.rubik_cube(3, metric="QTM")
     assert graph.n_generators == 12
 
 
-def test_cube_333_htm():
+def test_cube_333_htm() -> None:
     graph = Puzzles.rubik_cube(3, metric="HTM")
     assert graph.n_generators == 18
 
 
-def test_cube_222_atm():
+def test_cube_222_atm() -> None:
     graph = Puzzles.rubik_cube(2, metric="ATM")
     assert graph.n_generators == 24
 
 
-def test_cube_333_atm():
+def test_cube_333_atm() -> None:
     graph = Puzzles.rubik_cube(3, metric="ATM")
     assert graph.n_generators == 78

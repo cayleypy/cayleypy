@@ -1,10 +1,10 @@
-from typing import Optional, Union
+from typing import Any, Optional, Union
 
 import numpy as np
 import torch
 
 from .cayley_graph import CayleyGraph
-from .cayley_graph_def import CayleyGraphDef, MatrixGenerator
+from .cayley_graph_def import AnyStateType, CayleyGraphDef, MatrixGenerator
 from .graphs_lib import prepare_graph
 
 
@@ -20,9 +20,9 @@ def create_graph(
     generators_matrices: Optional[list[Union[MatrixGenerator, list, np.ndarray]]] = None,
     generator_names: Optional[list[str]] = None,
     name: str = "",
-    central_state=None,
+    central_state: Optional[Union[AnyStateType, str]] = None,
     make_inverse_closed: bool = False,
-    **kwargs,
+    **kwargs: Any,
 ) -> CayleyGraph:
     """Creates CayleyGraph.
 
@@ -46,7 +46,7 @@ def create_graph(
     :param generator_names: Names of the generators.
     :param name: the name of the graph. If generators are not explicitly specified, this will be used to create graph,
         see ``prepare_graph`` source for supported names.
-    :param central_state: central state of the graph.
+    :param central_state: central state of the graph. Strings are supported only for permutation groups.
     :param make_inverse_closed: if generators are not inverse-closed and ``make_inverse_closed=True``, adds inverse
         generators to make set of generators inverse-closed.
     :return: created CayleyGraph.
@@ -58,6 +58,8 @@ def create_graph(
         )
     elif generators_matrices is not None:
         assert generators_permutations is None
+        if isinstance(central_state, str):
+            raise TypeError("central_state must not be a string for matrix groups.")
         generators = [_to_matrix_generator(g) for g in generators_matrices]
         graph_def = CayleyGraphDef.for_matrix_group(
             generators=generators, generator_names=generator_names, central_state=central_state, name=name

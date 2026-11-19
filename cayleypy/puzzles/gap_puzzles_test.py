@@ -1,20 +1,20 @@
 from cayleypy.puzzles import GapPuzzles
 
 
-def test_list_puzzles():
+def test_list_puzzles() -> None:
     puzzle_names = GapPuzzles.list_puzzles()
     assert "2x2x2" in puzzle_names
     assert "dino" in puzzle_names
 
 
-def test_load_all_puzzles():
+def test_load_all_puzzles() -> None:
     puzzle_names = GapPuzzles.list_puzzles()
     for puzzle_name in puzzle_names:
         graph = GapPuzzles.puzzle(puzzle_name)
         assert len(graph.generators) > 0
 
 
-def test_inverse_closed():
+def test_inverse_closed() -> None:
     graph1 = GapPuzzles.puzzle("2x2x2")
     assert graph1.name == "2x2x2.gap-ic"
     assert graph1.n_generators == 12

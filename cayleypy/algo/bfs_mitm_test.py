@@ -3,9 +3,10 @@ import torch
 
 from cayleypy import PermutationGroups, CayleyGraph, Puzzles
 from cayleypy.algo import MeetInTheMiddle
+from cayleypy.cayley_graph_def import AnyStateType
 
 
-def test_find_path_bfs_mitm_lrx10():
+def test_find_path_bfs_mitm_lrx10() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(10))
     br12 = graph.bfs(max_diameter=12, return_all_hashes=True)
     br13 = graph.bfs(max_diameter=13, return_all_hashes=True)
@@ -21,7 +22,7 @@ def test_find_path_bfs_mitm_lrx10():
     graph.validate_path(start_state, path)
 
 
-def test_find_path_bfs_mitm_lrx20():
+def test_find_path_bfs_mitm_lrx20() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(20))
     br11 = graph.bfs(max_diameter=11, return_all_hashes=True)
     br12 = graph.bfs(max_diameter=12, return_all_hashes=True)
@@ -37,7 +38,7 @@ def test_find_path_bfs_mitm_lrx20():
     graph.validate_path(start_state, path)
 
 
-def test_find_path_bfs_mitm_cube222():
+def test_find_path_bfs_mitm_cube222() -> None:
     graph = CayleyGraph(Puzzles.rubik_cube(2, metric="fixed_HTM"), verbose=2)
     br = graph.bfs(max_diameter=6, return_all_hashes=True)
     start_state = [0, 0, 4, 0, 0, 1, 5, 4, 2, 2, 5, 1, 3, 3, 5, 2, 4, 1, 5, 3, 2, 3, 1, 4]
@@ -53,7 +54,7 @@ def test_find_path_bfs_mitm_cube222():
     graph.validate_path(start_state, path2)
 
 
-def test_mitm_lx10():
+def test_mitm_lx10() -> None:
     # This test checks that MITM finds paths correctly for not inverse-closed generators (such as LX).
     graph = CayleyGraph(PermutationGroups.lx(10))
     br16 = graph.bfs(max_diameter=17, return_all_hashes=True)
@@ -76,7 +77,7 @@ def test_mitm_lx10():
     assert path2 == path
 
 
-def test_mitm_find_path_between_lx10():
+def test_mitm_find_path_between_lx10() -> None:
     graph = CayleyGraph(PermutationGroups.lx(10))
     perm1 = [2, 6, 4, 5, 9, 7, 8, 3, 1, 0]
     perm2 = [7, 1, 0, 6, 2, 4, 5, 9, 8, 3]
@@ -87,11 +88,11 @@ def test_mitm_find_path_between_lx10():
     assert path.edges == [1, 0, 0, 0, 0, 0, 1, 0, 1, 0]
 
 
-def _state_to_tuple(state):
+def _state_to_tuple(state: AnyStateType) -> tuple[int, ...]:
     return tuple(int(x) for x in state)
 
 
-def test_find_path_between_sets_lrx10():
+def test_find_path_between_sets_lrx10() -> None:
     n = 10
     graph = CayleyGraph(PermutationGroups.lrx(n))
     states1 = [_state_to_tuple(np.random.permutation(n)) for _ in range(10)]

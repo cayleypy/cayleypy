@@ -14,15 +14,15 @@ class BeamSearchResult:
     debug_scores: dict[int, float]  # Scores achieved on each step.
     graph: CayleyGraphDef  # Definition of graph on which beam search was run.
 
-    def __post_init__(self):
+    def __post_init__(self) -> None:
         if self.path is not None:
             assert len(self.path) == self.path_length
 
-    def get_path_as_string(self, delimiter="."):
+    def get_path_as_string(self, delimiter: str = ".") -> str:
         assert self.path is not None
         return self.graph.path_to_string(self.path, delimiter)
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         if not self.path_found:
             return "BeamSearchResult(path_found=False)"
         ans = f"BeamSearchResult(path_length={self.path_length}"

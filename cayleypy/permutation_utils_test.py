@@ -2,7 +2,7 @@ from math import factorial
 from .permutation_utils import permutations_with_cycle_lenghts, partition_to_permutation
 
 
-def test_permutations_with_cycle_lenghts_n_3():
+def test_permutations_with_cycle_lenghts_n_3() -> None:
     perms = permutations_with_cycle_lenghts(3, [3])
     assert len(perms) == 2
     assert all(sorted(p) == [0, 1, 2] for p in perms)
@@ -14,7 +14,7 @@ def test_permutations_with_cycle_lenghts_n_3():
     assert perms == [[0, 2, 1], [1, 0, 2], [2, 1, 0]]
 
 
-def test_permutations_with_cycle_lenghts_n_4():
+def test_permutations_with_cycle_lenghts_n_4() -> None:
     perms = permutations_with_cycle_lenghts(4, [4])
     assert len(perms) == 6
     assert all(sorted(p) == [0, 1, 2, 3] for p in perms)
@@ -45,7 +45,7 @@ def test_permutations_with_cycle_lenghts_n_4():
     assert perms == [[0, 1, 3, 2], [0, 2, 1, 3], [0, 3, 2, 1], [1, 0, 2, 3], [2, 1, 0, 3], [3, 1, 2, 0]]
 
 
-def test_permutations_with_cycle_lenghts_n_8_sum():
+def test_permutations_with_cycle_lenghts_n_8_sum() -> None:
     n = 8
     partitions = [
         [8],
@@ -83,7 +83,7 @@ def test_permutations_with_cycle_lenghts_n_8_sum():
     assert len(all_perms) + 1 == factorial(n)
 
 
-def test_partition_to_permutation():
+def test_partition_to_permutation() -> None:
     assert partition_to_permutation([2, 2]) == [1, 0, 3, 2]
     assert partition_to_permutation([5]) == [1, 2, 3, 4, 0]
     assert partition_to_permutation([1, 2, 3]) == [0, 2, 1, 4, 5, 3]

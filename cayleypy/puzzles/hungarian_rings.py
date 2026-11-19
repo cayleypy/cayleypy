@@ -103,7 +103,7 @@ def get_santa_parameters_from_n(n: int) -> tuple[int, int, int, int]:
     return left_size, left_index, right_size, right_index
 
 
-def get_group(n: int):
+def get_group(n: int) -> list[tuple[int, int, int, int]]:
     """
     Returns all non-repeating parameter variants for current n
     """
@@ -119,7 +119,7 @@ def get_group(n: int):
     return result
 
 
-def get_pair_variants(left_size, right_size):
+def get_pair_variants(left_size: int, right_size: int) -> list[tuple[int, int, int, int]]:
     """
     non-repeating index variants for two intersections
     """

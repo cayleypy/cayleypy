@@ -20,7 +20,7 @@ class RandomWalksGenerator:
       * "bfs": Breadth-first search based random walks with uniqueness constraints.
     """
 
-    def __init__(self, graph: "CayleyGraph"):
+    def __init__(self, graph: "CayleyGraph") -> None:
         """Initialize the random walks generator.
 
         :param graph: The Cayley graph to generate walks on.
@@ -30,9 +30,9 @@ class RandomWalksGenerator:
     def generate(
         self,
         *,
-        width=5,
-        length=10,
-        mode="classic",
+        width: int = 5,
+        length: int = 10,
+        mode: str = "classic",
         start_state: Union[None, torch.Tensor, np.ndarray, list] = None,
         nbt_history_depth: int = 0,
     ) -> tuple[torch.Tensor, torch.Tensor]:

@@ -47,7 +47,7 @@ class MeetInTheMiddle:
         bfs_last_layer = bfs_result.layers_hashes[-1]
         middle_states = []
 
-        def _stop_condition(layer2, layer2_hashes):
+        def _stop_condition(layer2: torch.Tensor, layer2_hashes: torch.Tensor) -> bool:
             mask = isin_via_searchsorted(layer2_hashes, bfs_last_layer)
             if not torch.any(mask):
                 return False
