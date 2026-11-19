@@ -1,8 +1,7 @@
 """Breadth-first-search with meet-in-the-middle."""
 
-from typing import Union, Optional
+from typing import Optional
 
-import numpy as np
 import torch
 
 from .bfs_result import BfsResult
@@ -48,7 +47,7 @@ class MeetInTheMiddle:
         bfs_last_layer = bfs_result.layers_hashes[-1]
         middle_states = []
 
-        def _stop_condition(layer2, layer2_hashes):
+        def _stop_condition(layer2: torch.Tensor, layer2_hashes: torch.Tensor) -> bool:
             mask = isin_via_searchsorted(layer2_hashes, bfs_last_layer)
             if not torch.any(mask):
                 return False
@@ -81,7 +80,7 @@ class MeetInTheMiddle:
     @staticmethod
     def find_path_from(
         graph: CayleyGraph,
-        start_state: Union[torch.Tensor, np.ndarray, list],
+        start_state: AnyStateType,
         bfs_result: BfsResult,
     ) -> Optional[list[int]]:
         """Finds path from ``start_state`` to central state using MITM algorithm and precomputed BFS result.

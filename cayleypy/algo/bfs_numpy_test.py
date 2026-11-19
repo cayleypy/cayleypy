@@ -1,7 +1,7 @@
 from cayleypy import CayleyGraph, load_dataset, bfs_numpy, PermutationGroups
 
 
-def test_bfs_numpy():
+def test_bfs_numpy() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(7))
     assert bfs_numpy(graph) == load_dataset("lrx_cayley_growth")["7"]
 
@@ -17,7 +17,7 @@ def test_bfs_numpy():
 
 
 # This test checks that StringEncoder.implement_permutation_1d works correctly.
-def test_bfs_numpy_lrx_16():
+def test_bfs_numpy_lrx_16() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(16))
     result = bfs_numpy(graph, max_diameter=10)
     assert result == [1, 3, 6, 12, 24, 48, 91, 172, 324, 596, 1092]

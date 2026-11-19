@@ -19,7 +19,7 @@ class SklearnStyleModel:
 class MultiOutputModel(torch.nn.Module):
     """Model returning one score per generator (i.e. having 2-D output)."""
 
-    def __init__(self, n_outputs: int):
+    def __init__(self, n_outputs: int) -> None:
         super().__init__()
         self.n_outputs = n_outputs
 
@@ -27,7 +27,7 @@ class MultiOutputModel(torch.nn.Module):
         return x[:, :1].float() + torch.arange(self.n_outputs, dtype=torch.float32)
 
 
-def test_hamming_predictor():
+def test_hamming_predictor() -> None:
     graph_def = PermutationGroups.lrx(5).with_central_state("01001")
     graph = CayleyGraph(graph_def, device="cpu")
     predictor = Predictor(graph, "hamming")
@@ -44,7 +44,7 @@ def test_hamming_predictor():
     assert torch.equal(predictor(states), torch.tensor([2, 3, 0, 5, 3, 2]))
 
 
-def test_predictor_batches_1d_output():
+def test_predictor_batches_1d_output() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu", batch_size=3)
     predictor = Predictor(graph, "hamming")
@@ -52,7 +52,7 @@ def test_predictor_batches_1d_output():
     assert torch.equal(predictor(states), predictor.predict(states))
 
 
-def test_predictor_batches_2d_output():
+def test_predictor_batches_2d_output() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu", batch_size=3)
     predictor = Predictor(graph, MultiOutputModel(graph_def.n_generators))
@@ -64,7 +64,7 @@ def test_predictor_batches_2d_output():
     assert torch.equal(ans, predictor.predict(states))
 
 
-def test_predictor_rejects_2d_output():
+def test_predictor_rejects_2d_output() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu")
     predictor = Predictor(graph, MultiOutputModel(graph_def.n_generators))
@@ -73,7 +73,7 @@ def test_predictor_rejects_2d_output():
         predictor(states)
 
 
-def test_score_children():
+def test_score_children() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu")
     predictor = Predictor(graph, "hamming")
@@ -90,7 +90,7 @@ def test_score_children():
     assert len({tuple(scores[:, i].tolist()) for i in range(graph_def.n_generators)}) > 1
 
 
-def test_score_children_single_state():
+def test_score_children_single_state() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu")
     predictor = Predictor(graph, "hamming")
@@ -100,7 +100,7 @@ def test_score_children_single_state():
         assert torch.equal(scores[:, i], predictor(graph.apply_path([0, 2, 1, 3, 4], [i])))
 
 
-def test_score_children_with_batching():
+def test_score_children_with_batching() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu", batch_size=4)
     predictor = Predictor(graph, "hamming")
@@ -116,7 +116,7 @@ def test_score_children_with_batching():
 class HammingQModel(torch.nn.Module):
     """Q-model equivalent to the "hamming" heuristic: output j is Hamming distance of the j-th child."""
 
-    def __init__(self, graph: CayleyGraph):
+    def __init__(self, graph: CayleyGraph) -> None:
         super().__init__()
         self.graph = graph
         self.n_outputs = graph.definition.n_generators
@@ -129,7 +129,7 @@ class HammingQModel(torch.nn.Module):
 
 
 @pytest.mark.parametrize("batch_size", [1024, 4])
-def test_predictor_converts_output_of_a_model_not_written_in_torch(batch_size):
+def test_predictor_converts_output_of_a_model_not_written_in_torch(batch_size: int) -> None:
     """A model with a `predict` method is a supported predictor, and sklearn estimators return NumPy arrays."""
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu", batch_size=batch_size)
@@ -144,7 +144,7 @@ def test_predictor_converts_output_of_a_model_not_written_in_torch(batch_size):
         assert torch.equal(scores[:, i], predictor(graph.apply_path(states, [i])))
 
 
-def test_score_children_uses_q_model():
+def test_score_children_uses_q_model() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu")
     states = torch.tensor([[0, 1, 2, 3, 4], [1, 2, 3, 4, 0], [4, 3, 2, 1, 0], [0, 2, 1, 3, 4]])
@@ -167,7 +167,7 @@ def test_score_children_uses_q_model():
     assert model.num_calls == 1
 
 
-def test_score_children_by_q_model_with_batching():
+def test_score_children_by_q_model_with_batching() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu", batch_size=3)
     states = torch.tensor([[i % 5, (i + 1) % 5, 2, 3, 4] for i in range(7)])
@@ -179,7 +179,7 @@ def test_score_children_by_q_model_with_batching():
         assert torch.equal(scores[:, i], Predictor(graph, "hamming")(graph.apply_path(states, [i])))
 
 
-def test_score_children_rejects_wrong_number_of_outputs():
+def test_score_children_rejects_wrong_number_of_outputs() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu")
     predictor = Predictor(graph, MultiOutputModel(graph_def.n_generators + 1))
@@ -187,7 +187,7 @@ def test_score_children_rejects_wrong_number_of_outputs():
         predictor.score_children(torch.tensor([[0, 1, 2, 3, 4]]))
 
 
-def test_score_children_with_q_model_from_config():
+def test_score_children_with_q_model_from_config() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu")
     config = ModelConfig(
@@ -207,7 +207,7 @@ def test_score_children_with_q_model_from_config():
 class WrongShapeModel(torch.nn.Module):
     """Model that declares one output per generator, but returns one score per state."""
 
-    def __init__(self, n_outputs: int):
+    def __init__(self, n_outputs: int) -> None:
         super().__init__()
         self.n_outputs = n_outputs
 
@@ -215,7 +215,7 @@ class WrongShapeModel(torch.nn.Module):
         return torch.zeros((x.shape[0],))
 
 
-def test_score_children_rejects_wrong_output_shape():
+def test_score_children_rejects_wrong_output_shape() -> None:
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu")
     predictor = Predictor(graph, WrongShapeModel(graph_def.n_generators))
@@ -223,7 +223,7 @@ def test_score_children_rejects_wrong_output_shape():
         predictor.score_children(torch.tensor([[0, 1, 2, 3, 4]]))
 
 
-def test_predict_batched_does_not_track_gradients():
+def test_predict_batched_does_not_track_gradients() -> None:
     """Test that inference does not build the graph for a backward pass (which would only waste memory)."""
     graph_def = PermutationGroups.lrx(5)
     graph = CayleyGraph(graph_def, device="cpu", batch_size=4)

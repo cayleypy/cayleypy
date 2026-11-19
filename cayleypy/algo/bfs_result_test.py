@@ -1,10 +1,11 @@
+from dataclasses import replace
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import numpy as np
 from cayleypy import CayleyGraph, BfsResult, PermutationGroups
 
 
-def test_adjacency_matrix():
+def test_adjacency_matrix() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(4))
     result = graph.bfs(return_all_edges=True, return_all_hashes=True)
 
@@ -16,7 +17,7 @@ def test_adjacency_matrix():
     assert np.array_equal(adj_mx_1, adj_mx_2)
 
 
-def test_laplacian_matrix():
+def test_laplacian_matrix() -> None:
     graph = CayleyGraph(PermutationGroups.lrx(4))
     bfs_result = graph.bfs(return_all_edges=True, return_all_hashes=True)
 
@@ -26,7 +27,7 @@ def test_laplacian_matrix():
     assert np.array_equal(lapl_mx_1, lapl_mx_1.T)
 
 
-def test_bfs_result_eq():
+def test_bfs_result_eq() -> None:
     graph_1 = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
     graph_2 = CayleyGraph(PermutationGroups.lrx(4), device="cpu")
     graph_3 = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
@@ -47,7 +48,15 @@ def test_bfs_result_eq():
             assert bfs_res_3 != bfs_res_3_md, "Bfs results must be different if bfs was not completed"
 
 
-def test_bfs_result_save_load():
+def test_bfs_result_eq_without_edges() -> None:
+    # Results with and without edge hashes must compare unequal in both directions without raising.
+    result = CayleyGraph(PermutationGroups.lrx(3), device="cpu").bfs(return_all_edges=True, return_all_hashes=True)
+    without_edges = replace(result, edges_list_hashes=None)
+    assert result != without_edges
+    assert without_edges != result
+
+
+def test_bfs_result_save_load() -> None:
 
     with TemporaryDirectory() as temp_dir:
         temp_dir = Path(temp_dir)

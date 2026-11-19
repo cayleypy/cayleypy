@@ -29,7 +29,7 @@ class CayleyPath:
         return ans
 
     @cached_property
-    def end_state(self):
+    def end_state(self) -> torch.Tensor:
         """Last state of the path."""
         return self.all_states[-1]
 

@@ -1,6 +1,7 @@
 from dataclasses import dataclass, replace
 from functools import cached_property
-from typing import Optional, Union, Any
+from os import PathLike
+from typing import Optional, Union, Any, TYPE_CHECKING
 
 import h5py
 import numpy as np
@@ -9,6 +10,9 @@ from scipy.sparse import coo_array
 
 from cayleypy.permutation_utils import apply_permutation
 from cayleypy.cayley_graph_def import CayleyGraphDef
+
+if TYPE_CHECKING:
+    import networkx
 
 
 @dataclass(frozen=True)
@@ -59,20 +63,20 @@ class BfsResult:
         for i in range(len(self.layers_hashes)):
             if not torch.all(self.layers_hashes[i] == other.layers_hashes[i]):
                 return False
-        if not self.has_edges_list_hashes():
-            if other.has_edges_list_hashes():
+        if self.edges_list_hashes is None or other.edges_list_hashes is None:
+            if self.edges_list_hashes is not other.edges_list_hashes:
                 return False
         else:
-            if self.edges_list_hashes.shape != other.edges_list_hashes.shape:  # type: ignore
+            if self.edges_list_hashes.shape != other.edges_list_hashes.shape:
                 return False
-            if not torch.all(self.edges_list_hashes == other.edges_list_hashes):  # type: ignore
+            if not torch.all(self.edges_list_hashes == other.edges_list_hashes):
                 return False
 
         if self.graph != other.graph:
             return False
         return True
 
-    def save(self, path: str):
+    def save(self, path: Union[str, PathLike[str]]) -> None:
         path = str(path)
         assert path.endswith(".h5"), "Please use '.h5' extention for BfsResult saving"
 
@@ -84,8 +88,8 @@ class BfsResult:
 
             for i, hashes in enumerate(self.layers_hashes):
                 f[f"edges_list_hashes__{i}"] = hashes.detach().cpu()
-            if self.has_edges_list_hashes():
-                f["edges_list_hashes"] = self.edges_list_hashes.detach().cpu()  # type: ignore
+            if self.edges_list_hashes is not None:
+                f["edges_list_hashes"] = self.edges_list_hashes.detach().cpu()
             else:
                 f["edges_list_hashes"] = torch.empty([])
 
@@ -95,24 +99,33 @@ class BfsResult:
             f["graph__name"] = self.graph.name
 
     @staticmethod
-    def load(path: str):
+    def load(path: Union[str, PathLike[str]]) -> "BfsResult":
+        """Load a saved result, restoring tensor fields on the CPU."""
         path = str(path)
-        # pylint: disable=no-member
         with h5py.File(path, "r") as f:
 
-            layer_sizes = f["layer_sizes"][()].tolist()
+            def read_dataset(key: str) -> h5py.Dataset:
+                dataset = f[key]
+                if not isinstance(dataset, h5py.Dataset):
+                    raise TypeError(f"Expected '{key}' to be an HDF5 dataset")
+                return dataset
+
+            def read_array(key: str) -> np.ndarray:
+                return np.asarray(read_dataset(key)[()])
+
+            layer_sizes = read_array("layer_sizes").tolist()
 
             layers_hashes = []
             for i in range(len(layer_sizes)):
                 key = f"edges_list_hashes__{i}"
                 if key not in f:
                     break
-                layers_hashes.append(f[key][()])
+                layers_hashes.append(torch.from_numpy(read_array(key)))
 
-            if f["edges_list_hashes"].shape == tuple():
+            if read_dataset("edges_list_hashes").shape == tuple():
                 edges_list_hashes = None
             else:
-                edges_list_hashes = f["edges_list_hashes"][()]
+                edges_list_hashes = torch.from_numpy(read_array("edges_list_hashes"))
 
             layers_keys = {}
             for k in f.keys():
@@ -120,23 +133,26 @@ class BfsResult:
                     layer_n = int(k.strip("layer__"))
                     layers_keys[layer_n] = k
 
+            graph_name = read_dataset("graph__name").asstr()[()]
+            if not isinstance(graph_name, str):
+                raise TypeError("Expected 'graph__name' to contain a scalar string")
+
             loaded_result = BfsResult(
-                bfs_completed=bool(f["bfs_completed"][()]),
+                bfs_completed=bool(read_array("bfs_completed").item()),
                 layer_sizes=layer_sizes,
-                layers={k: f[layer_key][()] for k, layer_key in layers_keys.items()},
+                layers={k: torch.from_numpy(read_array(layer_key)) for k, layer_key in layers_keys.items()},
                 edges_list_hashes=edges_list_hashes,
                 layers_hashes=layers_hashes,
                 graph=CayleyGraphDef.create(
-                    generators=f["graph__generators"][()].tolist(),
-                    generator_names=[x.decode("utf-8") for x in f["graph__generator_names"][()]],
-                    central_state=f["graph__central_state"][()].tolist(),
-                    name=f["graph__name"][()].decode("utf-8"),
+                    generators=read_array("graph__generators").tolist(),
+                    generator_names=np.asarray(read_dataset("graph__generator_names").asstr()[()]).tolist(),
+                    central_state=read_array("graph__central_state").tolist(),
+                    name=graph_name,
                 ),
             )
-        # pylint: enable=no-member
         return loaded_result
 
-    def diameter(self):
+    def diameter(self) -> int:
         """Maximal distance from any start vertex to any other vertex."""
         return len(self.layer_sizes) - 1
 
@@ -152,10 +168,7 @@ class BfsResult:
         """Returns last layer, formatted as set of strings."""
         return self.get_layer(self.diameter())
 
-    def has_edges_list_hashes(self):
-        return hasattr(self, "edges_list_hashes") and self.edges_list_hashes is not None
-
-    def to_device(self, device: Union[str, torch.device]):
+    def to_device(self, device: Union[str, torch.device]) -> "BfsResult":
 
         if isinstance(device, str):
             device = torch.device(device)
@@ -164,7 +177,9 @@ class BfsResult:
             self,
             layers={k: v.to(device) for k, v in self.layers.items()},
             layers_hashes=[h.to(device) for h in self.layers_hashes],
-            edges_list_hashes=self.edges_list_hashes.to(device) if self.has_edges_list_hashes() else None,  # type: ignore # pylint: disable=line-too-long
+            edges_list_hashes=(
+                self.edges_list_hashes.to(device) if self.edges_list_hashes is not None else None
+            ),  # pylint: disable=line-too-long
         )
 
     @cached_property
@@ -198,7 +213,7 @@ class BfsResult:
     def named_undirected_edges(self) -> set[tuple[str, str]]:
         """Names for vertices (representing coset elements in readable format)."""
         vn = self.vertex_names
-        return {tuple(sorted([vn[i1], vn[i2]])) for i1, i2 in self.edges_list}  # type: ignore
+        return {tuple(sorted([vn[i1], vn[i2]])) for i1, i2 in self.edges_list}
 
     def adjacency_matrix(self) -> np.ndarray:
         """Returns adjacency matrix as a dense NumPy array."""
@@ -264,7 +279,7 @@ class BfsResult:
                     return self.graph.generator_names[i]
         assert False, f"Edge ({i1},{i2}) not found."
 
-    def to_networkx_graph(self, directed=False, with_labels=True):
+    def to_networkx_graph(self, directed: bool = False, with_labels: bool = True) -> "networkx.Graph":
         """Returns explicit graph as networkx.Graph or networkx.DiGraph."""
         # Import networkx here so we don't need to depend on this library in requirements.
         import networkx  # pylint: disable=import-outside-toplevel
@@ -281,8 +296,8 @@ class BfsResult:
             ans.add_edge(vertex_names[i1], vertex_names[i2], label=label)
         return ans
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"BfsResult(diameter={self.diameter()}, layer_sizes={self.layer_sizes})"
 
-    def check_has_layer_hashes(self):
+    def check_has_layer_hashes(self) -> None:
         assert len(self.layers_hashes) == len(self.layer_sizes), "Run bfs with return_all_hashes=True."

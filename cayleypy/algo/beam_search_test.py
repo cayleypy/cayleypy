@@ -7,6 +7,7 @@ import pytest
 import torch
 
 from ..cayley_graph import CayleyGraph
+from ..cayley_graph_def import AnyStateType
 
 from ..graphs_lib import PermutationGroups, MatrixGroups, prepare_graph
 from ..predictor import Predictor
@@ -16,7 +17,7 @@ from .beam_search_result import BeamSearchResult
 RUN_SLOW_TESTS = os.getenv("RUN_SLOW_TESTS") == "1"
 
 
-def _validate_beam_search_result(graph: CayleyGraph, start_state, bs_result: BeamSearchResult):
+def _validate_beam_search_result(graph: CayleyGraph, start_state: AnyStateType, bs_result: BeamSearchResult) -> None:
     """Validate that beam search result is correct."""
     assert bs_result.path_found
     assert bs_result.path is not None
@@ -32,7 +33,7 @@ def _scramble(graph: CayleyGraph, num_scrambles: int) -> torch.Tensor:
 class _ChildrenHammingModel(torch.nn.Module):
     """Emulates a Q-model: returns Hamming distances of all children of a state, one output per generator."""
 
-    def __init__(self, graph: CayleyGraph):
+    def __init__(self, graph: CayleyGraph) -> None:
         super().__init__()
         self.permutations = torch.as_tensor(graph.definition.generators_permutations, device=graph.device)
         self.central_state = graph.central_state
@@ -46,7 +47,7 @@ class _ChildrenHammingModel(torch.nn.Module):
 class _ChildrenHammingPredictor(Predictor):
     """Predictor for a model that has one output per generator."""
 
-    def __init__(self, graph: CayleyGraph):
+    def __init__(self, graph: CayleyGraph) -> None:
         super().__init__(graph, _ChildrenHammingModel(graph))
 
     def score_children(self, states: torch.Tensor) -> torch.Tensor:
@@ -65,7 +66,7 @@ class _BrokenChildrenPredictor(Predictor):
 # =============================================================================
 
 
-def test_beam_search_simple_lrx_few_steps():
+def test_beam_search_simple_lrx_few_steps() -> None:
     """Test simple beam search on small LRX graph with few steps."""
     graph = CayleyGraph(PermutationGroups.lrx(5))
 
@@ -89,7 +90,7 @@ def test_beam_search_simple_lrx_few_steps():
     assert result2.get_path_as_string() == "L.X"
 
 
-def test_beam_search_simple_lrx_n8_random():
+def test_beam_search_simple_lrx_n8_random() -> None:
     """Test simple beam search on random LRX(8) state."""
     n = 8
     graph = CayleyGraph(PermutationGroups.lrx(n))
@@ -100,7 +101,7 @@ def test_beam_search_simple_lrx_n8_random():
     _validate_beam_search_result(graph, start_state, bs_result)
 
 
-def test_beam_search_simple_mini_pyramorphix():
+def test_beam_search_simple_mini_pyramorphix() -> None:
     """Test simple beam search on mini pyramorphix puzzle."""
     graph = CayleyGraph(prepare_graph("mini_pyramorphix"))
     start_state = _scramble(graph, 100)
@@ -109,7 +110,7 @@ def test_beam_search_simple_mini_pyramorphix():
     _validate_beam_search_result(graph, start_state, bs_result)
 
 
-def test_beam_search_simple_with_predictor():
+def test_beam_search_simple_with_predictor() -> None:
     """Test simple beam search with pretrained predictor."""
     graph = CayleyGraph(PermutationGroups.lrx(16))
     predictor = Predictor.pretrained(graph)
@@ -118,7 +119,7 @@ def test_beam_search_simple_with_predictor():
     assert result.path_found
 
 
-def test_beam_search_simple_meet_in_the_middle():
+def test_beam_search_simple_meet_in_the_middle() -> None:
     """Test simple beam search with meet-in-the-middle optimization."""
     graph = CayleyGraph(PermutationGroups.lrx(16))
     predictor = Predictor.pretrained(graph)
@@ -131,7 +132,7 @@ def test_beam_search_simple_meet_in_the_middle():
     _validate_beam_search_result(graph, state, result)
 
 
-def test_beam_search_simple_matrix_groups():
+def test_beam_search_simple_matrix_groups() -> None:
     """Test simple beam search on matrix groups."""
     graph = CayleyGraph(MatrixGroups.heisenberg())
     start_state = [[1, 2, 3], [0, 1, 1], [0, 0, 1]]
@@ -139,7 +140,7 @@ def test_beam_search_simple_matrix_groups():
     _validate_beam_search_result(graph, start_state, bs_result)
 
 
-def test_beam_search_simple_not_found():
+def test_beam_search_simple_not_found() -> None:
     """Test simple beam search when path is not found."""
     n = 50
     graph = CayleyGraph(PermutationGroups.lrx(n))
@@ -153,7 +154,7 @@ def test_beam_search_simple_not_found():
 # =============================================================================
 
 
-def test_expand_layer_keeps_provenance():
+def test_expand_layer_keeps_provenance() -> None:
     """Test that layer expansion deduplicates as usual, but remembers which generator produced each state."""
     graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
     parents = graph.encode_states([[0, 1, 2, 3, 4], [1, 0, 2, 3, 4], [2, 3, 4, 0, 1]])
@@ -174,7 +175,7 @@ def test_expand_layer_keeps_provenance():
         assert torch.equal(graph.encode_states(child), expanded.states[i : i + 1])
 
 
-def test_expand_layer_empty_frontier():
+def test_expand_layer_empty_frontier() -> None:
     """Test that expanding and scoring an empty layer gives empty answers rather than an error."""
     graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
     no_states = torch.zeros((0, graph.encoded_state_size), dtype=torch.int64)
@@ -188,7 +189,7 @@ def test_expand_layer_empty_frontier():
     assert len(_score_children(graph, _ChildrenHammingPredictor(graph), no_states)) == 0
 
 
-def test_beam_search_simple_child_scores_same_as_default():
+def test_beam_search_simple_child_scores_same_as_default() -> None:
     """Test that child scoring with the same predictor gives exactly the same beam."""
     graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
     start_state = [3, 0, 2, 4, 5, 6, 7, 1]
@@ -207,7 +208,7 @@ def test_beam_search_simple_child_scores_same_as_default():
     assert result1.debug_scores == result2.debug_scores
 
 
-def test_beam_search_simple_child_scores_same_as_default_when_path_not_found():
+def test_beam_search_simple_child_scores_same_as_default_when_path_not_found() -> None:
     """Test that child scoring does not change the beam even on a long unsuccessful search."""
     graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
     start_state = [7, 6, 5, 4, 3, 2, 1, 0]
@@ -221,7 +222,7 @@ def test_beam_search_simple_child_scores_same_as_default_when_path_not_found():
     assert result1.debug_scores == result2.debug_scores
 
 
-def test_beam_search_simple_child_scores_q_model_parity():
+def test_beam_search_simple_child_scores_q_model_parity() -> None:
     """Test that a model with one output per generator gives the same beam as its scalar equivalent."""
     graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
     start_state = [3, 0, 2, 4, 5, 6, 7, 1]
@@ -243,7 +244,7 @@ def test_beam_search_simple_child_scores_q_model_parity():
     assert result_scalar.debug_scores == result_q.debug_scores
 
 
-def test_beam_search_simple_child_scores_wrong_number_of_outputs():
+def test_beam_search_simple_child_scores_wrong_number_of_outputs() -> None:
     """Test that a model with wrong number of outputs is reported clearly."""
     graph = CayleyGraph(PermutationGroups.lrx(8), device="cpu")
     predictor = _BrokenChildrenPredictor(graph, "zero")
@@ -254,7 +255,7 @@ def test_beam_search_simple_child_scores_wrong_number_of_outputs():
         )
 
 
-def test_beam_search_child_scores_not_supported_in_advanced_mode():
+def test_beam_search_child_scores_not_supported_in_advanced_mode() -> None:
     """Test that child scoring is rejected in "advanced" mode, where it is not implemented."""
     graph = CayleyGraph(PermutationGroups.lrx(5), device="cpu")
 
@@ -267,7 +268,7 @@ def test_beam_search_child_scores_not_supported_in_advanced_mode():
 # =============================================================================
 
 
-def test_beam_search_advanced_lrx_few_steps():
+def test_beam_search_advanced_lrx_few_steps() -> None:
     """Test advanced beam search on small LRX graph with few steps."""
     graph = CayleyGraph(PermutationGroups.lrx(5))
 
@@ -287,7 +288,7 @@ def test_beam_search_advanced_lrx_few_steps():
     assert result2.path_length == 2
 
 
-def test_beam_search_advanced_with_history_depth():
+def test_beam_search_advanced_with_history_depth() -> None:
     """Test advanced beam search with non-backtracking (history_depth > 0)."""
     graph = CayleyGraph(PermutationGroups.lrx(8))
     start_state = np.random.permutation(8)
@@ -300,7 +301,7 @@ def test_beam_search_advanced_with_history_depth():
     assert result.path_found or result.path_length == 20
 
 
-def test_beam_search_advanced_with_predictor():
+def test_beam_search_advanced_with_predictor() -> None:
     """Test advanced beam search with pretrained predictor."""
     graph = CayleyGraph(PermutationGroups.lrx(16))
     predictor = Predictor.pretrained(graph)
@@ -309,7 +310,7 @@ def test_beam_search_advanced_with_predictor():
     assert result.path_found
 
 
-def test_beam_search_advanced_matrix_groups():
+def test_beam_search_advanced_matrix_groups() -> None:
     """Test advanced beam search on matrix groups."""
     graph = CayleyGraph(MatrixGroups.heisenberg())
     start_state = [[1, 2, 3], [0, 1, 1], [0, 0, 1]]
@@ -317,7 +318,7 @@ def test_beam_search_advanced_matrix_groups():
     assert bs_result.path_found
 
 
-def test_beam_search_advanced_not_found():
+def test_beam_search_advanced_not_found() -> None:
     """Test advanced beam search when path is not found."""
     n = 50
     graph = CayleyGraph(PermutationGroups.lrx(n))
@@ -328,7 +329,7 @@ def test_beam_search_advanced_not_found():
     assert not bs_result.path_found
 
 
-def test_beam_search_advanced_verbose_output():
+def test_beam_search_advanced_verbose_output() -> None:
     """Test advanced beam search with verbose output."""
     graph = CayleyGraph(PermutationGroups.lrx(8))
     start_state = np.random.permutation(8)
@@ -344,7 +345,7 @@ def test_beam_search_advanced_verbose_output():
 # =============================================================================
 
 
-def test_beam_search_default_mode():
+def test_beam_search_default_mode() -> None:
     """Test that default beam search uses simple mode."""
     graph = CayleyGraph(PermutationGroups.lrx(5))
     start_state = [1, 0, 2, 3, 4]
@@ -368,7 +369,7 @@ def test_beam_search_default_mode():
 
 
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
-def test_beam_search_simple_lrx_32():
+def test_beam_search_simple_lrx_32() -> None:
     """Test simple beam search on large LRX(32) graph."""
     graph = CayleyGraph(PermutationGroups.lrx(32))
     predictor = Predictor.pretrained(graph)
@@ -378,7 +379,7 @@ def test_beam_search_simple_lrx_32():
 
 
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
-def test_beam_search_advanced_lrx_32():
+def test_beam_search_advanced_lrx_32() -> None:
     """Test advanced beam search on large LRX(32) graph."""
     graph = CayleyGraph(PermutationGroups.lrx(32))
     predictor = Predictor.pretrained(graph)
@@ -388,7 +389,7 @@ def test_beam_search_advanced_lrx_32():
 
 
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
-def test_beam_search_simple_cube222():
+def test_beam_search_simple_cube222() -> None:
     """Test simple beam search on 2x2x2 cube."""
     graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
     start_state = _scramble(graph, 100)
@@ -398,7 +399,7 @@ def test_beam_search_simple_cube222():
 
 
 @pytest.mark.skipif(not RUN_SLOW_TESTS, reason="slow test")
-def test_beam_search_advanced_cube222():
+def test_beam_search_advanced_cube222() -> None:
     """Test advanced beam search on 2x2x2 cube."""
     graph = CayleyGraph(prepare_graph("cube_2/2/2_6gensQTM"))
     start_state = _scramble(graph, 100)
@@ -411,7 +412,7 @@ def test_beam_search_advanced_cube222():
 # =============================================================================
 
 
-def test_beam_search_invalid_mode():
+def test_beam_search_invalid_mode() -> None:
     """Test that invalid beam_mode raises ValueError."""
     graph = CayleyGraph(PermutationGroups.lrx(5))
     start_state = [1, 0, 2, 3, 4]
@@ -420,7 +421,7 @@ def test_beam_search_invalid_mode():
         graph.beam_search(start_state=start_state, beam_mode="invalid_mode")
 
 
-def test_beam_search_advanced_with_mitm_error():
+def test_beam_search_advanced_with_mitm_error() -> None:
     """Test that advanced mode with bfs_result_for_mitm raises error."""
     graph = CayleyGraph(PermutationGroups.lrx(8))
     start_state = np.random.permutation(8)

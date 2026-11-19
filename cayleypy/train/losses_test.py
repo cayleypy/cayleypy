@@ -4,7 +4,7 @@ import torch
 from .losses import Loss, MseLoss, PinballLoss, make_loss
 
 
-def test_mse_matches_manual_computation():
+def test_mse_matches_manual_computation() -> None:
     loss = MseLoss()
     predictions = torch.tensor([1.0, 2.0, 3.0])
     targets = torch.tensor([1.5, 2.0, 5.0])
@@ -12,7 +12,7 @@ def test_mse_matches_manual_computation():
     assert torch.allclose(loss(predictions, targets), torch.tensor(4.25 / 3))
 
 
-def test_mse_matches_torch():
+def test_mse_matches_torch() -> None:
     torch.manual_seed(0)
     predictions = torch.randn(20)
     targets = torch.randn(20)
@@ -20,7 +20,7 @@ def test_mse_matches_torch():
     assert torch.allclose(MseLoss()(predictions, targets), expected)
 
 
-def test_pinball_at_half_is_half_of_mae():
+def test_pinball_at_half_is_half_of_mae() -> None:
     torch.manual_seed(0)
     predictions = torch.randn(20)
     targets = torch.randn(20)
@@ -28,7 +28,7 @@ def test_pinball_at_half_is_half_of_mae():
     assert torch.allclose(PinballLoss(0.5)(predictions, targets), expected)
 
 
-def test_pinball_matches_manual_computation():
+def test_pinball_matches_manual_computation() -> None:
     # Underestimated by 1, exact, overestimated by 2.
     predictions = torch.tensor([1.0, 2.0, 5.0])
     targets = torch.tensor([2.0, 2.0, 3.0])
@@ -38,7 +38,7 @@ def test_pinball_matches_manual_computation():
     assert torch.allclose(loss(predictions, targets), expected.mean())
 
 
-def test_pinball_penalizes_underestimation_more_when_tau_is_large():
+def test_pinball_penalizes_underestimation_more_when_tau_is_large() -> None:
     loss = PinballLoss(0.9)
     target = torch.tensor([10.0])
     underestimate = loss(torch.tensor([9.0]), target)
@@ -51,7 +51,7 @@ def test_pinball_penalizes_underestimation_more_when_tau_is_large():
     assert torch.allclose(loss(torch.tensor([11.0]), target), torch.tensor(0.9))
 
 
-def test_pinball_is_minimized_at_the_quantile():
+def test_pinball_is_minimized_at_the_quantile() -> None:
     loss = PinballLoss(0.75)
     targets = torch.arange(1, 11).float()
     candidates = torch.arange(1, 11).float()
@@ -60,7 +60,7 @@ def test_pinball_is_minimized_at_the_quantile():
     assert float(candidates[int(torch.argmin(losses))]) == 8.0
 
 
-def test_mask_ignores_unlabeled_elements():
+def test_mask_ignores_unlabeled_elements() -> None:
     loss = MseLoss()
     predictions = torch.tensor([[1.0, 2.0], [3.0, 4.0]])
     targets = torch.tensor([[2.0, 1e9], [-1e9, 6.0]])
@@ -69,7 +69,7 @@ def test_mask_ignores_unlabeled_elements():
     assert torch.allclose(loss(predictions, targets, mask=mask), torch.tensor(2.5))
 
 
-def test_mask_can_be_numeric():
+def test_mask_can_be_numeric() -> None:
     loss = MseLoss()
     predictions = torch.tensor([[1.0, 2.0]])
     targets = torch.tensor([[2.0, 100.0]])
@@ -79,7 +79,7 @@ def test_mask_can_be_numeric():
 
 
 @pytest.mark.parametrize("bad_target", [float("nan"), float("inf"), float("-inf")])
-def test_mask_ignores_non_finite_targets_of_unlabeled_elements(bad_target):
+def test_mask_ignores_non_finite_targets_of_unlabeled_elements(bad_target: float) -> None:
     """Targets of unlabeled elements are documented to be arbitrary, and that includes non-finite ones."""
     loss = MseLoss()
     predictions = torch.zeros((2, 2), requires_grad=True)
@@ -94,7 +94,7 @@ def test_mask_ignores_non_finite_targets_of_unlabeled_elements(bad_target):
     assert float(predictions.grad[0, 1]) == 0.0
 
 
-def test_mask_magnitude_does_not_reweight_labeled_elements():
+def test_mask_magnitude_does_not_reweight_labeled_elements() -> None:
     """Nonzero in a mask means "labeled" and nothing else, so a 2 must not count an element twice."""
     loss = MseLoss()
     predictions = torch.zeros(2)
@@ -103,7 +103,7 @@ def test_mask_magnitude_does_not_reweight_labeled_elements():
     assert torch.allclose(loss(predictions, targets, mask=torch.tensor([1.0, 2.0])), indicator)
 
 
-def test_fully_masked_batch_gives_zero_loss_in_half_precision():
+def test_fully_masked_batch_gives_zero_loss_in_half_precision() -> None:
     """The lower bound on the denominator has to be representable in the dtype of the predictions."""
     loss = MseLoss()
     predictions = torch.zeros((1, 2), dtype=torch.float16)
@@ -111,7 +111,7 @@ def test_fully_masked_batch_gives_zero_loss_in_half_precision():
     assert float(loss(predictions, targets, mask=torch.zeros((1, 2), dtype=torch.float16))) == 0.0
 
 
-def test_mask_blocks_gradient():
+def test_mask_blocks_gradient() -> None:
     predictions = torch.tensor([[1.0, 2.0, 3.0]], requires_grad=True)
     targets = torch.tensor([[2.0, 1e9, 1e9]])
     mask = torch.tensor([[True, False, False]])
@@ -122,7 +122,7 @@ def test_mask_blocks_gradient():
     assert float(predictions.grad[0, 2]) == 0.0
 
 
-def test_fully_masked_batch_gives_zero_loss_and_zero_gradient():
+def test_fully_masked_batch_gives_zero_loss_and_zero_gradient() -> None:
     for loss in [MseLoss(), PinballLoss(0.7)]:
         predictions = torch.tensor([[1.0, 2.0]], requires_grad=True)
         targets = torch.tensor([[5.0, 5.0]])
@@ -134,7 +134,7 @@ def test_fully_masked_batch_gives_zero_loss_and_zero_gradient():
         assert torch.equal(predictions.grad, torch.zeros((1, 2)))
 
 
-def test_weights_give_weighted_mean():
+def test_weights_give_weighted_mean() -> None:
     loss = MseLoss()
     predictions = torch.tensor([1.0, 2.0])
     targets = torch.tensor([2.0, 4.0])
@@ -145,7 +145,7 @@ def test_weights_give_weighted_mean():
     assert torch.allclose(loss(predictions, targets, weights=weights * 10), torch.tensor(7.0 / 4))
 
 
-def test_weights_combine_with_mask():
+def test_weights_combine_with_mask() -> None:
     loss = MseLoss()
     predictions = torch.tensor([1.0, 2.0, 3.0])
     targets = torch.tensor([2.0, 4.0, 1e9])
@@ -154,7 +154,7 @@ def test_weights_combine_with_mask():
     assert torch.allclose(loss(predictions, targets, mask=mask, weights=weights), torch.tensor(7.0 / 4))
 
 
-def test_works_on_q_shaped_predictions():
+def test_works_on_q_shaped_predictions() -> None:
     loss = MseLoss()
     predictions = torch.zeros((7, 3))
     targets = torch.ones((7, 3))
@@ -163,7 +163,7 @@ def test_works_on_q_shaped_predictions():
     assert float(value) == 1.0
 
 
-def test_accepts_integer_targets():
+def test_accepts_integer_targets() -> None:
     # Exact distances computed by BFS are integers.
     predictions = torch.tensor([1.0, 2.0])
     targets = torch.tensor([2, 2], dtype=torch.int64)
@@ -171,17 +171,19 @@ def test_accepts_integer_targets():
     assert torch.allclose(PinballLoss(0.5)(predictions, targets), torch.tensor(0.25))
 
 
-def test_make_loss():
+def test_make_loss() -> None:
     assert isinstance(make_loss("mse"), MseLoss)
     pinball = make_loss("pinball", tau=0.9)
     assert isinstance(pinball, PinballLoss)
     assert pinball.tau == 0.9
-    assert make_loss("pinball").tau == 0.5  # type: ignore[attr-defined]
+    default_pinball = make_loss("pinball")
+    assert isinstance(default_pinball, PinballLoss)
+    assert default_pinball.tau == 0.5
     predictions, targets = torch.tensor([1.0]), torch.tensor([2.0])
     assert torch.equal(make_loss("mse")(predictions, targets), MseLoss()(predictions, targets))
 
 
-def test_training_reduces_loss():
+def test_training_reduces_loss() -> None:
     for loss in [MseLoss(), PinballLoss(0.5), PinballLoss(0.9)]:
         torch.manual_seed(42)
         prediction = torch.zeros(1, requires_grad=True)
@@ -197,7 +199,7 @@ def test_training_reduces_loss():
         assert abs(float(prediction.detach()) - 3.0) < 0.1
 
 
-def test_masked_training_updates_only_labeled_outputs():
+def test_masked_training_updates_only_labeled_outputs() -> None:
     # Emulates training a Q-model where only one output per state is labeled.
     torch.manual_seed(42)
     predictions = torch.zeros((1, 2), requires_grad=True)
@@ -212,23 +214,23 @@ def test_masked_training_updates_only_labeled_outputs():
     assert float(predictions[0, 1].detach()) == 0.0
 
 
-def test_loss_is_abstract():
+def test_loss_is_abstract() -> None:
     with pytest.raises(TypeError):
-        Loss()  # type: ignore[abstract]  # pylint: disable=abstract-class-instantiated
+        Loss()  # pyright: ignore[reportAbstractUsage]  # pylint: disable=abstract-class-instantiated
 
 
-def test_pinball_rejects_tau_outside_unit_interval():
+def test_pinball_rejects_tau_outside_unit_interval() -> None:
     for tau in [0.0, 1.0, -0.5, 1.5, float("nan")]:
         with pytest.raises(ValueError, match="tau must be strictly between 0 and 1"):
             PinballLoss(tau)
 
 
-def test_make_loss_rejects_unknown_name():
+def test_make_loss_rejects_unknown_name() -> None:
     with pytest.raises(ValueError, match="Unknown loss"):
         make_loss("huber")
 
 
-def test_rejects_targets_of_wrong_shape():
+def test_rejects_targets_of_wrong_shape() -> None:
     with pytest.raises(ValueError, match=r"Shape of targets is \(3,\)"):
         MseLoss()(torch.zeros(2), torch.zeros(3))
     with pytest.raises(ValueError, match="same as shape of predictions"):
@@ -236,11 +238,11 @@ def test_rejects_targets_of_wrong_shape():
         PinballLoss()(torch.zeros((2, 3)), torch.zeros((3, 2)))
 
 
-def test_rejects_mask_of_wrong_shape():
+def test_rejects_mask_of_wrong_shape() -> None:
     with pytest.raises(ValueError, match=r"Shape of mask is \(2, 1\)"):
         MseLoss()(torch.zeros((2, 3)), torch.zeros((2, 3)), mask=torch.ones((2, 1)))
 
 
-def test_rejects_weights_of_wrong_shape():
+def test_rejects_weights_of_wrong_shape() -> None:
     with pytest.raises(ValueError, match=r"Shape of weights is \(2,\)"):
         MseLoss()(torch.zeros((2, 3)), torch.zeros((2, 3)), weights=torch.ones(2))

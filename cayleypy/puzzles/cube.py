@@ -61,11 +61,11 @@ def generate_cube_permutations_oneline(n: int) -> Dict[str, str]:
     n_squared = n * n
     total_stickers = 6 * n_squared
 
-    def get_sticker_index(face_name, row, col):
+    def get_sticker_index(face_name: str, row: int, col: int) -> int:
         face_idx = face_map[face_name]
         return face_idx * n_squared + row * n + col
 
-    def rotate_face_cw(face_name):
+    def rotate_face_cw(face_name: str) -> list[tuple[int, ...]]:
         cycles = []
         permuted = [False] * n_squared
         for r_start in range(n):
@@ -244,11 +244,11 @@ def get_atm_metric_moves(n: int) -> Dict[str, list[int]]:
     if not base_slice_perms_str:
         return {}
     total_stickers = 6 * n * n
-    axis_slice_perms = {
+    axis_slice_perms: dict[str, list[dict[str, list[int]]]] = {
         "X": [],  # r0, r1, ...
         "Y": [],  # r0, r1, ...
         "Z": [],  # r0, r1, ...
-    }  # type: dict[str, list[dict[str, list[int]]]]
+    }
     slice_names_x = sorted([k for k in base_slice_perms_str if k.startswith("r")], key=lambda x: int(x[1:]))
     slice_names_y = sorted([k for k in base_slice_perms_str if k.startswith("d")], key=lambda x: int(x[1:]))
     slice_names_z = sorted([k for k in base_slice_perms_str if k.startswith("f")], key=lambda x: int(x[1:]))
