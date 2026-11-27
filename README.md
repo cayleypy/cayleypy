@@ -5,6 +5,8 @@ Supporting:  Cayley graphs, Schreier coset graphs, more to be added.
 
 The broader [CayleyPy project](https://cayleypy.github.io/) includes research papers, seminars, benchmarks, and collaborative “Polymath”-style problem solving by humans and AI.
 
+The CayleyPy [scientific advisory board](https://cayleypy.github.io/scientific-advisory-board/) includes leading researchers in mathematics and physics, among them two Fields Medalists.
+
 ## Overview
 
 Extremely large graphs (e.g. googol size, ~10<sup>100</sup> nodes) cannot be approached in a usual way,
