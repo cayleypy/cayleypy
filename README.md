@@ -3,6 +3,8 @@
 AI-based library to work with extremely large graphs.<br>
 Supporting:  Cayley graphs, Schreier coset graphs, more to be added.
 
+The broader [CayleyPy project](https://cayleypy.github.io/) includes research papers, seminars, benchmarks, and collaborative “Polymath”-style problem solving by humans and AI.
+
 ## Overview
 
 Extremely large graphs (e.g. googol size, ~10<sup>100</sup> nodes) cannot be approached in a usual way,
